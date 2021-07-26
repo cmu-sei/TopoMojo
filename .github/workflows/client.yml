@@ -1,0 +1,53 @@
+name: Build Client Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      clientVersion:
+        description: 'Version of the Client package'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '3.1.x'
+
+      - name: Setup Package Name
+        id: package_name
+        run: |
+          echo ::set-output name=client_name::TopoMojo.Api.Client
+          echo ::set-output name=api_name::TopoMojo.Api
+          echo ::set-output name=source_path::src
+
+      - uses: actions/checkout@v2
+
+      - name: Build Package
+        run: |
+          cd ${{ steps.package_name.outputs.source_path }}/${{ steps.package_name.outputs.api_name }}
+          dotnet tool restore
+          dotnet build -c Release /p:version=${{ github.event.inputs.clientVersion }}
+
+      - name: Run Swagger
+        run: |
+          cd ${{ steps.package_name.outputs.source_path }}/${{ steps.package_name.outputs.api_name }}
+          dotnet swagger tofile --output ../${{ steps.package_name.outputs.client_name }}/openapi.json bin/Release/*/${{ steps.package_name.outputs.api_name }}.dll v1
+
+      - name: Run NSwag
+        run: |
+          cd ${{ steps.package_name.outputs.source_path }}/${{ steps.package_name.outputs.client_name }}
+          npm install nswag@13.11.3
+          ./node_modules/.bin/nswag run /runtime:NetCore31
+
+      - name: Create NuGet Package
+        run: |
+          dotnet pack ${{ steps.package_name.outputs.source_path }}/${{ steps.package_name.outputs.client_name }} -c Release /p:version=${{ github.event.inputs.clientVersion }} --include-source -o ./
+
+      - name: Publish to Nuget.org as Unlisted
+        run: |
+          dotnet nuget push ${{ steps.package_name.outputs.client_name }}.${{ github.event.inputs.clientVersion }}.nupkg -k ${{ secrets.NUGET_APIKEY }} -s https://api.nuget.org/v3/index.json
+          # dotnet nuget delete ${{ steps.package_name.outputs.client_name }} ${{ github.event.inputs.clientVersion }} --non-interactive -k ${{ secrets.NUGET_APIKEY_UNLIST }} -s https://api.nuget.org/v3/index.json
