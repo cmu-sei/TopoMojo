@@ -12,7 +12,7 @@
     <Company>Carnegie Mellon University</Company>
     <Copyright>Copyright 2021 Carnegie Mellon University.</Copyright>
     <PackageId>TopoMojo.Api.Client</PackageId>
-    <PackageLicenseExpression>BSD-3-CLAUSE</PackageLicenseExpression>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/cmu-sei/TopoMojo</RepositoryUrl>
   </PropertyGroup>
 
