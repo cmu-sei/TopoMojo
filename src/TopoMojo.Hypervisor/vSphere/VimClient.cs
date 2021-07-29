@@ -1003,9 +1003,10 @@ namespace TopoMojo.Hypervisor.vSphere
                 if (subpools != null && subpools.Length > 0)
                     _pool = subpools.First();
 
-                if (_config.Uplink.StartsWith("nsx."))
+                if (_config.IsNsxNetwork || _config.Uplink.StartsWith("nsx."))
                 {
                     _netman = new NsxNetworkManager(
+                        _logger,
                         netSettings,
                         _vmCache,
                         _vlanman,

@@ -22,13 +22,17 @@ namespace TopoMojo.Hypervisor
         public VlanConfiguration Vlan { get; set; } = new VlanConfiguration();
         public int KeepAliveMinutes { get; set; } = 10;
         public string ExcludeNetworkMask { get; set; } = "topomojo";
+        public bool IsNsxNetwork { get; set; }
         public SddcConfiguration Sddc { get; set; } = new SddcConfiguration();
     }
 
     public class SddcConfiguration
     {
-        public string Url { get; set; }
+        public string ApiUrl { get; set; }
+        public string MetadataUrl { get; set; }
+        public string SegmentApiPath { get; set; } = "policy/api/v1/infra/tier-1s/cgw/segments";
         public string AuthUrl { get; set; }
+        public string AuthTokenHeader { get; set; } = "csp-auth-token";
         public string OrgId { get; set; }
         public string SddcId { get; set; }
         public string ApiKey { get; set; }

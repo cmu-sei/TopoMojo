@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using NetVimClient;
 using TopoMojo.Hypervisor.Extensions;
 
@@ -20,20 +21,26 @@ namespace TopoMojo.Hypervisor.vSphere
     public class NsxNetworkManager : NetworkManager
     {
         public NsxNetworkManager(
+            ILogger logger,
             VimReferences settings,
             ConcurrentDictionary<string, Vm> vmCache,
             VlanManager vlanManager,
             SddcConfiguration sddcConfig
         ) : base(settings, vmCache, vlanManager)
         {
+            _logger = logger;
             _config = sddcConfig;
+            _apiUrl = _config.ApiUrl;
+            _apiSegments = _config.SegmentApiPath;
         }
+
+        public ILogger _logger { get; }
 
         private readonly SddcConfiguration _config;
         private HttpClient _sddc;
         private DateTimeOffset authExpiration = DateTimeOffset.MinValue;
-        private string _apiUrl = "";
-        private string _apiSegments = "policy/api/v1/infra/tier-1s/cgw/segments";
+        private string _apiUrl;
+        private string _apiSegments;
         // private string authToken = "";
 
         private async Task InitClient()
@@ -64,6 +71,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private void InitClientWithCertificate()
         {
+            _logger.LogDebug($"NSX auth with certificate {_config.CertificatePath}");
+
             var clientcert = new X509Certificate2(
                 _config.CertificatePath,
                 _config.CertificatePassword,
@@ -84,6 +93,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private async Task InitClientViaRest()
         {
+            _logger.LogDebug($"NSX auth with rest to {_config.AuthUrl}");
+
             if (DateTimeOffset.UtcNow.CompareTo(authExpiration) < 0)
                 return;
 
@@ -111,14 +122,16 @@ namespace TopoMojo.Hypervisor.vSphere
 
             authExpiration = DateTimeOffset.UtcNow.AddSeconds(auth.expires_in);
 
-            _sddc.DefaultRequestHeaders.Add("csp-auth-token", auth.access_token);
+            _sddc.DefaultRequestHeaders.Add(_config.AuthTokenHeader, auth.access_token);
 
-            string meta = await _sddc.GetStringAsync(_config.Url);
+            if (!string.IsNullOrEmpty(_config.MetadataUrl))
+            {
+                string meta = await _sddc.GetStringAsync(_config.MetadataUrl);
 
-            var sddc = JsonSerializer.Deserialize<SddcResponse>(meta);
+                var sddc = JsonSerializer.Deserialize<SddcResponse>(meta);
 
-            _apiUrl = sddc.resource_config.nsx_api_public_endpoint_url;
-
+                _apiUrl = sddc.resource_config.nsx_api_public_endpoint_url;
+            }
         }
 
         public override async Task<PortGroupAllocation> AddPortGroup(string sw, VmNet eth)
