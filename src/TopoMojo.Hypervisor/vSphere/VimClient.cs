@@ -42,7 +42,7 @@ namespace TopoMojo.Hypervisor.vSphere
         private ConcurrentDictionary<string, Vm> _vmCache;
         private Dictionary<string, PortGroupAllocation> _pgAllocation;
         Dictionary<string, TaskInfo> _taskMap = new Dictionary<string, TaskInfo>();
-        Dictionary<string, string> _dsnsMap = new Dictionary<string, string>();
+        ConcurrentDictionary<string, string> _dsnsMap = new ConcurrentDictionary<string, string>();
         private INetworkManager _netman;
         HypervisorServiceConfiguration _config = null;
         VimPortTypeClient _vim = null;
@@ -523,7 +523,7 @@ namespace TopoMojo.Hypervisor.vSphere
                             target
                         );
 
-                        _dsnsMap.Add(target, result.Replace(summary.url, ""));
+                        _dsnsMap.TryAdd(target, result.Replace(summary.url, ""));
                     }
 
                     dsPath.TopLevelFolder = _dsnsMap[target];
@@ -554,7 +554,7 @@ namespace TopoMojo.Hypervisor.vSphere
                         try {
 
                             if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {spec.matchPattern}");
+                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {pattern}");
 
                             task = await _vim.SearchDatastoreSubFolders_TaskAsync(
                                 dsBrowser, dsPath.FolderPath, spec
@@ -563,7 +563,7 @@ namespace TopoMojo.Hypervisor.vSphere
                             info = await WaitForVimTask(task);
 
                             if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {spec.matchPattern}; found {((HostDatastoreBrowserSearchResults[])info.result)?.Length}");
+                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {pattern}; found {((HostDatastoreBrowserSearchResults[])info.result)?.Length}");
 
                             if (info.result != null)
                                 results.AddRange((HostDatastoreBrowserSearchResults[])info.result);
@@ -577,7 +577,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     else
                     {
                         if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching {dsPath.FolderPath} for {spec.matchPattern}");
+                                _logger.LogDebug($"searching {dsPath.FolderPath} for {pattern}");
 
                         task = await _vim.SearchDatastore_TaskAsync(
                             dsBrowser, dsPath.FolderPath, spec
@@ -586,7 +586,7 @@ namespace TopoMojo.Hypervisor.vSphere
                         info = await WaitForVimTask(task);
 
                         if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching {dsPath.FolderPath} for {spec.matchPattern}; found {((HostDatastoreBrowserSearchResults[])info.result)?.Length}");
+                                _logger.LogDebug($"searching {dsPath.FolderPath} for {pattern}; found {((HostDatastoreBrowserSearchResults[])info.result)?.Length}");
 
                         if (info.result != null)
                             results.Add((HostDatastoreBrowserSearchResults)info.result);
@@ -600,6 +600,10 @@ namespace TopoMojo.Hypervisor.vSphere
                             if (result != null && result.file != null && result.file.Length > 0)
                             {
                                 string fp = result.folderPath;
+
+                                if (_config.DebugVerbose)
+                                    _logger.LogDebug($"search datastore found {list.Count} results.");
+
                                 if (oldRoot.HasValue())
                                     fp = fp.Replace(dsPath.TopLevelFolder, oldRoot);
 
@@ -607,6 +611,14 @@ namespace TopoMojo.Hypervisor.vSphere
                                     fp += "/";
 
                                 list.AddRange(result.file.Select(o => fp + o.path));
+
+                                if (_config.DebugVerbose)
+                                {
+                                    foreach (var s in list)
+                                    {
+                                        _logger.LogDebug($"added file result {s}");
+                                    }
+                                }
                             }
                         }
                     }
@@ -616,6 +628,10 @@ namespace TopoMojo.Hypervisor.vSphere
                     }
                 }
             }
+
+            if (_config.DebugVerbose)
+                _logger.LogDebug($"search datastore found {list.Count} results.");
+
             return list.ToArray();
         }
 
