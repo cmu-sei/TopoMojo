@@ -505,40 +505,46 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 var summary = obj.propSet[2].val as DatastoreSummary;
 
-                // if topLevelDirectory not supported (vsan), map from directory name to guid)
-                if (
-                    capability.topLevelDirectoryCreateSupportedSpecified
-                    && !capability.topLevelDirectoryCreateSupported
-                    && dsPath.TopLevelFolder.HasValue()
-                )
-                {
-                    oldRoot = dsPath.TopLevelFolder;
-                    string target = summary.url + oldRoot;
-
-                    if (!_dsnsMap.ContainsKey(target))
-                    {
-                        var result = await _vim.ConvertNamespacePathToUuidPathAsync(
-                            _dsns,
-                            _datacenter,
-                            target
-                        );
-
-                        _dsnsMap.TryAdd(target, result.Replace(summary.url, ""));
-                    }
-
-                    dsPath.TopLevelFolder = _dsnsMap[target];
-
-                    // vmcloud sddc errors on Search_Datastore()
-                    // so force SearchDatastoreSubFolders()
-                    recursive = true;
-                    pattern = "*" + Path.GetExtension(dsPath.File);
-
-                    _logger.LogDebug("mapped datastore namespace: " + dsPath.ToString());
-
-                }
-
                 if (summary.name == dsPath.Datastore)
                 {
+                    // if topLevelDirectory not supported (vsan), map from directory name to guid)
+                    if (
+                        capability.topLevelDirectoryCreateSupportedSpecified
+                        && !capability.topLevelDirectoryCreateSupported
+                        && dsPath.TopLevelFolder.HasValue()
+                    )
+                    {
+                        try
+                        {
+                            oldRoot = dsPath.TopLevelFolder;
+                            string target = summary.url + oldRoot;
+
+                            if (!_dsnsMap.ContainsKey(target))
+                            {
+                                var result = await _vim.ConvertNamespacePathToUuidPathAsync(
+                                    _dsns,
+                                    _datacenter,
+                                    target
+                                );
+
+                                _dsnsMap.TryAdd(target, result.Replace(summary.url, ""));
+                            }
+
+                            dsPath.TopLevelFolder = _dsnsMap[target];
+
+                            // vmcloud sddc errors on Search_Datastore()
+                            // so force SearchDatastoreSubFolders()
+                            recursive = true;
+                            pattern = "*" + Path.GetExtension(dsPath.File);
+
+                            _logger.LogDebug("mapped datastore namespace: " + dsPath.ToString());
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "error processing vsan toplevel folder");
+                        }
+                    }
+
                     ManagedObjectReference task = null;
                     TaskInfo info = null;
 
