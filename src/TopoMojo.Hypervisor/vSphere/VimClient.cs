@@ -553,11 +553,17 @@ namespace TopoMojo.Hypervisor.vSphere
                     {
                         try {
 
+                            if (_config.DebugVerbose)
+                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {spec.matchPattern}");
+
                             task = await _vim.SearchDatastoreSubFolders_TaskAsync(
                                 dsBrowser, dsPath.FolderPath, spec
                             );
 
                             info = await WaitForVimTask(task);
+
+                            if (_config.DebugVerbose)
+                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {spec.matchPattern}; found {((HostDatastoreBrowserSearchResults[])info.result)?.Length}");
 
                             if (info.result != null)
                                 results.AddRange((HostDatastoreBrowserSearchResults[])info.result);
@@ -570,31 +576,43 @@ namespace TopoMojo.Hypervisor.vSphere
                     }
                     else
                     {
+                        if (_config.DebugVerbose)
+                                _logger.LogDebug($"searching {dsPath.FolderPath} for {spec.matchPattern}");
+
                         task = await _vim.SearchDatastore_TaskAsync(
                             dsBrowser, dsPath.FolderPath, spec
                         );
 
                         info = await WaitForVimTask(task);
 
+                        if (_config.DebugVerbose)
+                                _logger.LogDebug($"searching {dsPath.FolderPath} for {spec.matchPattern}; found {((HostDatastoreBrowserSearchResults[])info.result)?.Length}");
+
                         if (info.result != null)
                             results.Add((HostDatastoreBrowserSearchResults)info.result);
 
                     }
 
-                    foreach (HostDatastoreBrowserSearchResults result in results)
+                    try
                     {
-                        if (result != null && result.file != null && result.file.Length > 0)
+                        foreach (HostDatastoreBrowserSearchResults result in results)
                         {
-                            string fp = result.folderPath;
-                            if (oldRoot.HasValue())
-                                fp = fp.Replace(dsPath.TopLevelFolder, oldRoot);
+                            if (result != null && result.file != null && result.file.Length > 0)
+                            {
+                                string fp = result.folderPath;
+                                if (oldRoot.HasValue())
+                                    fp = fp.Replace(dsPath.TopLevelFolder, oldRoot);
 
-                            if (!fp.EndsWith("/"))
-                                fp += "/";
+                                if (!fp.EndsWith("/"))
+                                    fp += "/";
 
-                            list.AddRange(result.file.Select(o => fp + o.path));
+                                list.AddRange(result.file.Select(o => fp + o.path));
+                            }
                         }
-
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "error processing datastore search results.");
                     }
                 }
             }
@@ -743,6 +761,9 @@ namespace TopoMojo.Hypervisor.vSphere
                 //increment timeout counter
                 i++;
                 //_idle = 0;
+
+                if (_config.DebugVerbose)
+                    _logger.LogDebug($"waiting for vim task ({task.Value})...state = {info.state}");
 
                 //check for status updates until the task is complete
             } while ((info.state == TaskInfoState.running || info.state == TaskInfoState.queued));
