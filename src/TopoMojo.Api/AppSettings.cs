@@ -152,6 +152,8 @@ namespace TopoMojo.Api
         public string ConsoleHost { get; set; }
         public string LaunchUrl { get; set; } = "/lp";
         public string DocPath { get; set; } = "wwwroot/docs";
+        public bool TrustAllCerts { get; set; }
+        public List<string> TrustedCertHashes { get; set; } = new List<string>();
         public JanitorOptions Expirations { get; set; } = new JanitorOptions();
 
     }

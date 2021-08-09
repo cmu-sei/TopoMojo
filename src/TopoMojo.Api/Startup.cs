@@ -2,6 +2,8 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.IO;
+using System.Net;
+using System.Net.Security;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
@@ -93,6 +95,18 @@ namespace TopoMojo.Api
             services.AddConfiguredAuthentication(Settings.Oidc);
             services.AddConfiguredAuthorization();
 
+            // Allow valid and specified remote certificates
+            ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, error) => {
+                if (error == SslPolicyErrors.None)
+                    return true;
+
+                return
+                    Settings.Core.TrustAllCerts ||
+                    Settings.Core.TrustedCertHashes.Contains(
+                        cert.GetCertHashString()
+                    )
+                ;
+            };
         }
 
         public void Configure(IApplicationBuilder app)
