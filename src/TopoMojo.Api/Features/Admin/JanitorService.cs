@@ -39,37 +39,36 @@ namespace TopoMojo.Api.Services
 
         public async Task EndExpired()
         {
-            try {
-                var ts = DateTimeOffset.UtcNow;
+            var ts = DateTimeOffset.UtcNow;
 
-                var unended = await _gamespaceStore.List()
-                    .Where(g => g.EndTime == DateTimeOffset.MinValue)
-                    .ToListAsync()
-                ;
+            var unended = await _gamespaceStore.List()
+                .Where(g => g.EndTime == DateTimeOffset.MinValue)
+                .ToListAsync()
+            ;
 
-                var expired = unended
-                    .Where(g =>
-                        g.ExpirationTime.AddMinutes(g.CleanupGraceMinutes) < ts
-                    )
-                    .ToArray()
-                ;
+            var expired = unended
+                .Where(g =>
+                    g.ExpirationTime.AddMinutes(g.CleanupGraceMinutes) < ts
+                )
+                .ToArray()
+            ;
 
-                foreach (var gs in expired)
+            foreach (var gs in expired)
+            {
+                try
                 {
                     _logger.LogInformation($"Ending expired gamespace {gs.Id}");
 
                     gs.EndTime = gs.ExpirationTime;
+
+                    await _gamespaceStore.Update(gs);
+
+                    await _pod.DeleteAll(gs.Id);
                 }
-
-                await _gamespaceStore.Update(expired);
-
-                await RemoveVms(
-                    expired.Select(g => g.Id).ToArray()
-                );
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to expire gamespaces");
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to expire gamespace {gs.Id}");
+                }
             }
         }
 
