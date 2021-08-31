@@ -236,6 +236,16 @@ namespace TopoMojo.Api.Controllers
             return Ok();
         }
 
+        [HttpGet("api/report/disks")]
+        [SwaggerOperation(OperationId = "AttachedDisksReport")]
+        [Authorize(AppConstants.AdminOnlyPolicy)]
+        public async Task<ActionResult> AttachedDisksReport()
+        {
+            return Ok(
+                await _svc.DiskReport()
+            );
+        }
+
         private void SendBroadcast(Template template, string action)
         {
             Hub.Clients

@@ -227,5 +227,20 @@ namespace TopoMojo.Api.Services
 
             return map;
         }
+
+        public async Task<string[]> DiskReport()
+        {
+            var list =  await _store.List().ToArrayAsync();
+
+            return list
+                .SelectMany(t =>
+                    new TemplateUtility(t.Detail, "").AsTemplate().Disks
+                )
+                .Select(d => d.Path.Replace("[ds] ", ""))
+                .Distinct()
+                .OrderBy(x => x)
+                .ToArray()
+            ;
+        }
     }
 }
