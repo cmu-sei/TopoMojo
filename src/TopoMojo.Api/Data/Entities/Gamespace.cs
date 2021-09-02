@@ -19,6 +19,7 @@ namespace TopoMojo.Api.Data
         public DateTimeOffset EndTime { get; set; }
         public DateTimeOffset ExpirationTime { get; set; }
         public int CleanupGraceMinutes { get; set; }
+        public bool Cleaned { get; set; }
         public bool AllowReset { get; set; }
         public string Challenge { get; set; }
         public string WorkspaceId { get; set; }

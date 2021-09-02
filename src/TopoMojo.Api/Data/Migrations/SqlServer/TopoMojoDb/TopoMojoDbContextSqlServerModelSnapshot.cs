@@ -59,6 +59,9 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                     b.Property<string>("Challenge")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("Cleaned")
+                        .HasColumnType("bit");
+
                     b.Property<int>("CleanupGraceMinutes")
                         .HasColumnType("int");
 

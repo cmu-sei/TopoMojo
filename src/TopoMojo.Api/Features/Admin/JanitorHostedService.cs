@@ -64,6 +64,7 @@ namespace TopoMojo.HostedServices
 
                 // run every period
                 janitor.EndExpired().Wait();
+                janitor.CleanupEndedGamespaces().Wait();
 
                 // run after multiple periods (intermittently)
                 if (periodCount >= periodMax)

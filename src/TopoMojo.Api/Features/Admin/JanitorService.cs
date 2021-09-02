@@ -54,20 +54,35 @@ namespace TopoMojo.Api.Services
             ;
 
             foreach (var gs in expired)
+                gs.EndTime = gs.ExpirationTime;
+
+            await _gamespaceStore.Update(expired);
+        }
+
+        public async Task CleanupEndedGamespaces()
+        {
+            var ts = DateTimeOffset.UtcNow;
+
+            var ended = await _gamespaceStore.List()
+                .Where(g => g.EndTime > DateTimeOffset.MinValue && !g.Cleaned)
+                .ToListAsync()
+            ;
+
+            foreach (var gs in ended)
             {
                 try
                 {
-                    _logger.LogInformation($"Ending expired gamespace {gs.Id}");
-
-                    gs.EndTime = gs.ExpirationTime;
-
-                    await _gamespaceStore.Update(gs);
+                    _logger.LogInformation($"Cleaning ended gamespace {gs.Id}");
 
                     await _pod.DeleteAll(gs.Id);
+
+                    gs.Cleaned = true;
+
+                    await _gamespaceStore.Update(gs);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Failed to expire gamespace {gs.Id}");
+                    _logger.LogError(ex, $"Failed to clean gamespace {gs.Id}");
                 }
             }
         }
@@ -99,6 +114,9 @@ namespace TopoMojo.Api.Services
             bool dryrun
         )
         {
+            // Force dry-run pending further thought
+            dryrun = true;
+
             var items = new List<JanitorReport>();
 
             var workspaces = (await _workspaceStore.DeleteStale(
@@ -126,15 +144,15 @@ namespace TopoMojo.Api.Services
 
         public async Task<JanitorReport[]> CleanupIdleWorkspaceVms(JanitorOptions options)
         {
-            DateTimeOffset staleDate = options.IdleWorkspaceVmsExpiration.ToDatePast();
-            DateTimeOffset activeDate = staleDate.AddSeconds(
+            DateTimeOffset keepAliveDate = options.IdleWorkspaceVmsExpiration.ToDatePast();
+            DateTimeOffset previousWindow = keepAliveDate.AddSeconds(
                 -options.IdleWorkspaceVmsExpiration.ToSeconds()
             );
 
             var workspaces = await _workspaceStore.List()
                 .Where(w =>
-                    w.LastActivity > activeDate
-                    && w.LastActivity < staleDate
+                    w.LastActivity > previousWindow
+                    && w.LastActivity < keepAliveDate
                 )
                 .ToArrayAsync();
 

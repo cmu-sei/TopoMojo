@@ -185,7 +185,8 @@ namespace TopoMojo.Api.Services
                 await _store.Update(ctx.Gamespace);
             }
 
-            await _pod.DeleteAll(id);
+            // let janitor clean up
+            // await _pod.DeleteAll(id);
 
             return await LoadState(ctx.Gamespace);
         }
@@ -647,7 +648,6 @@ namespace TopoMojo.Api.Services
             )
             {
                 ctx.Gamespace.EndTime = ts;
-                await Stop(ctx.Gamespace.Id);
             }
 
             await _store.Update(ctx.Gamespace);

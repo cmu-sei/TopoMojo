@@ -131,6 +131,13 @@ namespace TopoMojo.Api.Controllers
             return Ok(await _janitor.Cleanup(options));
         }
 
+        [HttpPost("api/admin/janitor/idlewsvms")]
+        [SwaggerOperation(OperationId = "RunJanitorCleanupIdleWorkspaceVms")]
+        public async Task<ActionResult<JanitorReport[]>> RunJanitorCleanupIdleWorkspaceVms([FromBody]JanitorOptions options = null)
+        {
+            return Ok(await _janitor.CleanupIdleWorkspaceVms(options));
+        }
+
         [HttpGet("api/admin/log")]
         [SwaggerOperation(OperationId = "GetAdminLog")]
         public ActionResult<TimestampedException[]> GetAdminLog([FromQuery]string since)
