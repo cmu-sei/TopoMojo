@@ -131,10 +131,16 @@ namespace TopoMojo.Api.Data
 
         public async Task<bool> IsBelowGamespaceLimit(string subjectId, int limit)
         {
-            return
-                limit == 0 ||
-                limit > await DbSet.CountAsync(g => g.ManagerId == subjectId)
-            ;
+            if (limit == 0)
+                return true;
+
+            int active = await DbSet.CountAsync(g =>
+                g.ManagerId == subjectId &&
+                g.StartTime > DateTimeOffset.MinValue &&
+                g.EndTime == DateTimeOffset.MinValue
+            );
+
+            return active < limit;
         }
 
         public async Task<Player> FindPlayer(string id, string subjectId)
