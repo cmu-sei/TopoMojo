@@ -15,6 +15,9 @@ namespace TopoMojo.Api
             CreateMap<Data.Gamespace, Gamespace>()
             ;
 
+            CreateMap<ChangedGamespace, Data.Gamespace>()
+            ;
+
             CreateMap<Data.Gamespace, GameState>()
                 .ForMember(d => d.Name, opt => opt.MapFrom(s => s.Workspace.Name))
                 .ForMember(d => d.Challenge, opt => opt.Ignore())

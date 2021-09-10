@@ -155,6 +155,15 @@ namespace TopoMojo.Api.Services
             return spec;
         }
 
+        public async Task Update(ChangedGamespace model)
+        {
+            var entity = await _store.Retrieve(model.Id);
+
+            Mapper.Map(model, entity);
+
+            await _store.Update(entity);
+        }
+
         public async Task<GameState> Start(string id)
         {
             var ctx = await LoadContext(id);
@@ -588,6 +597,66 @@ namespace TopoMojo.Api.Services
             await _store.DeletePlayer(id, subjectId);
         }
 
+        public async Task<IEnumerable<SectionSubmission>> AuditSubmissions(string workspaceId)
+        {
+            var q = _store.List().Where(g => g.WorkspaceId == workspaceId);
+
+            var results = new List<SectionSubmission[]>();
+
+            foreach(var g in q)
+                results.Add(
+                    (await AuditSubmission(g.Id)).ToArray()
+                );
+
+            return results.SelectMany(x => x);
+        }
+
+        public async Task<ICollection<SectionSubmission>> AuditSubmission(string id)
+        {
+            var ctx = await LoadContext(id);
+
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, jsonOptions);
+
+            return spec.Submissions;
+        }
+
+        public async Task RegradeAll(string workspaceId)
+        {
+            var q = _store.List().Where(g => g.WorkspaceId == workspaceId);
+
+            foreach(var g in q)
+                await Regrade(g.Id);
+        }
+
+        public async Task<GameState> Regrade(string id)
+        {
+            if (! await _locker.Lock(id))
+                throw new ResourceIsLocked();
+
+            var ctx = await LoadContext(id);
+
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, jsonOptions);
+
+            foreach(var submission in spec.Submissions)
+            {
+                _Grade(spec, submission);
+
+                if (spec.Score == 1)
+                {
+                    ctx.Gamespace.EndTime = submission.Timestamp;
+                    break;
+                }
+            }
+
+            ctx.Gamespace.Challenge = JsonSerializer.Serialize(spec, jsonOptions);
+
+            await _store.Update(ctx.Gamespace);
+
+            await _locker.Unlock(id);
+
+            return await LoadState(ctx.Gamespace);
+        }
+
         public async Task<GameState> Grade(SectionSubmission submission)
         {
             DateTimeOffset ts = DateTimeOffset.UtcNow;
@@ -615,26 +684,7 @@ namespace TopoMojo.Api.Services
             submission.Timestamp = ts;
             spec.Submissions.Add(submission);
 
-            // grade and save
-            double lastScore = spec.Score;
-
-            int i = 0;
-            foreach (var question in section.Questions)
-                question.Grade(submission.Questions.ElementAtOrDefault(i++)?.Answer ?? "");
-
-            section.Score = section.Questions
-                .Where(q => q.IsCorrect)
-                .Select(q => q.Weight - q.Penalty)
-                .Sum();
-
-            spec.Score = spec.Challenge.Sections
-                .SelectMany(s => s.Questions)
-                .Where(q => q.IsCorrect)
-                .Select(q => q.Weight - q.Penalty)
-                .Sum();
-
-            if (spec.Score > lastScore)
-                spec.LastScoreTime = ts;
+            _Grade(spec, submission);
 
             ctx.Gamespace.Challenge = JsonSerializer.Serialize(spec, jsonOptions);
 
@@ -656,13 +706,38 @@ namespace TopoMojo.Api.Services
             var result = await LoadState(ctx.Gamespace);
 
             // merge submission into return model
-            i = 0;
+            int i = 0;
             foreach (var question in result.Challenge.Questions)
                 question.Answer = submission.Questions.ElementAtOrDefault(i++)?.Answer ?? "";
 
             await _locker.Unlock(id);
 
             return result;
+        }
+
+        private void _Grade(ChallengeSpec spec, SectionSubmission submission)
+        {
+            var section = spec.Challenge.Sections.ElementAtOrDefault(submission.SectionIndex);
+
+            double lastScore = spec.Score;
+
+            int i = 0;
+            foreach (var question in section.Questions)
+                question.Grade(submission.Questions.ElementAtOrDefault(i++)?.Answer ?? "");
+
+            section.Score = section.Questions
+                .Where(q => q.IsCorrect)
+                .Select(q => q.Weight - q.Penalty)
+                .Sum();
+
+            spec.Score = spec.Challenge.Sections
+                .SelectMany(s => s.Questions)
+                .Where(q => q.IsCorrect)
+                .Select(q => q.Weight - q.Penalty)
+                .Sum();
+
+            if (spec.Score > lastScore)
+                spec.LastScoreTime = submission.Timestamp;
         }
 
         private ChallengeView MapChallenge(ChallengeSpec spec, int sectionIndex = 0)

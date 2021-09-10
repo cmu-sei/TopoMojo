@@ -25,6 +25,12 @@ namespace TopoMojo.Api.Models
 
     }
 
+    public class ChangedGamespace
+    {
+        public string Id { get; set; }
+        public DateTimeOffset ExpirationTime { get; set; }
+    }
+
     public class GameState
     {
         public string Id { get; set; }
