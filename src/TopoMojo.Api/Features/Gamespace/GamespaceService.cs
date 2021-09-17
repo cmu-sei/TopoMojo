@@ -672,6 +672,12 @@ namespace TopoMojo.Api.Services
 
             var section = spec.Challenge.Sections.ElementAtOrDefault(submission.SectionIndex);
 
+            if (IsDuplicateSubmission(spec.Submissions, submission))
+            {
+                _locker.Unlock(id).Wait();
+                return await LoadState(ctx.Gamespace);
+            }
+
             if (section == null)
                 _locker.Unlock(id, new InvalidOperationException()).Wait();
 
@@ -713,6 +719,29 @@ namespace TopoMojo.Api.Services
             await _locker.Unlock(id);
 
             return result;
+        }
+
+        private bool IsDuplicateSubmission(ICollection<SectionSubmission> history, SectionSubmission submission)
+        {
+            bool dupe = false;
+
+            string incoming = string.Join('|',
+                submission.Questions.Select(q => q.Answer ?? "")
+            );
+
+            foreach (var s in history)
+            {
+                string target = string.Join('|',
+                    s.Questions.Select(q => q.Answer ?? "")
+                );
+
+                dupe |= target.Equals(incoming);
+
+                if (dupe)
+                    break;
+            }
+
+            return dupe || incoming.Replace("|", "") == string.Empty;
         }
 
         private void _Grade(ChallengeSpec spec, SectionSubmission submission)
