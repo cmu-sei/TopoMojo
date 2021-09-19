@@ -246,6 +246,15 @@ namespace TopoMojo.Api.Controllers
             );
         }
 
+        [HttpGet("api/healthz/{id}")]
+        [SwaggerOperation(OperationId = "CheckHealth")]
+        [AllowAnonymous]
+        public async Task<ActionResult> CheckHealth([FromRoute]string id)
+        {
+            await _svc.CheckHealth(id);
+            return Ok();
+        }
+
         private void SendBroadcast(Template template, string action)
         {
             Hub.Clients

@@ -242,5 +242,16 @@ namespace TopoMojo.Api.Services
                 .ToArray()
             ;
         }
+
+        /// <summary>
+        /// Check health by hitting database and hypervisor
+        /// </summary>
+        /// <param name="id">Template Id</param>
+        /// <returns></returns>
+        public async Task CheckHealth(string id)
+        {
+            var template = await GetDeployableTemplate(id);
+            var vm = _pod.Refresh(template);
+        }
     }
 }

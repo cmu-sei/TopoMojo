@@ -34,20 +34,23 @@ namespace TopoMojo.Api
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error");
-
-                var errorList = cache.Get<List<TimestampedException>>(AppConstants.ErrorListCacheKey) ?? new List<TimestampedException>();
-                errorList.Add(new TimestampedException
+                if (!(ex is ResourceNotFound))
                 {
-                    Timestamp = DateTimeOffset.UtcNow,
-                    Message = ex.Message,
-                    StackTrace = ex.StackTrace
-                });
+                    _logger.LogError(ex, "Error");
 
-                cache.Set(
-                    AppConstants.ErrorListCacheKey,
-                    errorList.OrderByDescending(e => e.Timestamp).Take(50).ToList()
-                );
+                    var errorList = cache.Get<List<TimestampedException>>(AppConstants.ErrorListCacheKey) ?? new List<TimestampedException>();
+                    errorList.Add(new TimestampedException
+                    {
+                        Timestamp = DateTimeOffset.UtcNow,
+                        Message = ex.Message,
+                        StackTrace = ex.StackTrace
+                    });
+
+                    cache.Set(
+                        AppConstants.ErrorListCacheKey,
+                        errorList.OrderByDescending(e => e.Timestamp).Take(50).ToList()
+                    );
+                }
 
                 if (!context.Response.HasStarted)
                 {

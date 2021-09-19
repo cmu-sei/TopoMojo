@@ -51,7 +51,8 @@ namespace TopoMojo.Api.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("api/version")]
-        [SwaggerOperation(OperationId = "LoadDocument")]
+        [SwaggerOperation(OperationId = "GetAppVersion")]
+        [AllowAnonymous]
         public ActionResult<AppVersionInfo> GetAppVersionInfo()
         {
             return Ok(new AppVersionInfo

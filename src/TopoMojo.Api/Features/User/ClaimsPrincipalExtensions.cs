@@ -14,6 +14,17 @@ namespace TopoMojo.Api
 
         public static Models.User ToModel(this ClaimsPrincipal principal)
         {
+            string sub = principal.Subject();
+
+            // support anonymous endpoints
+            if (string.IsNullOrEmpty(sub))
+            {
+                return new Models.User
+                {
+                    Role = UserRole.User
+                };
+            }
+
             return new Models.User
             {
                 Id = principal.Subject(),
