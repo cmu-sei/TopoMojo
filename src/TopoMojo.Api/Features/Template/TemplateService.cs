@@ -251,7 +251,9 @@ namespace TopoMojo.Api.Services
         public async Task CheckHealth(string id)
         {
             var template = await GetDeployableTemplate(id);
-            var vm = _pod.Refresh(template);
+            var vm = await _pod.Refresh(template);
+            if (vm.Status == "created") // healthy is 'initialized' for existing template
+                throw new Exception("bad health");
         }
     }
 }
