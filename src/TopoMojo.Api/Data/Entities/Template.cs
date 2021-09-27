@@ -22,6 +22,7 @@ namespace TopoMojo.Api.Data
         public string Detail { get; set; }
         public string ParentId { get; set; }
         public int Replicas { get; set; }
+        public int Variant { get; set; }
         public virtual Template Parent { get; set; }
         public string WorkspaceId { get; set; }
         public virtual Workspace Workspace { get; set; }

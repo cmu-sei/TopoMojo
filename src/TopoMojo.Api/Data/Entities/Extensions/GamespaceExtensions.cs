@@ -14,22 +14,37 @@ namespace TopoMojo.Api.Data.Extensions
             name = name.Untagged();
 
             // a vm could be a replica, denoted by `_1` or some number,
-            // so strip that to find template.
-            int x = name.LastIndexOf('_');
+            // or a variant-vm, with `_v1` removed earlier
+            // so check name, name-with-variant-suffix, name-without-replica-suffix, name-without-replica-suffix-with-variant-suffix
 
             // check full name
             var tmpl = gamespace.Workspace.Templates
-                .Where(t => !t.IsHidden && t.Name == name)
+                .Where(t => t.Name == name)
                 .FirstOrDefault();
 
-            // check without replica index
-            if (tmpl == null && x == name.Length - 2)
+            // check with variant suffix
+            if (tmpl == null)
             {
-                name = name.Substring(0, x);
+                tmpl = gamespace.Workspace.Templates
+                    .Where(t => t.Name == $"{name}_v{gamespace.Variant + 1}")
+                    .FirstOrDefault();
+            }
+
+            // check without replica suffix
+            if (tmpl == null)
+            {
+                name = name.Substring(0, name.LastIndexOf('_'));
 
                 tmpl = gamespace.Workspace.Templates
-                .Where(t => !t.IsHidden && t.Name == name)
+                .Where(t => t.Name == name)
                 .FirstOrDefault();
+
+                if (tmpl == null)
+                {
+                    tmpl = gamespace.Workspace.Templates
+                        .Where(t => t.Name == $"{name}_v{gamespace.Variant + 1}")
+                        .FirstOrDefault();
+                }
             }
 
             return (!tmpl?.IsHidden) ?? false;

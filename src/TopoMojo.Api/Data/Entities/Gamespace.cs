@@ -23,6 +23,7 @@ namespace TopoMojo.Api.Data
         public bool AllowReset { get; set; }
         public string Challenge { get; set; }
         public string WorkspaceId { get; set; }
+        public int Variant { get; set; }
         public virtual Workspace Workspace { get; set; }
         public virtual ICollection<Player> Players { get; set; } = new List<Player>();
         [NotMapped] public bool HasStarted => StartTime.Year > 1;

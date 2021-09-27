@@ -84,6 +84,9 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                     b.Property<DateTimeOffset>("StartTime")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int>("Variant")
+                        .HasColumnType("int");
+
                     b.Property<DateTimeOffset>("WhenCreated")
                         .HasColumnType("datetimeoffset");
 
@@ -165,6 +168,9 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                         .HasColumnType("nvarchar(36)");
 
                     b.Property<int>("Replicas")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Variant")
                         .HasColumnType("int");
 
                     b.Property<DateTimeOffset>("WhenCreated")

@@ -244,12 +244,13 @@ namespace TopoMojo.Api.Services
             // TODO: if customize-script, run and update transforms
 
             // select variant, adjusting from 1-based to 0-based index
-            int v = ctx.Request.Variant > 0
+            gamespace.Variant = ctx.Request.Variant > 0
                 ? Math.Min(ctx.Request.Variant, spec.Variants.Count) - 1
-                : _random.Next(spec.Variants.Count);
+                : _random.Next(spec.Variants.Count)
+            ;
 
             spec.Challenge = spec.Variants
-                .Skip(v).Take(1)
+                .Skip(gamespace.Variant).Take(1)
                 .FirstOrDefault();
 
             // initialize selected challenge
@@ -394,10 +395,17 @@ namespace TopoMojo.Api.Services
                 .ToLower()
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-            var templates = Mapper.Map<List<ConvergedTemplate>>(gamespace.Workspace.Templates);
+            var templates = Mapper.Map<List<ConvergedTemplate>>(
+                gamespace.Workspace.Templates
+                    .Where(t => t.Variant == 0 || (t.Variant - 1) == gamespace.Variant)
+            );
 
             foreach (var template in templates.ToList())
             {
+                // normalize name for variant-specific templates
+                if (template.Variant > 0 && template.Name.EndsWith($"_v{template.Variant}"))
+                    template.Name = template.Name.Substring(0, template.Name.LastIndexOf('_'));
+
                 // apply template macro substitutions
                 foreach (var kvp in spec.Transforms)
                 {
@@ -410,7 +418,10 @@ namespace TopoMojo.Api.Services
                     template.Iso = $"{spec.Challenge.Iso.File}";
 
                 // expand replicas
-                int replicas = template.Replicas < 0 ? gamespace.Players.Count : Math.Min(template.Replicas, _options.ReplicaLimit);
+                int replicas = template.Replicas < 0
+                    ? gamespace.Players.Count
+                    : Math.Min(template.Replicas, _options.ReplicaLimit)
+                ;
 
                 if (replicas > 1)
                 {
