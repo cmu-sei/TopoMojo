@@ -145,7 +145,7 @@ namespace TopoMojo.Api.Controllers
         [HttpPut("api/workspace")]
         [SwaggerOperation(OperationId = "UpdateWorkspace")]
         [Authorize]
-        public async Task<ActionResult> UpdateWorkspace([FromBody]ChangedWorkspace model)
+        public async Task<ActionResult> UpdateWorkspace([FromBody]RestrictedChangedWorkspace model)
         {
             await Validate(model);
 
@@ -154,7 +154,33 @@ namespace TopoMojo.Api.Controllers
                 () => _svc.CanEdit(model.Id, Actor.Id).Result
             );
 
-            Workspace workspace = await _svc.Update(model, Actor.IsAdmin);
+            Workspace workspace = await _svc.Update(model);
+
+            await Hub.Clients
+                .Group(workspace.Id)
+                .TopoEvent(new BroadcastEvent<Workspace>(User, "TOPO.UPDATED", workspace))
+            ;
+
+            return Ok();
+        }
+
+        /// <summary>
+        /// Update an existing workspace.
+        /// </summary>
+        /// <param name="model">Changed Workspace (privileged</param>
+        /// <returns></returns>
+        [HttpPut("api/workspace/priv")]
+        [SwaggerOperation(OperationId = "PrivilegedUpdateWorkspace")]
+        [Authorize]
+        public async Task<ActionResult> PrivilegedUpdateWorkspace([FromBody]ChangedWorkspace model)
+        {
+            await Validate(model);
+
+            AuthorizeAny(
+                () => Actor.IsAdmin
+            );
+
+            Workspace workspace = await _svc.Update(model);
 
             await Hub.Clients
                 .Group(workspace.Id)

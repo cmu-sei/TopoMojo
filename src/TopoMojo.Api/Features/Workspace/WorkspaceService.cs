@@ -159,7 +159,7 @@ namespace TopoMojo.Api.Services
             var workspace = Mapper.Map<Data.Workspace>(model);
 
             workspace.TemplateLimit = _options.DefaultTemplateLimit;
-
+            workspace.WhenCreated = DateTimeOffset.UtcNow;
             workspace.LastActivity = DateTimeOffset.UtcNow;
 
             if (workspace.Challenge.IsEmpty())
@@ -193,22 +193,34 @@ namespace TopoMojo.Api.Services
         /// Update an existing workspace.
         /// </summary>
         /// <param name="model"></param>
-        /// <param name="sudo"></param>
         /// <returns></returns>
-        public async Task<Workspace> Update(ChangedWorkspace model, bool sudo = false)
+        public async Task<Workspace> Update(RestrictedChangedWorkspace model)
         {
             var entity = await _store.Retrieve(model.Id);
 
-            if (sudo.Equals(false))
-                Mapper.Map<RestrictedChangedWorkspace, Data.Workspace>(
-                    Mapper.Map<RestrictedChangedWorkspace>(model),
-                    entity
-                );
-            else
-                Mapper.Map<ChangedWorkspace, Data.Workspace>(
-                    model,
-                    entity
-                );
+            Mapper.Map<RestrictedChangedWorkspace, Data.Workspace>(
+                model,
+                entity
+            );
+
+            await _store.Update(entity);
+
+            return Mapper.Map<Workspace>(entity);
+        }
+
+        /// <summary>
+        /// Update an existing workspace (privileged).
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        public async Task<Workspace> Update(ChangedWorkspace model)
+        {
+            var entity = await _store.Retrieve(model.Id);
+
+            Mapper.Map<ChangedWorkspace, Data.Workspace>(
+                model,
+                entity
+            );
 
             await _store.Update(entity);
 

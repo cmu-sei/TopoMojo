@@ -65,8 +65,9 @@ namespace TopoMojo.Api.Data
         {
             return await DbContext.Workspaces
                 .Where(w => w.Id == id)
-                .Select(w => w.TemplateLimit >= w.Templates.Count)
-                .FirstOrDefaultAsync();
+                .Select(w => w.Templates.Count >= w.TemplateLimit)
+                .FirstOrDefaultAsync()
+            ;
         }
 
         public async Task<string> ResolveKey(string key)

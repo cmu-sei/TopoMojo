@@ -34,6 +34,9 @@ namespace TopoMojo.Api.Validators
             if (model is ChangedWorkspace)
                 return _validate(model as ChangedWorkspace);
 
+            if (model is RestrictedChangedWorkspace)
+                return _validate(model as RestrictedChangedWorkspace);
+
             if (model is ClientAudience)
                 return _validate(model as ClientAudience);
 
@@ -57,6 +60,17 @@ namespace TopoMojo.Api.Validators
         }
 
         private async Task _validate(ChangedWorkspace model)
+        {
+            if (model.Name.IsEmpty())
+                throw new ArgumentException("ChangedWorkspace.Name");
+
+            if ((await Exists(model.Id)).Equals(false))
+                throw new ResourceNotFound();
+
+            await Task.CompletedTask;
+        }
+
+        private async Task _validate(RestrictedChangedWorkspace model)
         {
             if (model.Name.IsEmpty())
                 throw new ArgumentException("ChangedWorkspace.Name");
