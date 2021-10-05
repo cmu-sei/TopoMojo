@@ -648,6 +648,32 @@ namespace TopoMojo.Api.Services
 
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, jsonOptions);
 
+            // updating working copy from challenge spec
+            var workspaceChallenge = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", jsonOptions);
+
+            var variant = workspaceChallenge.Variants.Skip(ctx.Gamespace.Variant).FirstOrDefault();
+
+            int i = 0;
+            foreach (var section in spec.Challenge.Sections)
+            {
+                int j = 0;
+                foreach (var question in section.Questions)
+                {
+                    var updatedSection = variant.Sections.ElementAtOrDefault(i++);
+                    if (updatedSection != null)
+                    {
+                        var q = updatedSection.Questions.ElementAtOrDefault(j++);
+                        if (q != null)
+                        {
+                            question.Grader = q.Grader;
+                            question.Answer = q.Answer ?? "";
+                        }
+                    }
+
+                }
+            }
+
+
             foreach(var submission in spec.Submissions)
             {
                 _Grade(spec, submission);
