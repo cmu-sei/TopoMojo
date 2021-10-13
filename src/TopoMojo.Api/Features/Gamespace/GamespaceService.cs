@@ -221,7 +221,8 @@ namespace TopoMojo.Api.Services
                 AllowReset = ctx.Request.AllowReset,
                 CleanupGraceMinutes = actor.GamespaceCleanupGraceMinutes,
                 WhenCreated = ts,
-                ExpirationTime = ctx.Request.ResolveExpiration(ts, duration)
+                ExpirationTime = ctx.Request.ResolveExpiration(ts, duration),
+                PlayerCount = ctx.Request.PlayerCount > 0 ? ctx.Request.PlayerCount : ctx.Request.Players.Count()
             };
 
             foreach (var player in ctx.Request.Players)
@@ -419,7 +420,7 @@ namespace TopoMojo.Api.Services
 
                 // expand replicas
                 int replicas = template.Replicas < 0
-                    ? gamespace.Players.Count
+                    ? gamespace.PlayerCount
                     : Math.Min(template.Replicas, _options.ReplicaLimit)
                 ;
 
@@ -648,6 +649,32 @@ namespace TopoMojo.Api.Services
 
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, jsonOptions);
 
+            // updating working copy from challenge spec
+            var workspaceChallenge = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", jsonOptions);
+
+            var variant = workspaceChallenge.Variants.Skip(ctx.Gamespace.Variant).FirstOrDefault();
+
+            int i = 0;
+            foreach (var section in spec.Challenge.Sections)
+            {
+                int j = 0;
+                foreach (var question in section.Questions)
+                {
+                    var updatedSection = variant.Sections.ElementAtOrDefault(i++);
+                    if (updatedSection != null)
+                    {
+                        var q = updatedSection.Questions.ElementAtOrDefault(j++);
+                        if (q != null)
+                        {
+                            question.Grader = q.Grader;
+                            question.Answer = q.Answer ?? "";
+                        }
+                    }
+
+                }
+            }
+
+
             foreach(var submission in spec.Submissions)
             {
                 _Grade(spec, submission);
@@ -768,13 +795,15 @@ namespace TopoMojo.Api.Services
             section.Score = section.Questions
                 .Where(q => q.IsCorrect)
                 .Select(q => q.Weight - q.Penalty)
-                .Sum();
+                .Sum()
+            ;
 
             spec.Score = spec.Challenge.Sections
                 .SelectMany(s => s.Questions)
                 .Where(q => q.IsCorrect)
                 .Select(q => q.Weight - q.Penalty)
-                .Sum();
+                .Sum()
+            ;
 
             if (spec.Score > lastScore)
                 spec.LastScoreTime = submission.Timestamp;
@@ -828,7 +857,7 @@ namespace TopoMojo.Api.Services
                 : await _workspaceStore.Load(id)
             ;
 
-            //if just workspace, check for existing gamespace
+            // if just workspace, check for existing gamespace
             if (ctx.Gamespace is null && subjectId.NotEmpty())
             {
                 ctx.Gamespace = await _store.LoadActiveByContext(
@@ -849,7 +878,8 @@ namespace TopoMojo.Api.Services
 
             return id.NotEmpty() && System.IO.File.Exists(path)
                 ? await System.IO.File.ReadAllTextAsync(path)
-                : String.Empty;
+                : String.Empty
+            ;
         }
 
         public async Task<bool> CanManage(string id, string actorId)

@@ -81,6 +81,9 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<int>("PlayerCount")
+                        .HasColumnType("int");
+
                     b.Property<DateTimeOffset>("StartTime")
                         .HasColumnType("datetimeoffset");
 

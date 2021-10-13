@@ -1278,10 +1278,16 @@ namespace TopoMojo.Hypervisor.vSphere
                 catch (Exception ex)
                 {
                     _logger.LogError(0, ex, $"Failed to refresh cache for {_config.Host}");
+
+                    if (ex.GetType().Name.Contains("ServerTooBusy"))
+                        await Disconnect();
                 }
                 finally
                 {
                     await Task.Delay(_syncInterval);
+
+                    if (_vim == null)
+                        await Connect();
                 }
             }
             // _logger.LogDebug("sessionMonitor ended.");

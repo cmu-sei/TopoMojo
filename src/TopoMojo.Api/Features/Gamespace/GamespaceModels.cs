@@ -84,6 +84,7 @@ namespace TopoMojo.Api.Models
     {
         public string ResourceId { get; set; }
         public int Variant { get; set; }
+        public int PlayerCount { get; set; }
         public int MaxAttempts { get; set; }
         public int MaxMinutes { get; set; }
         public int Points { get; set; } = 100;
