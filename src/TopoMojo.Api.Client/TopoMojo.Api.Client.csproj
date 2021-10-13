@@ -7,7 +7,6 @@
     <Nullable>annotations</Nullable>
     <LangVersion>8.0</LangVersion>
     <IncludeGeneratorSharedCode>true</IncludeGeneratorSharedCode>
-    <Version>2.0.5</Version>
     <Authors>Software Engineering Institute</Authors>
     <Company>Carnegie Mellon University</Company>
     <Copyright>Copyright 2021 Carnegie Mellon University.</Copyright>
