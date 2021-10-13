@@ -253,7 +253,7 @@ namespace TopoMojo.Api.Services
             var template = await GetDeployableTemplate(id);
             var vm = await _pod.Refresh(template);
             if (vm.Status == "created") // healthy is 'initialized' for existing template
-                throw new Exception("bad health");
+                throw new Exception("unhealthy");
         }
     }
 }
