@@ -74,7 +74,7 @@ namespace TopoMojo.Api
 
             string value = await _cache.GetStringAsync(key);
 
-            if (!value.NotEmpty())
+            if (value.IsEmpty())
                 return AuthenticateResult.NoResult();
 
             await _cache.RemoveAsync(key);
@@ -87,7 +87,7 @@ namespace TopoMojo.Api
                 ? guid.ToString()
                 : "";
 
-            if (subject == null) // || expired)
+            if (subject.IsEmpty()) // || expired)
                 return AuthenticateResult.NoResult();
 
             var principal = new ClaimsPrincipal(
