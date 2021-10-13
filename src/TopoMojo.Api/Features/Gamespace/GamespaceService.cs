@@ -221,7 +221,8 @@ namespace TopoMojo.Api.Services
                 AllowReset = ctx.Request.AllowReset,
                 CleanupGraceMinutes = actor.GamespaceCleanupGraceMinutes,
                 WhenCreated = ts,
-                ExpirationTime = ctx.Request.ResolveExpiration(ts, duration)
+                ExpirationTime = ctx.Request.ResolveExpiration(ts, duration),
+                PlayerCount = ctx.Request.PlayerCount > 0 ? ctx.Request.PlayerCount : ctx.Request.Players.Count()
             };
 
             foreach (var player in ctx.Request.Players)
@@ -419,7 +420,7 @@ namespace TopoMojo.Api.Services
 
                 // expand replicas
                 int replicas = template.Replicas < 0
-                    ? gamespace.Players.Count
+                    ? gamespace.PlayerCount
                     : Math.Min(template.Replicas, _options.ReplicaLimit)
                 ;
 
@@ -794,13 +795,15 @@ namespace TopoMojo.Api.Services
             section.Score = section.Questions
                 .Where(q => q.IsCorrect)
                 .Select(q => q.Weight - q.Penalty)
-                .Sum();
+                .Sum()
+            ;
 
             spec.Score = spec.Challenge.Sections
                 .SelectMany(s => s.Questions)
                 .Where(q => q.IsCorrect)
                 .Select(q => q.Weight - q.Penalty)
-                .Sum();
+                .Sum()
+            ;
 
             if (spec.Score > lastScore)
                 spec.LastScoreTime = submission.Timestamp;
@@ -854,7 +857,7 @@ namespace TopoMojo.Api.Services
                 : await _workspaceStore.Load(id)
             ;
 
-            //if just workspace, check for existing gamespace
+            // if just workspace, check for existing gamespace
             if (ctx.Gamespace is null && subjectId.NotEmpty())
             {
                 ctx.Gamespace = await _store.LoadActiveByContext(
@@ -875,7 +878,8 @@ namespace TopoMojo.Api.Services
 
             return id.NotEmpty() && System.IO.File.Exists(path)
                 ? await System.IO.File.ReadAllTextAsync(path)
-                : String.Empty;
+                : String.Empty
+            ;
         }
 
         public async Task<bool> CanManage(string id, string actorId)
