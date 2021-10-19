@@ -240,7 +240,7 @@ namespace TopoMojo.Api.Services
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", jsonOptions);
 
             //resolve transforms
-            ResolveTransforms(spec);
+            ResolveTransforms(spec, ctx);
 
             // TODO: if customize-script, run and update transforms
 
@@ -274,11 +274,11 @@ namespace TopoMojo.Api.Services
             ctx.Gamespace = gamespace;
         }
 
-        private void ResolveTransforms(ChallengeSpec spec)
+        private void ResolveTransforms(ChallengeSpec spec, RegistrationContext ctx)
         {
             foreach(var kvp in spec.Transforms.ToArray())
             {
-                kvp.Value = ResolveRandom(kvp.Value);
+                kvp.Value = ResolveRandom(kvp.Value, ctx);
 
                 // insert `key_index: value` for any multi-token values (i.e. list-resolver)
                 var tokens =  kvp.Value.Split(" ", StringSplitOptions.RemoveEmptyEntries);
@@ -298,7 +298,7 @@ namespace TopoMojo.Api.Services
 
         }
 
-        private string ResolveRandom(string key)
+        private string ResolveRandom(string key, RegistrationContext ctx)
         {
             byte[] buffer;
 
@@ -310,6 +310,14 @@ namespace TopoMojo.Api.Services
 
             switch (seg[0])
             {
+                case "id":
+                result = ctx.Gamespace.Id;
+                break;
+
+                case "apikey":
+                result = ctx.Request.ApiKey;
+                break;
+
                 case "uid":
                 result = Guid.NewGuid().ToString("n");
                 break;
