@@ -833,7 +833,7 @@ namespace TopoMojo.Api.Services
                 SectionCount = spec.Challenge.Sections.Count,
                 SectionScore = Math.Round(section.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
                 SectionText = section.Text,
-                Questions = Mapper.Map<QuestionView[]>(section.Questions)
+                Questions = Mapper.Map<QuestionView[]>(section.Questions.Where(q => !q.Hidden))
             };
 
             foreach(var q in challenge.Questions)
