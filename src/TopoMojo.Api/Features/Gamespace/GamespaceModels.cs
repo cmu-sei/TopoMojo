@@ -83,6 +83,7 @@ namespace TopoMojo.Api.Models
     public class GamespaceRegistration
     {
         public string ResourceId { get; set; }
+        public string ApiKey { get; set; }
         public int Variant { get; set; }
         public int PlayerCount { get; set; }
         public int MaxAttempts { get; set; }
