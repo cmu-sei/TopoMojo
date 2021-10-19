@@ -58,6 +58,7 @@ namespace TopoMojo.Api.Models
         public float Weight { get; set; }
         public float Penalty { get; set; }
         public AnswerGrader Grader { get; set; }
+        public bool Hidden { get; set; }
         public bool IsCorrect { get; set; }
         public bool IsGraded { get; set; }
     }
