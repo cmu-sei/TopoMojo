@@ -39,7 +39,8 @@ namespace TopoMojo.Api.Models
             string b = submission.ToLower();
             string c = b.Replace(" ", "");
 
-            switch (question.Grader) {
+            switch (question.Grader)
+            {
 
                 case AnswerGrader.MatchAll:
                 question.IsCorrect = a.Intersect(
@@ -72,6 +73,18 @@ namespace TopoMojo.Api.Models
             var questions = spec.Sections.SelectMany(s => s.Questions).ToArray();
             var unweighted = questions.Where(q => q.Weight == 0).ToArray();
             float max = questions.Sum(q => q.Weight);
+
+            // normalize integer weights to percentage
+            if (max > 1)
+            {
+                float total = Math.Max(max, 100);
+
+                foreach (var q in questions)
+                    q.Weight = q.Weight / total;
+
+                max = questions.Sum(q => q.Weight);
+            }
+
             if (unweighted.Any())
             {
                 float val = (1 - max) / unweighted.Length;
@@ -80,6 +93,7 @@ namespace TopoMojo.Api.Models
                     q.Weight = val;
                     max += val;
                 }
+
                 unweighted.Last().Weight = 1 - max;
             }
         }
