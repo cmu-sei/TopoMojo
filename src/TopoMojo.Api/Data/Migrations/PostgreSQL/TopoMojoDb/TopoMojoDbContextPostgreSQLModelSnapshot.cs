@@ -71,6 +71,10 @@ namespace TopoMojo.Api.Data.Migrations.PostgreSQL.TopoMojoDb
                     b.Property<DateTimeOffset>("ExpirationTime")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("GraderKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("ManagerId")
                         .HasColumnType("text");
 

@@ -14,6 +14,7 @@ namespace TopoMojo.Api.Data
         public string Name { get; set; }
         public string ManagerId { get; set; }
         public string ManagerName { get; set; }
+        public string GraderKey { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
         public DateTimeOffset StartTime { get; set; }
         public DateTimeOffset EndTime { get; set; }

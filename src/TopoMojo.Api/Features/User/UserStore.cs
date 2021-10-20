@@ -90,9 +90,22 @@ namespace TopoMojo.Api.Data
 
         public async Task<User> ResolveApiKey(string hash)
         {
-            return await DbSet.FirstOrDefaultAsync(u =>
+            var user = await DbSet.FirstOrDefaultAsync(u =>
                 u.ApiKeys.Any(k => k.Hash == hash)
             );
+
+            if (user is User)
+                return user;
+
+            var gs = await DbContext.Gamespaces.FirstOrDefaultAsync(
+                g => g.GraderKey == hash
+            );
+
+            return (gs is Gamespace)
+                ? new User { Id = gs.Id }
+                : null
+            ;
+
         }
 
         public async Task<string[]> ListScopes()
