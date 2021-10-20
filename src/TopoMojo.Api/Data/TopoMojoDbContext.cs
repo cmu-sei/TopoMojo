@@ -30,6 +30,7 @@ namespace TopoMojo.Api.Data
                 b.HasOne(g => g.Workspace).WithMany(w => w.Gamespaces).OnDelete(DeleteBehavior.SetNull);
                 b.Property(w => w.Id).HasMaxLength(KEYLENGTH);
                 b.Property(w => w.Name).HasMaxLength(64);
+                b.Property(w => w.GraderKey).HasMaxLength(64);
             });
 
             builder.Entity<Template>(b => {

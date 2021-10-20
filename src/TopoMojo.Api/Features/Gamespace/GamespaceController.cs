@@ -155,6 +155,16 @@ namespace TopoMojo.Api.Controllers
                 () => _svc.HasValidUserScope(model.ResourceId, Actor.Scope, Actor.Id).Result
             );
 
+            if (string.IsNullOrEmpty(model.GraderEndpoint))
+            {
+                model.GraderEndpoint = string.Format(
+                    "{0}://{1}{2}",
+                    Request.Scheme,
+                    Request.Host,
+                    Url.Action("GradeChallenge")
+                );
+            }
+
             var result = await _svc.Register(model, Actor);
 
             string token = Guid.NewGuid().ToString("n");
@@ -289,6 +299,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
+                () => model.Id == Actor.Id,  // from valid grader_apikey
                 () => _svc.CanInteract(model.Id, Actor.Id).Result
             );
 

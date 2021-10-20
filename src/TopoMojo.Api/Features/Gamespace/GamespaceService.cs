@@ -212,8 +212,12 @@ namespace TopoMojo.Api.Services
                     : _options.DefaultGamespaceMinutes
             ;
 
-            var gamespace = new Data.Gamespace
+            if (string.IsNullOrEmpty(ctx.Request.GraderKey))
+                ctx.Request.GraderKey = Guid.NewGuid().ToString("n");
+
+            ctx.Gamespace = new Data.Gamespace
             {
+                Id = Guid.NewGuid().ToString("n"),
                 Name = ctx.Workspace.Name,
                 Workspace = ctx.Workspace,
                 ManagerId = actor.Id,
@@ -222,8 +226,11 @@ namespace TopoMojo.Api.Services
                 CleanupGraceMinutes = actor.GamespaceCleanupGraceMinutes,
                 WhenCreated = ts,
                 ExpirationTime = ctx.Request.ResolveExpiration(ts, duration),
-                PlayerCount = ctx.Request.PlayerCount > 0 ? ctx.Request.PlayerCount : ctx.Request.Players.Count()
+                PlayerCount = ctx.Request.PlayerCount > 0 ? ctx.Request.PlayerCount : ctx.Request.Players.Count(),
+                GraderKey = ctx.Request.GraderKey.ToSha256()
             };
+
+            var gamespace = ctx.Gamespace;
 
             foreach (var player in ctx.Request.Players)
             {
@@ -271,7 +278,6 @@ namespace TopoMojo.Api.Services
 
             await _store.Create(gamespace);
 
-            ctx.Gamespace = gamespace;
         }
 
         private void ResolveTransforms(ChallengeSpec spec, RegistrationContext ctx)
@@ -314,8 +320,12 @@ namespace TopoMojo.Api.Services
                 result = ctx.Gamespace.Id;
                 break;
 
-                case "apikey":
-                result = ctx.Request.ApiKey;
+                case "grader_key":
+                result = ctx.Request.GraderKey;
+                break;
+
+                case "grader_url":
+                result = ctx.Request.GraderEndpoint;
                 break;
 
                 case "uid":
