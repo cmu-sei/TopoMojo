@@ -84,7 +84,7 @@ namespace TopoMojo.Api.Models
     {
         public string ResourceId { get; set; }
         public string GraderKey { get; set; }
-        public string GraderEndpoint { get; set; }
+        public string GraderUrl { get; set; }
         public int Variant { get; set; }
         public int PlayerCount { get; set; }
         public int MaxAttempts { get; set; }

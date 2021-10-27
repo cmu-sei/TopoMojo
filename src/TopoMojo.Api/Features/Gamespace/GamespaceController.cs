@@ -155,9 +155,9 @@ namespace TopoMojo.Api.Controllers
                 () => _svc.HasValidUserScope(model.ResourceId, Actor.Scope, Actor.Id).Result
             );
 
-            if (string.IsNullOrEmpty(model.GraderEndpoint))
+            if (string.IsNullOrEmpty(model.GraderUrl))
             {
-                model.GraderEndpoint = string.Format(
+                model.GraderUrl = string.Format(
                     "{0}://{1}{2}",
                     Request.Scheme,
                     Request.Host,
