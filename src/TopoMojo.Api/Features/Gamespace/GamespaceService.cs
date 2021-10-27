@@ -325,7 +325,7 @@ namespace TopoMojo.Api.Services
                 break;
 
                 case "grader_url":
-                result = ctx.Request.GraderEndpoint;
+                result = ctx.Request.GraderUrl;
                 break;
 
                 case "uid":
