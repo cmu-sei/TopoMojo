@@ -351,7 +351,7 @@ namespace TopoMojo.Api.Controllers
                 () => CanManageVm(name, Actor.Id).Result
             );
 
-            Vm vm = await _pod.Deploy(template, Actor.IsCreator);
+            Vm vm = await _pod.Deploy(template, Actor.IsBuilder);
 
             if (template.HostAffinity)
             {
