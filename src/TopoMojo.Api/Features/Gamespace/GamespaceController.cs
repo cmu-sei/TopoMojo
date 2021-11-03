@@ -237,7 +237,7 @@ namespace TopoMojo.Api.Controllers
             );
 
             return Ok(
-                await _svc.Start(id)
+                await _svc.Start(id, Actor.IsBuilder)
             );
         }
 

@@ -96,7 +96,7 @@ namespace TopoMojo.Api.Services
             var gamespace = await _Register(request, actor);
 
             if (request.StartGamespace)
-                await Deploy(gamespace);
+                await Deploy(gamespace, actor.IsBuilder);
 
             return await LoadState(gamespace, request.AllowPreview);
         }
@@ -164,12 +164,12 @@ namespace TopoMojo.Api.Services
             await _store.Update(entity);
         }
 
-        public async Task<GameState> Start(string id)
+        public async Task<GameState> Start(string id, bool sudo = false)
         {
             var ctx = await LoadContext(id);
 
             if (ctx.WorkspaceExists && !ctx.Gamespace.IsExpired)
-                await Deploy(ctx.Gamespace);
+                await Deploy(ctx.Gamespace, sudo);
 
             return await LoadState(ctx.Gamespace);
         }
@@ -404,7 +404,7 @@ namespace TopoMojo.Api.Services
             return result;
         }
 
-        private async Task Deploy(TopoMojo.Api.Data.Gamespace gamespace)
+        private async Task Deploy(TopoMojo.Api.Data.Gamespace gamespace, bool sudo = false)
         {
             var tasks = new List<Task<Vm>>();
 
@@ -463,7 +463,8 @@ namespace TopoMojo.Api.Services
                     _pod.Deploy(
                         template
                         .ToVirtualTemplate(gamespace.Id)
-                        .SetHostAffinity(gamespace.Workspace.HostAffinity)
+                        .SetHostAffinity(gamespace.Workspace.HostAffinity),
+                        sudo
                     )
                 );
             }
