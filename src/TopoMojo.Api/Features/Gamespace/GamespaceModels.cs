@@ -71,6 +71,18 @@ namespace TopoMojo.Api.Models
         public bool IsManager => Permission == Permission.Manager;
     }
 
+    public class Enlistee
+    {
+        public string SubjectName { get; set; }
+        public string Code { get; set; }
+    }
+
+    public class Enlistment
+    {
+        public string GamespaceId { get; set; }
+        public string Token { get; set; }
+    }
+    
     public class GamespaceSearch: Search
     {
         public const string FilterAll = "all";

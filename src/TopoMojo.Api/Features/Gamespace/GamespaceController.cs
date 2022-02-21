@@ -40,7 +40,7 @@ namespace TopoMojo.Api.Controllers
 
             _cacheOpts = new DistributedCacheEntryOptions
             {
-                SlidingExpiration = new TimeSpan(0, 0, 60)
+                SlidingExpiration = new TimeSpan(0, 0, 180)
             };
         }
 
@@ -233,7 +233,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => _svc.CanInteract(id, Actor.Id).Result
+                () => _svc.CanManage(id, Actor.Id).Result
             );
 
             return Ok(
@@ -255,7 +255,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => _svc.CanInteract(id, Actor.Id).Result
+                () => _svc.CanManage(id, Actor.Id).Result
             );
 
             return Ok(
@@ -277,7 +277,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => _svc.CanInteract(id, Actor.Id).Result
+                () => _svc.CanManage(id, Actor.Id).Result
             );
 
             return Ok(
@@ -380,7 +380,7 @@ namespace TopoMojo.Api.Controllers
 
         [HttpPost("api/gamespace/{id}/invite")]
         [SwaggerOperation(OperationId = "GetGamespaceInvitation")]
-        [Authorize]
+        [Authorize(AppConstants.AnyUserPolicy)]
         public async Task<ActionResult<JoinCode>> GetGamespaceInvitation(string id)
         {
             await Validate(new Entity { Id = id });
@@ -408,6 +408,29 @@ namespace TopoMojo.Api.Controllers
             await _svc.Enlist(code, Actor);
 
             return Ok();
+        }
+        
+        /// <summary>
+        /// Accept an invitation to a gamespace.
+        /// </summary>
+        /// <param name="model">Enlistee</param>
+        /// <param name="ct">CancellationToken</param>
+        /// <returns></returns>
+        [HttpPut("api/player/enlist")]
+        [AllowAnonymous]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public async Task<ActionResult<Enlistment>> Enlist(Enlistee model, CancellationToken ct)
+        {
+            var result = await _svc.Enlist(model);
+
+            // Set an auth ticket
+            string key = $"{TicketAuthentication.TicketCachePrefix}{result.Token}";
+
+            string value = $"{result.Token}#{model.SubjectName ?? "anonymous"}";
+
+            await _distCache.SetStringAsync(key, value, _cacheOpts, ct);
+
+            return Ok(result);
         }
 
         /// <summary>

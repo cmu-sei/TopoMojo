@@ -623,6 +623,33 @@ namespace TopoMojo.Api.Services
 
         }
 
+        public async Task<Enlistment> Enlist(Enlistee model)
+        {
+           string id = await _distCache.GetStringAsync(model.Code);
+
+            if (id.IsEmpty())
+                throw new InvalidInvitation();
+
+            var gamespace = await _store.Load(id);
+
+            string token = Guid.NewGuid().ToString("n");
+            string name = model.SubjectName ?? "anonymous";
+
+            gamespace.Players.Add(new Data.Player
+            {
+                SubjectId = token,
+                SubjectName = name
+            });
+
+            await _store.Update(gamespace);
+
+            return new Enlistment
+            {
+                Token = token,
+                GamespaceId = id
+            };
+        }
+
         public async Task Delist(string id, string subjectId)
         {
             await _store.DeletePlayer(id, subjectId);
