@@ -289,6 +289,11 @@ namespace TopoMojo.Api.Controllers
                         target = map[src.Host];
                 break;
 
+                // TODO: make this default after publishing change
+                case "none":
+                case "":
+                break;
+
                 case "querystring":
                 default:
                     qs = $"?vmhost={src.Host}";
