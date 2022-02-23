@@ -242,7 +242,10 @@ namespace TopoMojo.Api.Services
                     }
                 );
             }
-
+            
+            if (gamespace.Players.Any())
+                gamespace.Players.First().Permission = Permission.Manager;
+            
             // clone challenge
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", jsonOptions);
 
