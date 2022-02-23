@@ -111,9 +111,13 @@ namespace TopoMojo.Api.Data
 
         public async Task<bool> CanManage(string id, string subjectId)
         {
-            var gamespace = await DbSet.FindAsync(id);
-
-            return gamespace.ManagerId.Equals(subjectId);
+            return await DbSet.AnyAsync(g =>
+                g.Id == id &&
+                (
+                    g.ManagerId == subjectId ||
+                    g.Players.Any(p => p.SubjectId == subjectId && p.Permission == Permission.Manager)
+                )
+            );
         }
 
         public async Task<bool> HasValidUserScope(string workspaceId, string scope, string subjectId)
