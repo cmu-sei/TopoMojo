@@ -106,7 +106,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     throw new Exception("Template disks have not been prepared.");
             }
 
-            if (!host.Options.Uplink.StartsWith("nsx."))
+            if (!host.Options.IsNsxNetwork && !host.Options.Uplink.StartsWith("nsx."))
             {
                 _logger.LogDebug("deploy: reserve vlans ");
                 _vlanman.ReserveVlans(template, host.Options.IsVCenter);
