@@ -187,21 +187,25 @@ namespace TopoMojo.Hypervisor.vSphere
             foreach (ObjectContent obj in oc)
             {
                 string vmName = obj.GetProperty("name").ToString();
+
                 VirtualMachineConfigInfo config = obj.GetProperty("config") as VirtualMachineConfigInfo;
+
                 foreach (VirtualEthernetCard card in config.hardware.device.OfType<VirtualEthernetCard>())
                 {
-                    if (card.backing is VirtualEthernetCardOpaqueNetworkBackingInfo)
+                    if (card.backing is VirtualEthernetCardDistributedVirtualPortBackingInfo)
                     {
-                        var back = card.backing as VirtualEthernetCardOpaqueNetworkBackingInfo;
+                        var back = card.backing as VirtualEthernetCardDistributedVirtualPortBackingInfo;
 
                         result.Add(new VmNetwork
                         {
-                            NetworkMOR = $"{back.opaqueNetworkType}#{back.opaqueNetworkId}",
+                            NetworkMOR = $"DistributedVirtualPortgroup|{back.port.portgroupKey}",
                             VmName = vmName
                         });
                     }
                 }
+
             }
+
             return result.ToArray();
         }
 
@@ -211,24 +215,34 @@ namespace TopoMojo.Hypervisor.vSphere
 
             RetrievePropertiesResponse response = await _client.vim.RetrievePropertiesAsync(
                 _client.props,
-                FilterFactory.OpaqueNetworkFilter(_client.cluster));
+                FilterFactory.DistributedPortgroupFilter(_client.cluster));
 
             ObjectContent[] clunkyTree = response.returnval;
-            foreach (var dvpg in clunkyTree.FindType("OpaqueNetwork"))
+            foreach (var dvpg in clunkyTree.FindType("DistributedVirtualPortgroup"))
             {
-                var config = (OpaqueNetworkSummary)dvpg.GetProperty("summary");
+                var config = (DVPortgroupConfigInfo)dvpg.GetProperty("config");
+                if (config.distributedVirtualSwitch.Value == _client.dvs.Value)
+                {
+                    string net = dvpg.GetProperty("name") as string;
 
-                if (Regex.Match(config.name, _client.ExcludeNetworkMask).Success)
+                    if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
                         continue;
 
-                list.Add(
-                    new PortGroupAllocation
+                    if (
+                        config.defaultPortConfig is VMwareDVSPortSetting
+                        && ((VMwareDVSPortSetting)config.defaultPortConfig).vlan is VmwareDistributedVirtualSwitchVlanIdSpec
+                    )
                     {
-                        Net = config.name,
-                        Key = $"{config.opaqueNetworkType}#{config.opaqueNetworkId}",
-                        Switch = config.opaqueNetworkType
+                        list.Add(
+                            new PortGroupAllocation
+                            {
+                                Net = net,
+                                Key = dvpg.obj.AsString(),
+                                Switch = _client.UplinkSwitch
+                            }
+                        );
                     }
-                );
+                }
             }
 
             return list.ToArray();
@@ -272,13 +286,17 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             if (card != null)
             {
-                if (card.backing is VirtualEthernetCardOpaqueNetworkBackingInfo)
+                if (card.backing is VirtualEthernetCardDistributedVirtualPortBackingInfo)
                 {
                     string netMorName = this.Resolve(portgroupName);
-                    card.backing = new VirtualEthernetCardOpaqueNetworkBackingInfo
+
+                    card.backing = new VirtualEthernetCardDistributedVirtualPortBackingInfo
                     {
-                        opaqueNetworkId = netMorName.Tag(),
-                        opaqueNetworkType = netMorName.Untagged()
+                        port = new DistributedVirtualSwitchPortConnection
+                        {
+                            switchUuid = _client.DvsUuid,
+                            portgroupKey = netMorName.AsReference().Value
+                        }
                     };
                 }
 
