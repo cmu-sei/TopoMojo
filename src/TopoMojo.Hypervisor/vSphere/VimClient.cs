@@ -1046,6 +1046,12 @@ namespace TopoMojo.Hypervisor.vSphere
                 if (subpools != null && subpools.Length > 0)
                     _pool = subpools.First();
 
+                var dvs = clunkyTree.FindTypeByName("DistributedVirtualSwitch", _config.Uplink.ToLower()) ?? clunkyTree.First("DistributedVirtualSwitch");
+                _dvs = dvs?.obj;
+                _dvsuuid = dvs?.GetProperty("uuid").ToString();
+                netSettings.dvs = dvs?.obj;
+                netSettings.DvsUuid = _dvsuuid;
+                
                 if (_config.IsNsxNetwork || _config.Uplink.StartsWith("nsx."))
                 {
                     _netman = new NsxNetworkManager(
@@ -1058,14 +1064,6 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
                 else
                 {
-
-                    var dvs = clunkyTree.FindTypeByName("DistributedVirtualSwitch", _config.Uplink.ToLower()) ?? clunkyTree.First("DistributedVirtualSwitch");
-                    _dvs = dvs?.obj;
-                    _dvsuuid = dvs?.GetProperty("uuid").ToString();
-
-                    netSettings.dvs = dvs?.obj;
-                    netSettings.DvsUuid = _dvsuuid;
-
                     _netman = new DistributedNetworkManager(
                         netSettings,
                         _vmCache,

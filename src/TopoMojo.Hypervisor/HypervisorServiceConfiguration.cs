@@ -43,7 +43,7 @@ namespace TopoMojo.Hypervisor
 
     public class VlanConfiguration
     {
-        public string Range { get; set; }
+        public string Range { get; set; } = "";
         public Vlan[] Reservations { get; set; } = new Vlan[] {};
     }
 
