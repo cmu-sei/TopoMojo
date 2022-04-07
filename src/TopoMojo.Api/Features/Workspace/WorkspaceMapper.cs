@@ -24,8 +24,7 @@ namespace TopoMojo.Api
             CreateMap<NewWorkspace, Data.Workspace>()
                 .ForMember(d => d.Challenge, opt => opt.MapFrom(s => s.Challenge ??
                     JsonSerializer.Serialize<ChallengeSpec>(
-                        new ChallengeSpec(),
-                        null
+                        new ChallengeSpec(), new JsonSerializerOptions()
                     )
                 ))
             ;

@@ -57,7 +57,7 @@ namespace TopoMojo
         public static T Clone<T>(this T obj)
         {
             return JsonSerializer.Deserialize<T>(
-                JsonSerializer.Serialize(obj, null)
+                JsonSerializer.Serialize(obj)
             );
         }
     }

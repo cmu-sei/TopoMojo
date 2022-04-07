@@ -5,7 +5,6 @@
     <OutputType>library</OutputType>
     <IsPackable>true</IsPackable>
     <Nullable>annotations</Nullable>
-    <LangVersion>8.0</LangVersion>
     <IncludeGeneratorSharedCode>true</IncludeGeneratorSharedCode>
     <Authors>Software Engineering Institute</Authors>
     <Company>Carnegie Mellon University</Company>
@@ -16,8 +15,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="5.0" />
-    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0" />
+    <PackageReference Include="System.Text.Json" Version="6.0" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="6.0" />
   </ItemGroup>
 
 </Project>
