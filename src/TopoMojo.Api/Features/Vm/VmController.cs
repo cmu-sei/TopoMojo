@@ -15,6 +15,7 @@ using TopoMojo.Api.Extensions;
 using TopoMojo.Api.Hubs;
 using TopoMojo.Api.Services;
 using TopoMojo.Api.Validators;
+using TopoMojo.Api.Models;
 using TopoMojo.Hypervisor;
 
 namespace TopoMojo.Api.Controllers
@@ -51,12 +52,24 @@ namespace TopoMojo.Api.Controllers
         /// <returns></returns>
         [HttpGet("api/vms")]
         [SwaggerOperation(OperationId = "ListVms")]
-        [Authorize(AppConstants.AdminOnlyPolicy)]
+        [Authorize]
+
         public async Task<ActionResult<Vm[]>> ListVms([FromQuery]string filter)
         {
-            AuthorizeAll();
+            AuthorizeAny(
+                () => Actor.IsObserver
+            );
 
             var vms = await _pod.Find(filter);
+
+            if (Actor.IsObserver && !Actor.IsAdmin)
+            {
+                // filter by scope/audience: ensure all VMs come from workspaces w/ audiences 
+                // within this user's scope or they are manager
+                vms = vms.Where(vm => 
+                    CanManageVm(vm.Name, Actor).Result
+                ).ToArray();
+            }
 
             var keys = vms.Select(v => v.Name.Tag()).Distinct().ToArray();
 
@@ -85,7 +98,7 @@ namespace TopoMojo.Api.Controllers
         {
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(id, Actor.Id).Result
+                () => CanManageVm(id, Actor).Result
             );
 
             return Ok(
@@ -110,7 +123,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(op.Id, Actor.Id).Result
+                () => CanManageVmOperation(op, Actor).Result
             );
 
             Vm vm = await _pod.ChangeState(op);
@@ -132,7 +145,7 @@ namespace TopoMojo.Api.Controllers
         {
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(id, Actor.Id).Result
+                () => CanDeleteVm(id, Actor.Id).Result
             );
 
             Vm vm = await _pod.Delete(id);
@@ -155,7 +168,7 @@ namespace TopoMojo.Api.Controllers
         {
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(id, Actor.Id).Result
+                () => CanManageVm(id, Actor).Result
             );
 
             // need elevated privileges to change vm to special nets
@@ -189,7 +202,7 @@ namespace TopoMojo.Api.Controllers
         {
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(id, Actor.Id).Result
+                () => CanManageVm(id, Actor).Result
             );
 
             Vm vm = await _pod.Answer(id, answer);
@@ -211,7 +224,7 @@ namespace TopoMojo.Api.Controllers
         {
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(id, Actor.Id).Result
+                () => CanManageVm(id, Actor).Result
             );
 
             return Ok(
@@ -233,7 +246,7 @@ namespace TopoMojo.Api.Controllers
         {
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(id, Actor.Id).Result
+                () => CanManageVm(id, Actor).Result
             );
 
             return Ok(
@@ -255,7 +268,7 @@ namespace TopoMojo.Api.Controllers
         {
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(id, Actor.Id).Result
+                () => CanManageVm(id, Actor).Result
             );
 
             var info = await _pod.Display(id);
@@ -322,7 +335,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(name, Actor.Id).Result
+                () => CanManageVm(name, Actor).Result
             );
 
             return Ok(
@@ -348,7 +361,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(name, Actor.Id).Result
+                () => CanManageVm(name, Actor).Result
             );
 
             Vm vm = await _pod.Deploy(template, Actor.IsBuilder);
@@ -397,7 +410,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVm(name, Actor.Id).Result
+                () => CanManageVm(name, Actor).Result
             );
 
             return Ok(
@@ -419,12 +432,26 @@ namespace TopoMojo.Api.Controllers
             return Ok();
         }
 
-        private async Task<bool> CanManageVm(string id, string subjectId)
+        private async Task<bool> CanDeleteVm(string id, string subjectId)
         {
             return await _userService.CanInteract(
                 subjectId,
                 await GetVmIsolationTag(id)
             );
+        }
+
+        private async Task<bool> CanManageVm(string id, User actor)
+        {
+            string isolationTag = await GetVmIsolationTag(id);
+            return (actor.IsObserver && await _userService.CanInteractWithAudience(actor.Scope, isolationTag)) ||
+                (await _userService.CanInteract(actor.Id, isolationTag));
+        }
+
+        private async Task<bool> CanManageVmOperation(VmOperation op, User actor)
+        {
+            return op.Type == VmOperationType.Delete
+                ? await CanDeleteVm(op.Id, Actor.Id)
+                : await CanManageVm(op.Id, Actor);
         }
 
         private async Task<string> GetVmIsolationTag(string id)

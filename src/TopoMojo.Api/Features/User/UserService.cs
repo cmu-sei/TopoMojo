@@ -165,6 +165,11 @@ namespace TopoMojo.Api.Services
             return await _store.CanInteract(subjectId, isolationId);
         }
 
+        public async Task<bool> CanInteractWithAudience(string subjectId, string isolationId)
+        {
+            return await _store.CanInteractWithAudience(subjectId, isolationId);
+        }
+
         public async Task<ApiKeyResult> CreateApiKey(string id, string subjectName)
         {
             var entity = await _store.Retrieve(id);

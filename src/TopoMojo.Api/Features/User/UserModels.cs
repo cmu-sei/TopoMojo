@@ -12,7 +12,8 @@ namespace TopoMojo.Api.Models
         Builder,
         Creator,
         Administrator,
-        Disabled
+        Disabled,
+        Observer
     }
 
     public class User
@@ -29,13 +30,19 @@ namespace TopoMojo.Api.Models
         public bool IsAdmin =>
             Role == UserRole.Administrator
         ;
+        public bool IsObserver => 
+            Role == UserRole.Observer ||
+            Role == UserRole.Administrator
+        ;
         public bool IsCreator =>
             Role == UserRole.Creator ||
+            Role == UserRole.Observer ||
             Role == UserRole.Administrator
         ;
         public bool IsBuilder =>
             Role == UserRole.Builder ||
             Role == UserRole.Creator ||
+            Role == UserRole.Observer ||
             Role == UserRole.Administrator
         ;
     }
