@@ -62,6 +62,7 @@ namespace TopoMojo.Api.Models
     public class UserSearch: Search
     {
         public bool WantsAdmins => Filter.Contains(UserRole.Administrator.ToString().ToLower());
+        public bool WantsObservers => Filter.Contains(UserRole.Observer.ToString().ToLower());
         public bool WantsCreators => Filter.Contains(UserRole.Creator.ToString().ToLower());
         public bool WantsBuilders => Filter.Contains(UserRole.Builder.ToString().ToLower());
         public string scope { get; set; }

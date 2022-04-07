@@ -47,6 +47,9 @@ namespace TopoMojo.Api.Services
 
             if (search.WantsAdmins)
                 q = q.Where(p => p.Role == UserRole.Administrator);
+            
+            if (search.WantsObservers)
+                q = q.Where(p => p.Role == UserRole.Observer);
 
             if (search.WantsCreators)
                 q = q.Where(p => p.Role == UserRole.Creator);
@@ -55,7 +58,7 @@ namespace TopoMojo.Api.Services
                 q = q.Where(p => p.Role == UserRole.Builder);
 
             if (search.scope.NotEmpty())
-                q = q.Where(p => p.Scope == search.scope);
+                q = q.Where(p => p.Scope.Contains(search.scope));
 
             q = q.OrderBy(p => p.Name);
 
