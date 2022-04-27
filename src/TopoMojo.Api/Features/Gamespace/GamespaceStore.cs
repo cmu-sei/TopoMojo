@@ -133,6 +133,16 @@ namespace TopoMojo.Api.Data
             ;
         }
 
+        public async Task<bool> HasValidUserScopeGamespace(string gamespaceId, string scope)
+        {
+            var gamespace = await DbContext.Gamespaces
+                .Where(g => g.Id == gamespaceId)
+                .Include( g => g.Workspace)
+                .FirstOrDefaultAsync();
+
+            return gamespace.Workspace.Audience.HasAnyToken(scope);
+        }
+
         public async Task<bool> IsBelowGamespaceLimit(string subjectId, int limit)
         {
             if (limit == 0)
