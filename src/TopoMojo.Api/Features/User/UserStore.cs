@@ -102,7 +102,7 @@ namespace TopoMojo.Api.Data
             );
 
             return (gs is Gamespace)
-                ? new User { Id = gs.Id }
+                ? new User { Id = gs.Id, Name = "Gamespace Agent" }
                 : null
             ;
 

@@ -18,6 +18,7 @@ CMD ["dotnet", "run"]
 FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS prod
 ARG commit
 ENV COMMIT=$commit
+ENV DOTNET_HOSTBUILDER__RELOADCONFIGCHANGE=false
 COPY --from=dev /app/dist /app
 COPY --from=dev /app/LICENSE.md /app/LICENSE.md
 WORKDIR /app

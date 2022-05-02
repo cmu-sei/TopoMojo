@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TopoMojo.Api.Data;
 
+#nullable disable
+
 namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
 {
     [DbContext(typeof(TopoMojoDbContextSqlServer))]
@@ -15,9 +17,10 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .UseIdentityColumns()
-                .HasAnnotation("Relational:MaxIdentifierLength", 128)
-                .HasAnnotation("ProductVersion", "5.0.0");
+                .HasAnnotation("ProductVersion", "6.0.0")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder, 1L, 1);
 
             modelBuilder.Entity("TopoMojo.Api.Data.ApiKey", b =>
                 {
@@ -45,6 +48,45 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                     b.HasIndex("UserId");
 
                     b.ToTable("ApiKeys");
+                });
+
+            modelBuilder.Entity("TopoMojo.Api.Data.Dispatch", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReferenceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("Result")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TargetGroup")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("TargetName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Trigger")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("WhenCreated")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("WhenUpdated")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetGroup");
+
+                    b.ToTable("Dispatches");
                 });
 
             modelBuilder.Entity("TopoMojo.Api.Data.Gamespace", b =>

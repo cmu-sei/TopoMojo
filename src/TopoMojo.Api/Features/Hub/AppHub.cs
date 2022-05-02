@@ -25,6 +25,7 @@ namespace TopoMojo.Api.Hubs
         Task VmEvent(BroadcastEvent<VmState> broadcastEvent);
         Task PresenceEvent(BroadcastEvent broadcastEvent);
         Task GameEvent(BroadcastEvent<GameState> broadcastEvent);
+        Task DispatchEvent(BroadcastEvent<Dispatch> broadcastEvent);
     }
 
     public interface IHubAction
