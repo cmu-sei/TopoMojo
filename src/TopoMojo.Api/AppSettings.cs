@@ -1,6 +1,7 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Cors.Infrastructure;
@@ -100,7 +101,7 @@ namespace TopoMojo.Api
 
     public class SecurityHeaderOptions
     {
-        public string ContentSecurity { get; set; } = "default-src 'self' 'unsafe-inline'";
+        public string ContentSecurity { get; set; } = "default-src 'self'";
         public string XContentType { get; set; } = "nosniff";
         public string XFrame { get; set; } = "SAMEORIGIN";
     }
@@ -112,6 +113,8 @@ namespace TopoMojo.Api
         public string[] Methods { get; set; } = new string[]{};
         public string[] Headers { get; set; } = new string[]{};
         public bool AllowCredentials { get; set; }
+        public bool AllowWildcardSubdomains { get; set; } = true;
+        public int PreflightMaxAgeMinutes { get; set; } = 10;
 
         public CorsPolicy Build()
         {
@@ -133,7 +136,10 @@ namespace TopoMojo.Api
                 if (headers.First() == "*") policy.AllowAnyHeader(); else policy.WithHeaders(headers);
             }
 
-            policy.SetIsOriginAllowedToAllowWildcardSubdomains();
+            if (AllowWildcardSubdomains)
+                policy.SetIsOriginAllowedToAllowWildcardSubdomains();
+
+            policy.SetPreflightMaxAge(new TimeSpan(0, PreflightMaxAgeMinutes, 0));
 
             return policy.Build();
         }
