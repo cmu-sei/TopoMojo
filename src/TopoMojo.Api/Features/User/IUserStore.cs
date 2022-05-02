@@ -9,7 +9,7 @@ namespace TopoMojo.Api.Data.Abstractions
     public interface IUserStore : IStore<User>
     {
         Task<bool> CanInteract(string id, string isolationId);
-        Task<bool> CanInteractWithAudience(string scope, string gamespaceId);
+        Task<bool> CanInteractWithAudience(string scope, string isolationId);
         Task<User> LoadWithKeys(string id);
         Task<User> ResolveApiKey(string hash);
         Task DeleteApiKey(string id);
