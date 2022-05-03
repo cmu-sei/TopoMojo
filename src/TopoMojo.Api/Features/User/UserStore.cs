@@ -66,18 +66,27 @@ namespace TopoMojo.Api.Data
             return found;
         }
 
-        public async Task<bool> CanInteractWithAudience(string scope, string gamespaceId)
+        public async Task<bool> CanInteractWithAudience(string scope, string isolationId)
         {
-            if (gamespaceId.IsEmpty())
+            if (isolationId.IsEmpty())
                 return false;
 
             var gamespace = await DbContext.Gamespaces
                 .Include(g => g.Workspace)
                 .FirstOrDefaultAsync(g =>
-                    g.Id == gamespaceId
+                    g.Id == isolationId
                 );
-
-            return gamespace.Workspace.Audience.HasAnyToken(scope);
+            if (gamespace != null)
+                return gamespace.Workspace.Audience.HasAnyToken(scope);
+            
+            var workspace = await DbContext.Workspaces
+                .FirstOrDefaultAsync(g =>
+                    g.Id == isolationId
+                );
+            if (workspace != null)
+                return workspace.Audience.HasAnyToken(scope);
+            
+            return false;
         }
 
         public Task<User> LoadWithKeys(string id)
