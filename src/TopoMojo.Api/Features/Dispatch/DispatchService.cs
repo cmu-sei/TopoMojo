@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using TopoMojo.Api.Data.Abstractions;
+using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Models;
 
 namespace TopoMojo.Api.Services
@@ -24,8 +25,13 @@ namespace TopoMojo.Api.Services
 
         public async Task<Dispatch> Create(NewDispatch model)
         {
+            if (string.IsNullOrEmpty(model.ReferenceId))
+                model.ReferenceId = Guid.NewGuid().ToString("n");
+
             var entity = Mapper.Map<Data.Dispatch>(model);
+
             await Store.Create(entity);
+
             return Mapper.Map<Dispatch>(entity);
         }
 
@@ -34,12 +40,43 @@ namespace TopoMojo.Api.Services
             return Mapper.Map<Dispatch>(await Store.Retrieve(id));
         }
 
-        public async Task Update(ChangedDispatch model)
+        /// <summary>
+        /// Add or Update dispatch reponse
+        /// </summary>
+        /// <remarks>
+        /// If a dispatch is broadcast (no target), then multiple response
+        /// can be added.
+        /// </remarks>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        public async Task<Dispatch> Update(ChangedDispatch model)
         {
-            model.ResponseTime = DateTimeOffset.Now;
+            model.WhenUpdated = DateTimeOffset.UtcNow;
+
             var entity = await Store.Retrieve(model.Id);
-            Mapper.Map(model, entity);
-            await Store.Update(entity);
+
+            // targets match (specified or blank)
+            if (model.TargetName == entity.TargetName)
+            {
+                Mapper.Map(model, entity);
+                await Store.Update(entity);
+            }
+            else if (string.IsNullOrEmpty(entity.TargetName))
+            {   
+                // no target specified, so add new for each response that self identifies its target name
+                var replica = Mapper.Map<Data.Dispatch>(entity);
+                model.Id = null;
+                Mapper.Map(model, replica);
+                await Store.Create(replica);
+                entity = replica;
+            }
+            else
+            {
+                // don't update when target is specified, but response doesn't match
+                throw new ActionForbidden();
+            }
+
+            return Mapper.Map<Dispatch>(entity);
         }
 
         public async Task Delete(string id)
@@ -59,7 +96,7 @@ namespace TopoMojo.Api.Services
                 (d.WhenCreated > ts || d.WhenUpdated > ts)
             );
 
-            q = q.OrderByDescending(d => d.WhenCreated);
+            q = q.OrderBy(d => d.WhenCreated);
             
             q = q.Skip(filter.Skip);
 

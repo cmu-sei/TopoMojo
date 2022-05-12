@@ -1,19 +1,24 @@
 # Example tests with REST Client (VSCode Extension)
 
-@url = http://localhost:5000/api
+@url = http://localhost:5004/api
 @json = content-type: application/json
+@key = x-api-key: rrVaLR4kE4vKPw5N2LpzBoREBzx4cumv
 
 ###
 
-GET {{url}}/dispatchs?term=
+GET {{url}}/dispatches?gs=5285f0c2a7b5474ca05735ab765311dc&since=2022-05-11T00:38:08%2b00:00
+{{key}}
 
 ###
 
 POST {{url}}/dispatch
 {{json}}
+{{key}}
 
 {
-    "name": "new dispatch"
+    "trigger": "ls -l",
+    "targetGroup": "5285f0c2a7b5474ca05735ab765311dc",
+    "targetName": "jamtest"
 }
 
 ###
@@ -28,4 +33,5 @@ PUT {{url}}/dispatch
 
 ###
 
-DELETE {{url}}/dispatch/1
+DELETE {{url}}/dispatch/448355b31547460ea95746ea1beca164
+{{key}}

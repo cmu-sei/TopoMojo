@@ -289,8 +289,8 @@ namespace TopoMojo.Api.Controllers
         /// <returns></returns>
         [HttpGet("/api/user/ticket")]
         [Authorize]
-        [ApiExplorerSettings(IgnoreApi = true)]
-        public async Task<IActionResult> GetOneTimeTicket()
+        [SwaggerOperation(OperationId = "GetOneTimeTicket")]
+        public async Task<ActionResult<OneTimeTicketResult>> GetOneTimeTicket()
         {
             string token = Guid.NewGuid().ToString("n");
 
@@ -300,7 +300,9 @@ namespace TopoMojo.Api.Controllers
 
             await _distCache.SetStringAsync(key, value, _cacheOpts);
 
-            return Ok(new { Ticket = token });
+            OneTimeTicketResult result = new() { Ticket = token };
+
+            return Ok(result);
         }
 
         /// <summary>
@@ -348,6 +350,7 @@ namespace TopoMojo.Api.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("/api/user/ping")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         [Authorize(AppConstants.CookiePolicy)]
         public IActionResult Heartbeat()
         {

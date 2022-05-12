@@ -2,7 +2,6 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -82,7 +81,8 @@ namespace TopoMojo.Api.Hubs
 
             Groups.AddToGroupAsync(Context.ConnectionId, channelId);
 
-            Context.Items.Add("channelId", channelId);
+            if (!Context.Items.ContainsKey("channelId"))
+                Context.Items.Add("channelId", channelId);
 
             _cache.Connections.TryAdd(Context.ConnectionId,
                 new CachedConnection
@@ -134,52 +134,5 @@ namespace TopoMojo.Api.Hubs
             return Clients.OthersInGroup(channelId).DocumentEvent(new BroadcastEvent<object>(Context.User, "DOCUMENT.CURSOR", positions));
         }
 
-    }
-
-    public class BroadcastEvent
-    {
-        public BroadcastEvent(
-            System.Security.Principal.IPrincipal user,
-            string action
-        ) {
-            Actor = user.AsActor();
-            Action = action;
-        }
-
-        public Actor Actor { get; private set; }
-        public string Action { get; set; }
-    }
-
-    public class BroadcastEvent<T> : BroadcastEvent where T : class
-    {
-        public BroadcastEvent(
-            System.Security.Principal.IPrincipal user,
-            string action,
-            T model
-        ) : base(user, action)
-        {
-            Model = model;
-        }
-
-        public T Model { get; set; }
-    }
-
-    public class Actor
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-    }
-
-    public static class HubExtensions
-    {
-        public static Actor AsActor(this System.Security.Principal.IPrincipal user)
-        {
-            var principal = user as ClaimsPrincipal;
-            return new Actor
-            {
-                Id = principal.FindFirstValue(JwtRegisteredClaimNames.Sub),
-                Name = principal.FindFirstValue("name")
-            };
-        }
     }
 }

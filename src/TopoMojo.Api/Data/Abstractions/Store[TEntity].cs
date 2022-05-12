@@ -35,7 +35,7 @@ namespace TopoMojo.Api.Data
                 entity.Id = Guid.NewGuid().ToString("n");
 
             if (entity.WhenCreated == DateTimeOffset.MinValue)
-                entity.WhenCreated = DateTimeOffset.Now;
+                entity.WhenCreated = DateTimeOffset.UtcNow;
 
             DbContext.Add(entity);
 

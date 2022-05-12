@@ -96,10 +96,10 @@ namespace TopoMojo.Api.Controllers
                 () => GamespaceService.CanManage(dispatch.TargetGroup, Actor.Id).Result
             );
 
-            await DispatchService.Update(model);
+            dispatch = await DispatchService.Update(model);
 
             SendBroadcast(
-                await DispatchService.Retrieve(model.Id),
+                dispatch,
                 "UPDATE"
             );
         }
@@ -125,7 +125,7 @@ namespace TopoMojo.Api.Controllers
 
             await DispatchService.Delete(id);
 
-            SendBroadcast(new Dispatch { Id = id }, "DELETE");
+            SendBroadcast(new Dispatch { Id = id, TargetGroup = entity.TargetGroup }, "DELETE");
         }
 
         /// <summary>
@@ -151,7 +151,7 @@ namespace TopoMojo.Api.Controllers
 
         private void SendBroadcast(Dispatch dispatch, string action)
         {
-            Hub.Clients.Group(dispatch.Id).DispatchEvent(
+            Hub.Clients.Group(dispatch.TargetGroup).DispatchEvent(
                 new BroadcastEvent<Dispatch>(
                     User,
                     "DISPATCH." + action.ToUpper(),

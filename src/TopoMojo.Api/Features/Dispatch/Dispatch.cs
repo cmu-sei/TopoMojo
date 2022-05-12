@@ -12,7 +12,7 @@ namespace TopoMojo.Api.Models
         public string TargetName { get; set; }
         public string Result { get; set; }
         public string Error { get; set; }
-        public DateTimeOffset ResponseTime { get; set; }
+        public DateTimeOffset WhenUpdated { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
     }
 
@@ -29,7 +29,8 @@ namespace TopoMojo.Api.Models
         public string Id { get; set; }
         public string Result { get; set; }
         public string Error { get; set; }
-        public DateTimeOffset ResponseTime { get; set; }
+        public string TargetName { get; set; }
+        public DateTimeOffset WhenUpdated { get; set; }
     }
 
     public class DispatchSearch : Search

@@ -56,21 +56,24 @@ namespace TopoMojo.Api
                     .ToString()
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-                string scheme = authHeader[0];
+                if (authHeader?.Any() == true)
+                {
+                    string scheme = authHeader[0];
 
-                if (authHeader.Length > 1
-                    && scheme.Equals(ApiKeyAuthentication.AuthenticationScheme, StringComparison.OrdinalIgnoreCase)
-                ) {
-                    key = authHeader[1];
+                    if (authHeader.Length > 1
+                        && scheme.Equals(ApiKeyAuthentication.AuthenticationScheme, StringComparison.OrdinalIgnoreCase)
+                    ) {
+                        key = authHeader[1];
 
-                    if (authHeader.Length > 2)
-                        name = authHeader[2];
+                        if (authHeader.Length > 2)
+                            name = authHeader[2];
+                    }
                 }
             }
 
             var subject = await _svc.ResolveApiKey(key);
 
-            if (string.IsNullOrEmpty(subject.Id))
+            if (subject is null)
                 return AuthenticateResult.NoResult();
 
             var principal = new ClaimsPrincipal(
