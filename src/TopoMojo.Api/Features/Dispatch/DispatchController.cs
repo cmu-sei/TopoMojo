@@ -45,7 +45,8 @@ namespace TopoMojo.Api.Controllers
             AuthorizeAny(
                 () => Actor.IsAdmin,
                 () => model.TargetGroup == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(model.TargetGroup, Actor.Id).Result
+                () => GamespaceService.CanManage(model.TargetGroup, Actor.Id).Result,
+                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(model.TargetGroup, Actor.Scope).Result
             );
 
             var result = await DispatchService.Create(model);
@@ -71,7 +72,8 @@ namespace TopoMojo.Api.Controllers
             AuthorizeAny(
                 () => Actor.IsAdmin,
                 () => model.TargetGroup == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(model.TargetGroup, Actor.Id).Result
+                () => GamespaceService.CanManage(model.TargetGroup, Actor.Id).Result,
+                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(model.TargetGroup, Actor.Scope).Result
             );
 
             return await DispatchService.Retrieve(id);
@@ -93,7 +95,8 @@ namespace TopoMojo.Api.Controllers
             AuthorizeAny(
                 () => Actor.IsAdmin,
                 () => dispatch.TargetGroup == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(dispatch.TargetGroup, Actor.Id).Result
+                () => GamespaceService.CanManage(dispatch.TargetGroup, Actor.Id).Result,
+                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(dispatch.TargetGroup, Actor.Scope).Result
             );
 
             dispatch = await DispatchService.Update(model);
@@ -120,7 +123,8 @@ namespace TopoMojo.Api.Controllers
             AuthorizeAny(
                 () => Actor.IsAdmin,
                 () => entity.TargetGroup == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(entity.TargetGroup, Actor.Id).Result
+                () => GamespaceService.CanManage(entity.TargetGroup, Actor.Id).Result,
+                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(entity.TargetGroup, Actor.Scope).Result
             );
 
             await DispatchService.Delete(id);
@@ -143,7 +147,8 @@ namespace TopoMojo.Api.Controllers
             AuthorizeAny(
                 () => Actor.IsAdmin,
                 () => model.gs == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(model.gs, Actor.Id).Result
+                () => GamespaceService.CanManage(model.gs, Actor.Id).Result,
+                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(model.gs, Actor.Scope).Result
             );
 
             return await DispatchService.List(model, ct);
