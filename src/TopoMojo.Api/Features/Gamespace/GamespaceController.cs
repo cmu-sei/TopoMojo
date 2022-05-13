@@ -70,7 +70,7 @@ namespace TopoMojo.Api.Controllers
             AuthorizeAll();
 
             return Ok(
-                await _svc.List(model, Actor.Id, Actor.IsAdmin, ct)
+                await _svc.List(model, Actor.Id, Actor.IsAdmin, Actor.IsObserver, Actor.Scope, ct)
             );
         }
 
@@ -122,14 +122,15 @@ namespace TopoMojo.Api.Controllers
 
         [HttpGet("api/gamespace/{id}/challenge")]
         [SwaggerOperation(OperationId = "LoadGamespaceChallenge")]
-        [Authorize(AppConstants.AdminOnlyPolicy)]
+        [Authorize]
         [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<ActionResult<ChallengeSpec>> LoadChallenge(string id)
         {
             await Validate(new Entity { Id = id });
 
             AuthorizeAny(
-                () => Actor.IsAdmin
+                () => Actor.IsAdmin,
+                () => Actor.IsObserver && _svc.HasValidUserScopeGamespace(id, Actor.Scope).Result 
             );
 
             return Ok(

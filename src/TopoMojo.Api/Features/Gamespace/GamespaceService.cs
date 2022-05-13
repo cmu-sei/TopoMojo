@@ -49,11 +49,12 @@ namespace TopoMojo.Api.Services
         private readonly Random _random;
         private readonly IDistributedCache _distCache;
 
-        public async Task<Gamespace[]> List(GamespaceSearch search, string subjectId, bool sudo, CancellationToken ct = default(CancellationToken))
+        public async Task<Gamespace[]> List(GamespaceSearch search, string subjectId, bool sudo, bool observer, string scope, CancellationToken ct = default(CancellationToken))
         {
-            var query =  (sudo && search.WantsAll)
-                ? _store.List(search.Term)
-                : _store.ListByUser(subjectId)
+            
+            var query = (observer && search.WantsAll)
+                ? _store.List(search.Term) // dashboard list - admin or observer
+                : _store.ListByUser(subjectId) // side panel browser - anyone
             ;
 
             if (search.WantsActive)
@@ -73,9 +74,21 @@ namespace TopoMojo.Api.Services
             if (search.Take > 0)
                 query = query.Take(search.Take);
 
-            return Mapper.Map<Gamespace[]>(
-                await query.ToArrayAsync()
-            );
+            query = query.Include(g => g.Workspace);
+
+            var data = await query.ToArrayAsync();
+            
+            // filter only when user is observer (but not admin)
+            // select gamespaces with matching workspace audience / user scope
+            if (search.WantsAll && observer && !sudo)
+            { 
+                // complex string splitting done after all querying completed
+                data = data
+                    .Where(g => g.Workspace.Audience.HasAnyToken(scope)) 
+                    .ToArray();
+            }
+
+            return Mapper.Map<Gamespace[]>(data);
         }
 
         public async Task<GameState> Preview(string resourceId)
@@ -946,6 +959,13 @@ namespace TopoMojo.Api.Services
             scope += " " + _options.DefaultUserScope;
 
             return await _store.HasValidUserScope(id, scope, subjectId);
+        }
+
+        public async Task<bool> HasValidUserScopeGamespace(string id, string scope)
+        {
+            scope += " " + _options.DefaultUserScope;
+
+            return await _store.HasValidUserScopeGamespace(id, scope);
         }
     }
 }
