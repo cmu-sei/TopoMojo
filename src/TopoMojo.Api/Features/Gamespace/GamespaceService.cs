@@ -336,6 +336,10 @@ namespace TopoMojo.Api.Services
                 result = ctx.Gamespace.Id;
                 break;
 
+                case "app_url":
+                result = ctx.Request.GraderUrl.Split("/api").First();
+                break;
+
                 case "grader_key":
                 result = ctx.Request.GraderKey;
                 break;
