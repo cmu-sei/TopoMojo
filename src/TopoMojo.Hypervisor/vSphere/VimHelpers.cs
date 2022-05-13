@@ -2,7 +2,7 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
-using NetVimClient;
+using VimClient;
 
 namespace TopoMojo.Hypervisor.vSphere
 {

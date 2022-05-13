@@ -5,7 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using NetVimClient;
+using VimClient;
 using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.vSphere

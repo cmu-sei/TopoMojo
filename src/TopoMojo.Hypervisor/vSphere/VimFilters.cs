@@ -3,7 +3,7 @@
 
 using System;
 using System.Linq;
-using NetVimClient;
+using VimClient;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
