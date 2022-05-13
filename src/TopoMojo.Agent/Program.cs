@@ -1,7 +1,4 @@
-﻿using System.Linq;
-using TopoMojo.Api.Client;
-
-namespace TopoMojo.Agent;
+﻿namespace TopoMojo.Agent;
 
 class Program
 {
@@ -18,15 +15,16 @@ class Program
 
         EventHandlerConfiguration config = new();
 
-        config.Url = !string.IsNullOrEmpty(argv[0]) ? argv[0] : System.Environment.GetEnvironmentVariable("DISPATCH_URL") ?? "";
-        config.ApiKey = !string.IsNullOrEmpty(argv[1]) ? argv[1] : System.Environment.GetEnvironmentVariable("DISPATCH_APIKEY") ?? "";
-        config.GroupId = !string.IsNullOrEmpty(argv[2]) ? argv[2] : System.Environment.GetEnvironmentVariable("DISPATCH_GROUPID") ?? "";
-        config.Hostname = !string.IsNullOrEmpty(argv[3]) ? argv[3] : System.Environment.GetEnvironmentVariable("HOSTNAME") ?? "";
+        config.Url = !string.IsNullOrEmpty(argv[0]) ? argv[0] : Environment.GetEnvironmentVariable("DISPATCH_URL") ?? "";
+        config.ApiKey = !string.IsNullOrEmpty(argv[1]) ? argv[1] : Environment.GetEnvironmentVariable("DISPATCH_APIKEY") ?? "";
+        config.GroupId = !string.IsNullOrEmpty(argv[2]) ? argv[2] : Environment.GetEnvironmentVariable("DISPATCH_GROUPID") ?? "";
+        config.Hostname = !string.IsNullOrEmpty(argv[3]) ? argv[3] : Environment.GetEnvironmentVariable("HOSTNAME") ?? "";
 
         if (!config.IsValid)
         {
             Console.WriteLine("You must specify a valid url, apikey, and target group.");
             Usage();
+            return;
         }
         EventHandler handler = new(config);
 
