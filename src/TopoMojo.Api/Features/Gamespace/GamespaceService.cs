@@ -337,10 +337,13 @@ namespace TopoMojo.Api.Services
                 break;
 
                 case "app_url":
+                case "topomojo_url":
                 result = ctx.Request.GraderUrl.Split("/api").First();
                 break;
 
                 case "grader_key":
+                case "api_key":
+                case "apikey":
                 result = ctx.Request.GraderKey;
                 break;
 

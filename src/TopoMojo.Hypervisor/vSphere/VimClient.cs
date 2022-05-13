@@ -854,7 +854,7 @@ namespace TopoMojo.Hypervisor.vSphere
                         sp = DateTimeOffset.Now;
                         _logger.LogInformation($"Connecting to {_config.Url}...");
                         _sic = client.RetrieveServiceContentAsync(new ManagedObjectReference { type = "ServiceInstance", Value = "ServiceInstance" }).Result;
-                        _config.IsVCenter = _sic.about.apiType == "VirtualCenter";
+                        _config.IsVCenter = _sic.about?.apiType == "VirtualCenter";
                         _props = _sic.propertyCollector;
                         _vdm = _sic.virtualDiskManager;
                         _file = _sic.fileManager;

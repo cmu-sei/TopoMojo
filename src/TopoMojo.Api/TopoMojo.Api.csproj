@@ -3,6 +3,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <PreserveCompilationContext>true</PreserveCompilationContext>
     <!-- <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> -->
+    <Nullable>disable</Nullable>
   </PropertyGroup>
   <PropertyGroup>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
