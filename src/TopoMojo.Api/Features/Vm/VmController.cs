@@ -407,7 +407,7 @@ namespace TopoMojo.Api.Controllers
         [HttpPut("api/vm-template/{id}")]
         [SwaggerOperation(OperationId = "InitializeVmTemplate")]
         [Authorize]
-        public async Task<ActionResult<Vm>> InitializeVmTemplate(string id)
+        public async Task<ActionResult<int>> InitializeVmTemplate(string id)
         {
             VmTemplate template  = await _templateService.GetDeployableTemplate(id, null);
 
