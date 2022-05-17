@@ -162,7 +162,6 @@ namespace TopoMojo.Api.Controllers
                     "{0}://{1}{2}{3}",
                     Request.Scheme,
                     Request.Host,
-                    Request.PathBase,
                     Url.Action("GradeChallenge")
                 );
             }
