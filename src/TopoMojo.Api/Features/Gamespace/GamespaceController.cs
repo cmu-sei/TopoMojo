@@ -159,7 +159,7 @@ namespace TopoMojo.Api.Controllers
             if (string.IsNullOrEmpty(model.GraderUrl))
             {
                 model.GraderUrl = string.Format(
-                    "{0}://{1}{2}{3}",
+                    "{0}://{1}{2}",
                     Request.Scheme,
                     Request.Host,
                     Url.Action("GradeChallenge")

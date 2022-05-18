@@ -136,10 +136,10 @@ public class EventHandler
                 await Hub.InvokeAsync("Listen", Config.GroupId);
                 connected = true;
             }
-            catch
+            catch (Exception ex)
             {
                 await Task.Delay(1000);
-                Console.WriteLine("trying to start websocket...");
+                Console.WriteLine("trying to start websocket... " + ex.Message);
             }
         }
     }
