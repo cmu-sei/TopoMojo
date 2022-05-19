@@ -76,8 +76,14 @@ namespace TopoMojo.Api.Hubs
         {
             var actor = Context.User.ToModel();
 
-            if (!actor.IsAdmin && !_store.CanInteract(Context.UserIdentifier, channelId).Result)
+            // a gamespace apikey yields a user.id == gamespace.id
+            if (
+                !actor.IsAdmin && 
+                Context.UserIdentifier != channelId &&
+                !_store.CanInteract(Context.UserIdentifier, channelId).Result
+            ) {
                 throw new ActionForbidden();
+            }
 
             Groups.AddToGroupAsync(Context.ConnectionId, channelId);
 
