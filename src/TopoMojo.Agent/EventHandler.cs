@@ -17,16 +17,19 @@ public class EventHandler
     {
         Config = config;
 
+        if (!Config.Url.EndsWith('/'))
+            Config.Url += "/";
+
         // set up api client
         HttpClient http = new();
-        http.BaseAddress = new Uri(config.Url);
-        http.DefaultRequestHeaders.Add("x-api-key", config.ApiKey);
+        http.BaseAddress = new Uri(Config.Url);
+        http.DefaultRequestHeaders.Add("x-api-key", Config.ApiKey);
         Mojo = new(http);
 
         // set up hub client
         Hub = new HubConnectionBuilder()
             .WithUrl(
-                $"{config.Url}/hub",
+                $"{Config.Url}hub",
                 Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets,
                 opt =>
                 {
@@ -41,11 +44,13 @@ public class EventHandler
 
         Hub.Reconnected += async (string? id) =>
         {
-            await Hub.InvokeAsync("Listen", config.GroupId);
+            Console.WriteLine($"Hub reconnected. Attempting to listen of channel {Config.GroupId}");
+            await Hub.InvokeAsync("Listen", Config.GroupId);
         };
 
         Hub.Closed += async (error) =>
         {
+            Console.WriteLine($"Hub closed. Attempting to reconnect...");
             await Task.Delay(new Random().Next(0, 5) * 1000);
             await Hub.StartAsync();
         };
@@ -84,6 +89,9 @@ public class EventHandler
         try
         {
 
+            if (args[0] == "noop")
+                throw new Exception("noop");
+
             ProcessStartInfo info = new()
             {
                 FileName = args[0],
@@ -105,6 +113,7 @@ public class EventHandler
             {
                 message.Model.Error = "Agent failed to start process.";
             }
+
         }
         catch (Exception ex)
         {
@@ -121,27 +130,68 @@ public class EventHandler
     private Task<string> GetAuthTicket()
     {
         var result = Mojo.GetOneTimeTicketAsync().Result;
+
+        Console.WriteLine($"Retrieved auth ticket: {result?.Ticket?.Substring(0, 8)}...");
+
         return Task.FromResult(result?.Ticket ?? "");
     }
 
     internal async Task Connect()
     {
         bool connected = false;
+        bool listening = false;
 
-        while (!connected)
+        while (!connected || !listening)
         {
             try
             {
-                await Hub.StartAsync();
-                await Hub.InvokeAsync("Listen", Config.GroupId);
-                connected = true;
+                
+                if (!connected)
+                {
+                    await Hub.StartAsync();
+
+                    Console.WriteLine($"Hub connected. Establishing listener on channel {Config.GroupId}...");
+
+                    connected = true;
+                }
+
+                if (!listening)
+                {
+                    await Hub.InvokeAsync("Listen", Config.GroupId);
+
+                    listening = true;
+                }
+
             }
             catch (Exception ex)
             {
-                await Task.Delay(1000);
-                Console.WriteLine("trying to start websocket... " + ex.Message);
+
+                string msg = connected
+                    ? "connected, but failed to listen on channel..."
+                    : $"retry connection... {ex.Message}"
+                ;
+
+                Console.WriteLine(msg);
+
+                await Task.Delay(2000);
+
             }
         }
+    }
+
+    internal async Task Heartbeat()
+    {
+        if (string.IsNullOrEmpty(Config.HeartbeatTrigger))
+            return;
+
+        NewDispatch model = new();
+
+        model.ReferenceId = "_heartbeat_";
+        model.TargetGroup = Config.GroupId;
+        model.TargetName = Config.Hostname;
+        model.Trigger = Config.HeartbeatTrigger;
+
+        await Mojo.CreateDispatchAsync(model);
     }
 
 }
