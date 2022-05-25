@@ -262,16 +262,16 @@ namespace TopoMojo.Api.Services
             // clone challenge
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", jsonOptions);
 
-            //resolve transforms
-            ResolveTransforms(spec, ctx);
-
-            // TODO: if customize-script, run and update transforms
-
             // select variant, adjusting from 1-based to 0-based index
             gamespace.Variant = ctx.Request.Variant > 0
                 ? Math.Min(ctx.Request.Variant, spec.Variants.Count) - 1
                 : _random.Next(spec.Variants.Count)
             ;
+
+            //resolve transforms
+            ResolveTransforms(spec, ctx);
+
+            // TODO: if customize-script, run and update transforms
 
             spec.Challenge = spec.Variants
                 .Skip(gamespace.Variant).Take(1)
@@ -324,6 +324,8 @@ namespace TopoMojo.Api.Services
         {
             byte[] buffer;
 
+            List<string> options = new();
+
             string result = "";
 
             string[] seg = key.Split(':');
@@ -334,6 +336,10 @@ namespace TopoMojo.Api.Services
             {
                 case "id":
                 result = ctx.Gamespace.Id;
+                break;
+
+                case "variant":
+                result = ctx.Gamespace.Variant.ToString();
                 break;
 
                 case "app_url":
@@ -387,7 +393,7 @@ namespace TopoMojo.Api.Services
                 if (seg.Length < 3 || !int.TryParse(seg[1], out count))
                     count = 1;
 
-                var options = seg.Last()
+                options = seg.Last()
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .ToList();
 
@@ -400,6 +406,17 @@ namespace TopoMojo.Api.Services
                 }
 
                 result = result.Trim();
+                break;
+
+                case "index": 
+                if (seg.Length < 2 || !int.TryParse(seg[1], out count))
+                    count = 0;
+                
+                options = seg.Last()
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .ToList();
+                
+                result = options[count];
                 break;
 
                 case "int":
