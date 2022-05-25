@@ -298,9 +298,14 @@ namespace TopoMojo.Api.Services
 
         private void ResolveTransforms(ChallengeSpec spec, RegistrationContext ctx)
         {
+            int index = 0;
+
             foreach(var kvp in spec.Transforms.ToArray())
             {
-                kvp.Value = ResolveRandom(kvp.Value, ctx);
+                kvp.Value = ResolveRandom(kvp.Value, ctx, index);
+
+                if (kvp.Key.ToLower() == "index" && !Int32.TryParse(kvp.Value, out index))
+                    index = 0;
 
                 // insert `key_index: value` for any multi-token values (i.e. list-resolver)
                 var tokens =  kvp.Value.Split(" ", StringSplitOptions.RemoveEmptyEntries);
@@ -320,7 +325,7 @@ namespace TopoMojo.Api.Services
 
         }
 
-        private string ResolveRandom(string key, RegistrationContext ctx)
+        private string ResolveRandom(string key, RegistrationContext ctx, int index = 0)
         {
             byte[] buffer;
 
@@ -408,15 +413,16 @@ namespace TopoMojo.Api.Services
                 result = result.Trim();
                 break;
 
-                case "index": 
-                if (seg.Length < 2 || !int.TryParse(seg[1], out count))
-                    count = 0;
+                case "index":
+                // if value doesn't specify index, use index from prior transform
+                if (seg.Length > 1 && !int.TryParse(seg[1], out count))
+                    count = index;
                 
                 options = seg.Last()
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .ToList();
                 
-                result = options[count];
+                result = options[Math.Min(count, options.Count - 1)];
                 break;
 
                 case "int":
