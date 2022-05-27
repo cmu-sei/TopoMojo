@@ -4,20 +4,18 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <OutputType>library</OutputType>
     <IsPackable>true</IsPackable>
-    <Nullable>annotations</Nullable>
-    <LangVersion>8.0</LangVersion>
     <IncludeGeneratorSharedCode>true</IncludeGeneratorSharedCode>
     <Authors>Software Engineering Institute</Authors>
     <Company>Carnegie Mellon University</Company>
-    <Copyright>Copyright 2021 Carnegie Mellon University.</Copyright>
+    <Copyright>Copyright 2022 Carnegie Mellon University.</Copyright>
     <PackageId>TopoMojo.Api.Client</PackageId>
     <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/cmu-sei/TopoMojo</RepositoryUrl>
+    <Version>2.0.7</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="5.0" />
-    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0" />
+    <PackageReference Include="System.Text.Json" Version="6.0.0" />
   </ItemGroup>
 
 </Project>

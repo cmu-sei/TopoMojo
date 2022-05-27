@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
-using NetVimClient;
+using VimClient;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
@@ -153,7 +153,7 @@ namespace TopoMojo.Hypervisor.vSphere
         public static T Clone<T>(this T obj)
         {
             return JsonSerializer.Deserialize<T>(
-                JsonSerializer.Serialize(obj, null)
+                JsonSerializer.Serialize(obj)
             );
         }
     }

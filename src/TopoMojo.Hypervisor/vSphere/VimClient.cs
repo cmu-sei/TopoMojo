@@ -10,7 +10,7 @@ using System.ServiceModel;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
-using NetVimClient;
+using VimClient;
 using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.vSphere
@@ -854,7 +854,11 @@ namespace TopoMojo.Hypervisor.vSphere
                         sp = DateTimeOffset.Now;
                         _logger.LogInformation($"Connecting to {_config.Url}...");
                         _sic = client.RetrieveServiceContentAsync(new ManagedObjectReference { type = "ServiceInstance", Value = "ServiceInstance" }).Result;
-                        _config.IsVCenter = _sic.about.apiType == "VirtualCenter";
+
+                        if (_sic is null)
+                            throw new Exception("Failed to retrieve ServiceContent from vmware sdk.");
+                            
+                        _config.IsVCenter = _sic.about?.apiType == "VirtualCenter";
                         _props = _sic.propertyCollector;
                         _vdm = _sic.virtualDiskManager;
                         _file = _sic.fileManager;

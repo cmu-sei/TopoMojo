@@ -107,7 +107,7 @@ namespace TopoMojo.Api.Services
                         }
                         catch (Exception ex)
                         {
-                            throw ex;
+                            throw new Exception("Error", ex);
                         }
                     }
                 }

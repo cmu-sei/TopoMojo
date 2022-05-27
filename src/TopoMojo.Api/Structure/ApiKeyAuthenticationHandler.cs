@@ -23,6 +23,7 @@ namespace TopoMojo.Api
         public static class ClaimNames
         {
             public const string Subject = AppConstants.SubjectClaimName;
+            public const string Name = AppConstants.NameClaimName;
         }
 
     }
@@ -47,31 +48,39 @@ namespace TopoMojo.Api
             await Task.Delay(0);
 
             string key = Request.Headers[ApiKeyAuthentication.ApiKeyHeaderName];
+            string name = "";
 
             if (string.IsNullOrEmpty(key))
             {
                 string[] authHeader = Request.Headers[ApiKeyAuthentication.AuthorizationHeaderName]
                     .ToString()
-                    .Split(' ');
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-                string scheme = authHeader[0];
+                if (authHeader?.Any() == true)
+                {
+                    string scheme = authHeader[0];
 
-                if (authHeader.Length > 1
-                    && scheme.Equals(ApiKeyAuthentication.AuthenticationScheme, StringComparison.OrdinalIgnoreCase)
-                ) {
-                    key = authHeader[1];
+                    if (authHeader.Length > 1
+                        && scheme.Equals(ApiKeyAuthentication.AuthenticationScheme, StringComparison.OrdinalIgnoreCase)
+                    ) {
+                        key = authHeader[1];
+
+                        if (authHeader.Length > 2)
+                            name = authHeader[2];
+                    }
                 }
             }
 
-            string subjectId = await _svc.ResolveApiKey(key);
+            var subject = await _svc.ResolveApiKey(key);
 
-            if (string.IsNullOrEmpty(subjectId))
+            if (subject is null)
                 return AuthenticateResult.NoResult();
 
             var principal = new ClaimsPrincipal(
                 new ClaimsIdentity(
                     new Claim[] {
-                        new Claim(ApiKeyAuthentication.ClaimNames.Subject, subjectId)
+                        new Claim(ApiKeyAuthentication.ClaimNames.Subject, subject.Id),
+                        new Claim(ApiKeyAuthentication.ClaimNames.Name, name ?? subject.Name)
                     },
                     Scheme.Name
                 )
@@ -94,9 +103,15 @@ namespace TopoMojo.Api
     {
     }
 
+    public class ApiKeyResolvedUser
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+    }
+
     public interface IApiKeyAuthenticationService
     {
-        Task<string> ResolveApiKey(string key);
+        Task<ApiKeyResolvedUser> ResolveApiKey(string key);
     }
 
 }

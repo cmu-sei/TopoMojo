@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TopoMojo.Hypervisor", "src\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TopoMojo.Api", "src\TopoMojo.Api\TopoMojo.Api.csproj", "{0F958584-D445-4CD0-B34F-7B4A08927379}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TopoMojo.Agent", "src\TopoMojo.Agent\TopoMojo.Agent.csproj", "{B1EC033E-567D-454F-AD86-1C0AD347A22C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,6 +44,18 @@ Global
 		{0F958584-D445-4CD0-B34F-7B4A08927379}.Release|x64.Build.0 = Release|Any CPU
 		{0F958584-D445-4CD0-B34F-7B4A08927379}.Release|x86.ActiveCfg = Release|Any CPU
 		{0F958584-D445-4CD0-B34F-7B4A08927379}.Release|x86.Build.0 = Release|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Debug|x86.Build.0 = Debug|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Release|x64.Build.0 = Release|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Release|x86.ActiveCfg = Release|Any CPU
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -49,5 +63,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{E0EAD642-0C46-488A-A17C-2ED612C92641} = {DDD4132E-E50D-4B24-8B87-C6702C10EC6E}
 		{0F958584-D445-4CD0-B34F-7B4A08927379} = {DDD4132E-E50D-4B24-8B87-C6702C10EC6E}
+		{B1EC033E-567D-454F-AD86-1C0AD347A22C} = {DDD4132E-E50D-4B24-8B87-C6702C10EC6E}
 	EndGlobalSection
 EndGlobal

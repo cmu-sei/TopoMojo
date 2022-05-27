@@ -262,16 +262,16 @@ namespace TopoMojo.Api.Services
             // clone challenge
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", jsonOptions);
 
-            //resolve transforms
-            ResolveTransforms(spec, ctx);
-
-            // TODO: if customize-script, run and update transforms
-
             // select variant, adjusting from 1-based to 0-based index
             gamespace.Variant = ctx.Request.Variant > 0
                 ? Math.Min(ctx.Request.Variant, spec.Variants.Count) - 1
                 : _random.Next(spec.Variants.Count)
             ;
+
+            //resolve transforms
+            ResolveTransforms(spec, ctx);
+
+            // TODO: if customize-script, run and update transforms
 
             spec.Challenge = spec.Variants
                 .Skip(gamespace.Variant).Take(1)
@@ -298,9 +298,14 @@ namespace TopoMojo.Api.Services
 
         private void ResolveTransforms(ChallengeSpec spec, RegistrationContext ctx)
         {
+            int index = 0;
+
             foreach(var kvp in spec.Transforms.ToArray())
             {
-                kvp.Value = ResolveRandom(kvp.Value, ctx);
+                kvp.Value = ResolveRandom(kvp.Value, ctx, index);
+
+                if (kvp.Key.ToLower() == "index" && !Int32.TryParse(kvp.Value, out index))
+                    index = 0;
 
                 // insert `key_index: value` for any multi-token values (i.e. list-resolver)
                 var tokens =  kvp.Value.Split(" ", StringSplitOptions.RemoveEmptyEntries);
@@ -320,9 +325,11 @@ namespace TopoMojo.Api.Services
 
         }
 
-        private string ResolveRandom(string key, RegistrationContext ctx)
+        private string ResolveRandom(string key, RegistrationContext ctx, int index = 0)
         {
             byte[] buffer;
+
+            List<string> options = new();
 
             string result = "";
 
@@ -336,7 +343,18 @@ namespace TopoMojo.Api.Services
                 result = ctx.Gamespace.Id;
                 break;
 
+                case "variant":
+                result = ctx.Gamespace.Variant.ToString();
+                break;
+
+                case "app_url":
+                case "topomojo_url":
+                result = ctx.Request.GraderUrl.Split("/api").First();
+                break;
+
                 case "grader_key":
+                case "api_key":
+                case "apikey":
                 result = ctx.Request.GraderKey;
                 break;
 
@@ -380,7 +398,7 @@ namespace TopoMojo.Api.Services
                 if (seg.Length < 3 || !int.TryParse(seg[1], out count))
                     count = 1;
 
-                var options = seg.Last()
+                options = seg.Last()
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .ToList();
 
@@ -393,6 +411,18 @@ namespace TopoMojo.Api.Services
                 }
 
                 result = result.Trim();
+                break;
+
+                case "index":
+                // if value doesn't specify index, use index from prior transform
+                if (seg.Length > 1 && !int.TryParse(seg[1], out count))
+                    count = index;
+                
+                options = seg.Last()
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .ToList();
+                
+                result = options[Math.Min(count, options.Count - 1)];
                 break;
 
                 case "int":

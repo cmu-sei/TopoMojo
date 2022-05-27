@@ -85,4 +85,9 @@ namespace TopoMojo.Api.Models
         public string Name { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
     }
+
+    public class OneTimeTicketResult
+    {
+        public string Ticket { get; set; }
+    }
 }

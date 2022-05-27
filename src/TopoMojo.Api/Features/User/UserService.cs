@@ -207,14 +207,17 @@ namespace TopoMojo.Api.Services
             await _store.DeleteApiKey(id);
         }
 
-        public async Task<string> ResolveApiKey(string key)
+        public async Task<ApiKeyResolvedUser> ResolveApiKey(string key)
         {
             if (key.IsEmpty())
                 return null;
 
             var entity = await _store.ResolveApiKey(key.ToSha256());
 
-            return entity?.Id;
+            return (entity is Data.User)
+                ? new ApiKeyResolvedUser { Id = entity.Id, Name = entity.Name }
+                : null
+            ;
         }
 
         internal async Task<object> LoadUserKeys(string id)

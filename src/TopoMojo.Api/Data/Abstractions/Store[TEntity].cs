@@ -34,6 +34,9 @@ namespace TopoMojo.Api.Data
             if (string.IsNullOrWhiteSpace(entity.Id))
                 entity.Id = Guid.NewGuid().ToString("n");
 
+            if (entity.WhenCreated == DateTimeOffset.MinValue)
+                entity.WhenCreated = DateTimeOffset.UtcNow;
+
             DbContext.Add(entity);
 
             await DbContext.SaveChangesAsync();

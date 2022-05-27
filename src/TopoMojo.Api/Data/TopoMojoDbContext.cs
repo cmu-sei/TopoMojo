@@ -75,6 +75,13 @@ namespace TopoMojo.Api.Data
                 b.HasIndex(w => w.Hash);
             });
 
+            builder.Entity<Dispatch>(b => {
+                b.Property(d => d.Id).HasMaxLength(KEYLENGTH);
+                b.Property(d => d.ReferenceId).HasMaxLength(KEYLENGTH);
+                b.Property(d => d.TargetGroup).HasMaxLength(KEYLENGTH);
+                b.HasIndex(d => d.TargetGroup);
+            });
+
         }
 
         public DbSet<Workspace> Workspaces { get; set; }
@@ -84,6 +91,7 @@ namespace TopoMojo.Api.Data
         public DbSet<Worker> Workers { get; set; }
         public DbSet<Player> Players { get; set; }
         public DbSet<ApiKey> ApiKeys { get; set; }
+        public DbSet<Dispatch> Dispatches { get; set; }
 
     }
 
