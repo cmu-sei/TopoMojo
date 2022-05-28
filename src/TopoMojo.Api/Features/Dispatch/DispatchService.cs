@@ -86,15 +86,15 @@ namespace TopoMojo.Api.Services
 
         public async Task<Dispatch[]> List(DispatchSearch filter,  CancellationToken ct = default(CancellationToken))
         {
-            if (!DateTimeOffset.TryParse(filter.since, out DateTimeOffset ts))
-                ts = DateTimeOffset.MinValue;
-
             var q = Store.List();
 
-            q = q.Where(d => 
-                d.TargetGroup == filter.gs &&
-                (d.WhenCreated > ts || d.WhenUpdated > ts)
-            );
+            q = q.Where(d => d.TargetGroup == filter.gs);
+
+            if (DateTimeOffset.TryParse(filter.since, out DateTimeOffset ts))
+                q = q.Where(d => d.WhenCreated > ts || d.WhenUpdated > ts);
+
+            if (filter.WantsPending)
+                q = q.Where(d => d.WhenUpdated <= DateTimeOffset.Parse("0001-01-01"));
 
             q = q.OrderBy(d => d.WhenCreated);
             

@@ -59,32 +59,47 @@ public class EventHandler
 
     private async Task onMessage(DispatchEvent message)
     {
+        switch (message.Action)
+        {
+            case "DISPATCH.CREATE":
+                await ProcessMessage(message.Model);
+                break;
+        }
+    }
+
+    private async Task ProcessInitial()
+    {
+        var since = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("u");
+
+        var dispatches = await Mojo.ListDispatchesAsync(
+            Config.GroupId, 
+            since,
+            "", null, null, "", new string[] { "pending" }
+        );
+
+        await Task.WhenAll(
+            dispatches.Select(d => ProcessMessage(d))
+        );
+    }
+
+    private async Task ProcessMessage(Dispatch model)
+    {
         // ensure targetname matches configured hostname, if specified
         if (
-            !string.IsNullOrEmpty(message.Model.TargetName) &&
-            message.Model?.TargetName.ToLower() != Config.Hostname.ToLower()
+            !string.IsNullOrEmpty(model.TargetName) &&
+            model?.TargetName.ToLower() != Config.Hostname.ToLower()
         )
         {
             return;
         }
 
-        switch (message.Action)
-        {
-            case "DISPATCH.CREATE":
-                await ProcessMessage(message);
-                break;
-        }
-    }
-
-    private async Task ProcessMessage(DispatchEvent message)
-    {
-        var args = message.Model.Trigger.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var args = model.Trigger.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         if (args.Length == 0)
             return;
 
-        if (string.IsNullOrEmpty(message.Model.TargetName))
-            message.Model.TargetName = Config.Hostname;
+        if (string.IsNullOrEmpty(model.TargetName))
+            model.TargetName = Config.Hostname;
 
         try
         {
@@ -106,25 +121,25 @@ public class EventHandler
             if (p is Process)
             {
                 await p.WaitForExitAsync();
-                message.Model.Result = await p.StandardOutput.ReadToEndAsync();
-                message.Model.Error = await p.StandardError.ReadToEndAsync();
+                model.Result = await p.StandardOutput.ReadToEndAsync();
+                model.Error = await p.StandardError.ReadToEndAsync();
             }
             else
             {
-                message.Model.Error = "Agent failed to start process.";
+                model.Error = "Agent failed to start process.";
             }
 
         }
         catch (Exception ex)
         {
-            message.Model.Error = ex.Message;
+            model.Error = ex.Message;
         }
 
-        ChangedDispatch? model = JsonSerializer.Deserialize<ChangedDispatch>(
-            JsonSerializer.Serialize<Dispatch>(message.Model)
+        ChangedDispatch? changed = JsonSerializer.Deserialize<ChangedDispatch>(
+            JsonSerializer.Serialize<Dispatch>(model)
         );
 
-        await Mojo.UpdateDispatchAsync(model);
+        await Mojo.UpdateDispatchAsync(changed);
     }
 
     private Task<string> GetAuthTicket()
@@ -159,7 +174,11 @@ public class EventHandler
                 {
                     await Hub.InvokeAsync("Listen", Config.GroupId);
 
+                    Console.WriteLine($"Hub listening on channel {Config.GroupId}.");
+
                     listening = true;
+
+                    await ProcessInitial();
                 }
 
             }

@@ -38,5 +38,8 @@ namespace TopoMojo.Api.Models
         public string gs { get; set; }
         public string since { get; set; }
 
+        public const string FilterPending = "pending";
+        public bool WantsPending => Filter.Contains(FilterPending);
+
     }
 }
