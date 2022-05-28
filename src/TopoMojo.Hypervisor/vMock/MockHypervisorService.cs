@@ -133,7 +133,7 @@ namespace TopoMojo.Hypervisor.vMock
         {
             Vm vm = TryFind(id);
             int test = _rand.Next(9);
-            if (test == 0)
+            if (vm is Vm && test == 0)
             {
                 vm.Question = new VmQuestion {
                     Id = Guid.NewGuid().ToString(),
@@ -147,7 +147,7 @@ namespace TopoMojo.Hypervisor.vMock
                 };
             }
             await Delay();
-            return _vms[id];
+            return vm;
         }
 
         public async Task<Vm> ChangeState(VmOperation op)
@@ -492,7 +492,7 @@ namespace TopoMojo.Hypervisor.vMock
             await Task.Delay(0);
             VmOptions opt = new VmOptions()
             {
-                Net = new string[] { "bridge-net", "isp-att" }
+                Net = new string[] { "bridge-net", "isp-att", "lan#12345678" }
             };
             return opt;
         }

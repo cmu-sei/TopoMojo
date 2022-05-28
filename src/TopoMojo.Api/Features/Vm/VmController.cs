@@ -249,11 +249,19 @@ namespace TopoMojo.Api.Controllers
                 () => CanManageVm(id, Actor).Result
             );
 
-            return Ok(
-                await _pod.GetVmNetOptions(
-                    await GetVmIsolationTag(id)
-                )
+            var opt = await _pod.GetVmNetOptions(
+                await GetVmIsolationTag(id)
             );
+
+            // if not builder, strip any privileged nets
+            if (
+                Actor.IsBuilder.Equals(false) &&
+                _options.AllowUnprivilegedVmReconfigure.Equals(false)
+            ) {
+                opt.Net = opt.Net.Where(x => x.Contains("#")).ToArray();
+            }
+
+            return Ok(opt);
         }
 
         /// <summary>
@@ -461,9 +469,11 @@ namespace TopoMojo.Api.Controllers
 
         private async Task<string> GetVmIsolationTag(string id)
         {
+            // id here can be name#isolationId, vm-id, or just isolationId
             return id.Contains("#")
                 ? id.Tag()
-                : (await _pod.Load(id))?.Name.Tag();
+                : (await _pod.Load(id))?.Name.Tag() ?? id
+            ;
         }
 
         private void SendBroadcast(Vm vm, string action)
