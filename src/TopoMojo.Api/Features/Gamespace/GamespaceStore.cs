@@ -74,7 +74,7 @@ namespace TopoMojo.Api.Data
 
             string id = await DbSet.Where(g =>
                     g.WorkspaceId == workspaceId &&
-                    g.EndTime == DateTimeOffset.MinValue &&
+                    g.EndTime <= DateTimeOffset.MinValue &&
                     g.ExpirationTime > ts &&
                     (
                         g.ManagerId == subjectId ||
@@ -151,7 +151,7 @@ namespace TopoMojo.Api.Data
             int active = await DbSet.CountAsync(g =>
                 g.ManagerId == subjectId &&
                 g.StartTime > DateTimeOffset.MinValue &&
-                g.EndTime == DateTimeOffset.MinValue
+                g.EndTime <= DateTimeOffset.MinValue
             );
 
             return active < limit;

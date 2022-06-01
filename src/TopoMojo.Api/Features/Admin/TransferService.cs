@@ -30,7 +30,8 @@ namespace TopoMojo.Api.Services
             _userStore = userStore;
             jsonSerializerSettings = new JsonSerializerOptions
             {
-                WriteIndented = true
+                WriteIndented = true,
+                ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve
             };
         }
 

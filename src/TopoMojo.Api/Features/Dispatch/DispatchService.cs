@@ -94,7 +94,7 @@ namespace TopoMojo.Api.Services
                 q = q.Where(d => d.WhenCreated > ts || d.WhenUpdated > ts);
 
             if (filter.WantsPending)
-                q = q.Where(d => d.WhenUpdated <= DateTimeOffset.Parse("0001-01-01"));
+                q = q.Where(d => d.WhenUpdated <= DateTimeOffset.MinValue);
 
             q = q.OrderBy(d => d.WhenCreated);
             

@@ -51,7 +51,7 @@ namespace TopoMojo.Api.Data
             return await DbContext.Gamespaces
                 .Where(g =>
                     g.WorkspaceId == id &&
-                    g.EndTime == DateTimeOffset.MinValue
+                    g.EndTime <= DateTimeOffset.MinValue
                 )
                 .ToArrayAsync()
             ;
@@ -124,7 +124,7 @@ namespace TopoMojo.Api.Data
         {
             return await DbContext.Gamespaces.CountAsync(g =>
                 g.WorkspaceId == id &&
-                g.EndTime == DateTimeOffset.MinValue
+                g.EndTime <= DateTimeOffset.MinValue
             );
         }
 

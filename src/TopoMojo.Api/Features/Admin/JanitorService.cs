@@ -42,7 +42,7 @@ namespace TopoMojo.Api.Services
             var ts = DateTimeOffset.UtcNow;
 
             var unended = await _gamespaceStore.List()
-                .Where(g => g.EndTime == DateTimeOffset.MinValue)
+                .Where(g => g.EndTime <= DateTimeOffset.MinValue)
                 .ToListAsync()
             ;
 
