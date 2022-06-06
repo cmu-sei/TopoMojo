@@ -235,6 +235,15 @@ namespace TopoMojo.Hypervisor.vSphere
                 bus.controllerKey = key--;
                 device = bus;
             }
+            
+            if (type.ToLower() == "pvscsi")
+            {
+                ParaVirtualSCSIController bus = new ParaVirtualSCSIController();
+                bus.busNumber = 0;
+                bus.sharedBus = VirtualSCSISharing.noSharing;
+                bus.controllerKey = key--;
+                device = bus;
+            }
 
             devicespec.device = device;
             devicespec.operation = VirtualDeviceConfigSpecOperation.add;
