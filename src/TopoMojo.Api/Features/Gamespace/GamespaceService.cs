@@ -575,7 +575,7 @@ namespace TopoMojo.Api.Services
             {
                 var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespace.Challenge, jsonOptions);
 
-                if (spec.Challenge == null)
+                if (spec.Challenge == null || spec.Challenge.Sections.Count == 0)
                     return state;
 
                 // TODO: get active question set
@@ -903,7 +903,7 @@ namespace TopoMojo.Api.Services
 
         private ChallengeView MapChallenge(ChallengeSpec spec, int sectionIndex = 0)
         {
-            var section = spec.Challenge.Sections.ElementAtOrDefault(sectionIndex);
+            var section = spec.Challenge.Sections?.ElementAtOrDefault(sectionIndex) ?? new SectionSpec();
 
             var challenge = new ChallengeView
             {
@@ -914,7 +914,7 @@ namespace TopoMojo.Api.Services
                 Attempts = spec.Submissions.Count,
                 Score = Math.Round(spec.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
                 SectionIndex = sectionIndex,
-                SectionCount = spec.Challenge.Sections.Count,
+                SectionCount = spec.Challenge.Sections?.Count ?? 0,
                 SectionScore = Math.Round(section.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
                 SectionText = section.Text,
                 Questions = Mapper.Map<QuestionView[]>(section.Questions.Where(q => !q.Hidden))
