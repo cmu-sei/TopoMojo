@@ -85,10 +85,9 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 ManagedObjectReference task = await _vim.PowerOnVM_TaskAsync(vm.AsVim(), null);
                 TaskInfo info = await WaitForVimTask(task);
-                vm.State = (info.state == TaskInfoState.success)
-                    ? VmPowerState.Running
-                    : vm.State;
-                if (vm.State != VmPowerState.Running)
+                if (info.state == TaskInfoState.success || (info.error?.localizedMessage.ToLower().Contains("powered on") ?? false))
+                    vm.State = VmPowerState.Running;
+                else
                     throw new Exception(info.error.localizedMessage);
 
                 //apply guestinfo for annotations
@@ -103,19 +102,25 @@ namespace TopoMojo.Hypervisor.vSphere
         public async Task<Vm> Stop(string id)
         {
             await Connect();
+
             Vm vm = _vmCache[id];
+
             _logger.LogDebug($"Stopping vm {vm.Name}");
+
             if (vm.State == VmPowerState.Running)
             {
                 ManagedObjectReference task = await _vim.PowerOffVM_TaskAsync(vm.AsVim());
+                
                 TaskInfo info = await WaitForVimTask(task);
-                vm.State = (info.state == TaskInfoState.success)
-                    ? VmPowerState.Off
-                    : vm.State;
-                if (vm.State == VmPowerState.Running)
+                
+                if (info.state == TaskInfoState.success || (info.error?.localizedMessage.ToLower().Contains("powered off") ?? false))
+                    vm.State = VmPowerState.Off;
+                else
                     throw new Exception(info.error.localizedMessage);
+                
+                _vmCache.TryUpdate(vm.Id, vm, vm);
             }
-            _vmCache.TryUpdate(vm.Id, vm, vm);
+
             return vm;
         }
 
@@ -199,7 +204,6 @@ namespace TopoMojo.Hypervisor.vSphere
 
             _logger.LogDebug($"Delete: stopping vm {vm.Name}");
             await Stop(id);
-            vm.State = VmPowerState.Off;
 
             _logger.LogDebug($"Delete: unregistering vm {vm.Name}");
             await _netman.Unprovision(vm.AsVim());
