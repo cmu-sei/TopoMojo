@@ -49,6 +49,7 @@ namespace TopoMojo.Api.Models
         public bool IsActive { get; set; }
         public IEnumerable<VmState> Vms { get; set; } = new List<VmState>();
         public ChallengeView Challenge { get; set; }
+        public int Variant { get; set; }
 
     }
 
