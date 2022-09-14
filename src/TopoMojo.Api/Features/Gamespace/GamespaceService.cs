@@ -17,6 +17,7 @@ using TopoMojo.Api.Extensions;
 using TopoMojo.Hypervisor;
 using TopoMojo.Api.Models;
 using Microsoft.Extensions.Caching.Distributed;
+using System.Text;
 
 namespace TopoMojo.Api.Services
 {
@@ -286,11 +287,15 @@ namespace TopoMojo.Api.Services
 
             spec.Variants = null;
 
-            gamespace.Challenge = JsonSerializer.Serialize(spec, jsonOptions);
+            StringBuilder sb = new(
+                JsonSerializer.Serialize(spec, jsonOptions)
+            );
 
             // apply transforms
             foreach (var kvp in spec.Transforms)
-                gamespace.Challenge = gamespace.Challenge.Replace($"##{kvp.Key}##", kvp.Value);
+                sb.Replace($"##{kvp.Key}##", kvp.Value);
+                
+            gamespace.Challenge = sb.ToString();
 
             await _store.Create(gamespace);
 
