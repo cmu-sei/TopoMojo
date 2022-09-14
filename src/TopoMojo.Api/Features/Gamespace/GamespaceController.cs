@@ -237,9 +237,11 @@ namespace TopoMojo.Api.Controllers
                 () => _svc.CanManage(id, Actor.Id).Result
             );
 
-            return Ok(
-                await _svc.Start(id, Actor.IsBuilder)
-            );
+            var result = await _svc.Start(id, Actor.IsBuilder);
+            
+            SendBroadcast(result, "UPDATE");
+
+            return Ok(result);
         }
 
         /// <summary>
@@ -259,9 +261,11 @@ namespace TopoMojo.Api.Controllers
                 () => _svc.CanManage(id, Actor.Id).Result
             );
 
-            return Ok(
-                await _svc.Stop(id)
-            );
+            var result = await _svc.Stop(id);
+            
+            SendBroadcast(result, "UPDATE");
+
+            return Ok(result);
         }
 
         /// <summary>
@@ -281,9 +285,11 @@ namespace TopoMojo.Api.Controllers
                 () => _svc.CanManage(id, Actor.Id).Result
             );
 
-            return Ok(
-                await _svc.Complete(id)
-            );
+            var result = await _svc.Complete(id);
+            
+            SendBroadcast(result, "UPDATE");
+
+            return Ok(result);
         }
 
         /// <summary>
@@ -304,9 +310,11 @@ namespace TopoMojo.Api.Controllers
                 () => _svc.CanInteract(model.Id, Actor.Id).Result
             );
 
-            return Ok(
-                await _svc.Grade(model)
-            );
+            var result = await _svc.Grade(model);
+            
+            SendBroadcast(result, "UPDATE");
+
+            return Ok(result);
         }
 
         /// <summary>
