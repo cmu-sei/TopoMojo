@@ -116,6 +116,8 @@ public class EventHandler
                 CreateNoWindow = true
             };
 
+            Log($"{model.TargetName} {info.FileName} {info.Arguments}");
+
             Process? p = Process.Start(info);
 
             if (p is Process)
@@ -134,6 +136,9 @@ public class EventHandler
         {
             model.Error = ex.Message;
         }
+
+        if (!string.IsNullOrEmpty(model.Error))
+            Log($"{model.TargetName} {model.Error}");
 
         ChangedDispatch? changed = JsonSerializer.Deserialize<ChangedDispatch>(
             JsonSerializer.Serialize<Dispatch>(model)
@@ -213,6 +218,11 @@ public class EventHandler
         await Mojo.CreateDispatchAsync(model);
     }
 
+    private void Log(string msg)
+    {
+        if (Config.QuietLogging) return;
+        Console.WriteLine(msg);
+    }
 }
 
 public class Actor

@@ -23,7 +23,8 @@ class Program
         config.HeartbeatSeconds = Int32.Parse(
             !string.IsNullOrEmpty(argv[5]) ? argv[5] : Environment.GetEnvironmentVariable("DISPATCH_HEARTBEATSECONDS") ?? "10"
         );
-
+        config.QuietLogging = bool.Parse(Environment.GetEnvironmentVariable("DISPATCH_QUIET") ?? "false");
+        
         if (!config.IsValid)
         {
             Console.WriteLine("You must specify a valid url, apikey, and target group.");

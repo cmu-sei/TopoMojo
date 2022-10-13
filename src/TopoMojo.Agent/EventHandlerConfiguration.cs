@@ -8,7 +8,8 @@ public class EventHandlerConfiguration
     public string Hostname { get; set; } = "";
     public string HeartbeatTrigger { get; set; } = "";
     public int HeartbeatSeconds { get; set; } = 10;
-
+    public bool QuietLogging { get; set; }
+    
     public bool IsValid =>
         Uri.TryCreate(Url, UriKind.Absolute, out Uri? uri) &&
         !string.IsNullOrEmpty(ApiKey) &&
