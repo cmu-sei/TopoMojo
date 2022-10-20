@@ -188,6 +188,9 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 string vmName = obj.GetProperty("name").ToString();
 
+                if (string.IsNullOrEmpty(_client.TenantId).Equals(false) && vmName.Contains(_client.TenantId).Equals(false))
+                    continue;
+
                 VirtualMachineConfigInfo config = obj.GetProperty("config") as VirtualMachineConfigInfo;
 
                 foreach (VirtualEthernetCard card in config.hardware.device.OfType<VirtualEthernetCard>())
@@ -224,9 +227,12 @@ namespace TopoMojo.Hypervisor.vSphere
                 if (config.distributedVirtualSwitch.Value == _client.dvs.Value)
                 {
                     string net = dvpg.GetProperty("name") as string;
-
+                    
                     if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
                         continue;
+
+                    if (net.Contains("#") && string.IsNullOrEmpty(_client.TenantId).Equals(false) && net.Contains(_client.TenantId).Equals(false))
+                            continue;
 
                     if (
                         config.defaultPortConfig is VMwareDVSPortSetting

@@ -77,6 +77,10 @@ namespace TopoMojo.Hypervisor.vSphere
                 //     continue;
 
                 string vmName = obj.GetProperty("name").ToString();
+
+                if (string.IsNullOrEmpty(_client.TenantId).Equals(false) && vmName.Contains(_client.TenantId).Equals(false))
+                    continue;
+
                 VirtualHardware hardware = obj.GetProperty("config.hardware") as VirtualHardware;
                 foreach (VirtualEthernetCard card in hardware.device.OfType<VirtualEthernetCard>())
                 {
@@ -103,14 +107,19 @@ namespace TopoMojo.Hypervisor.vSphere
 
             foreach(HostPortGroup pg in pgs)
             {
-                if (Regex.Match(pg.spec.name, _client.ExcludeNetworkMask).Success)
-                        continue;
+                string net = pg.spec.name;
 
-                if (pg.spec.name.Contains("#"))
+                if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
+                    continue;
+
+                if (net.Contains("#") && string.IsNullOrEmpty(_client.TenantId).Equals(false) && net.Contains(_client.TenantId).Equals(false))
+                    continue;
+
+                if (net.Contains("#"))
                     list.Add(new PortGroupAllocation
                     {
-                        Net = pg.spec.name,
-                        Key = pg.spec.name,
+                        Net = net,
+                        Key = net,
                         VlanId = pg.spec.vlanId,
                         Switch = pg.spec.vswitchName
                     });

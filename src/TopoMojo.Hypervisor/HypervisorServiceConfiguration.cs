@@ -22,6 +22,7 @@ namespace TopoMojo.Hypervisor
         public VlanConfiguration Vlan { get; set; } = new VlanConfiguration();
         public int KeepAliveMinutes { get; set; } = 10;
         public string ExcludeNetworkMask { get; set; } = "topomojo";
+        public string Tenant { get; set; } = "";
         public bool IsNsxNetwork { get; set; }
         public bool DebugVerbose { get; set; }
         public SddcConfiguration Sddc { get; set; } = new SddcConfiguration();

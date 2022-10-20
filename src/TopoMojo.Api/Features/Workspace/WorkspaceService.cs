@@ -157,7 +157,8 @@ namespace TopoMojo.Api.Services
         public async Task<Workspace> Create(NewWorkspace model, string subjectId, string subjectName)
         {
             var workspace = Mapper.Map<Data.Workspace>(model);
-
+            
+            workspace.Id = Guid.NewGuid().ToString("n");
             workspace.TemplateLimit = _options.DefaultTemplateLimit;
             workspace.WhenCreated = DateTimeOffset.UtcNow;
             workspace.LastActivity = DateTimeOffset.UtcNow;
@@ -174,7 +175,10 @@ namespace TopoMojo.Api.Services
                 SubjectName = subjectName,
                 Permission = Permission.Manager
             });
-
+            
+            if (string.IsNullOrEmpty(_options.Tenant).Equals(false))
+                workspace.Id = _options.Tenant + workspace.Id.Substring(0, workspace.Id.Length - _options.Tenant.Length);
+            
             workspace = await _store.Create(workspace);
 
             // TODO: consider handling document here
