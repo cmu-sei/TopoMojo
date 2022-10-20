@@ -219,6 +219,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
             _vmCache.TryRemove(vm.Id, out vm);
 
+            await Task.Delay(500);
+
             await _netman.Clean(tag);
 
             vm.Status = "initialized";
