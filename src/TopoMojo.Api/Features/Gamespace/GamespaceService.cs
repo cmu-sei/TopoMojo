@@ -244,6 +244,9 @@ namespace TopoMojo.Api.Services
                 GraderKey = ctx.Request.GraderKey.ToSha256()
             };
 
+            if (string.IsNullOrEmpty(_options.Tenant).Equals(false))
+                ctx.Gamespace.Id = _options.Tenant + ctx.Gamespace.Id.Substring(0, ctx.Gamespace.Id.Length - _options.Tenant.Length);
+                
             var gamespace = ctx.Gamespace;
 
             foreach (var player in ctx.Request.Players)

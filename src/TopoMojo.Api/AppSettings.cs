@@ -158,6 +158,7 @@ namespace TopoMojo.Api
         public string ConsoleHost { get; set; }
         public string LaunchUrl { get; set; } = "/lp";
         public string DocPath { get; set; } = "wwwroot/docs";
+        public string Tenant { get; set; }
         public JanitorOptions Expirations { get; set; } = new JanitorOptions();
 
     }

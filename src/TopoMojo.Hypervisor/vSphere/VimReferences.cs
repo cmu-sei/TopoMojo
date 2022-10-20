@@ -17,6 +17,7 @@ namespace TopoMojo.Hypervisor.vSphere
         public string UplinkSwitch { get; set; }
         public string DvsUuid { get; set; }
         public string ExcludeNetworkMask { get; set; } = "topomojo";
+        public string TenantId { get; set; }
         public string NetworkAllowAllSuffix { get; set; } = "-aa";
     }
 }
