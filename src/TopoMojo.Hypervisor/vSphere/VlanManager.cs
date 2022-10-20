@@ -52,9 +52,6 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 foreach (Vlan vlan in vlans)
                 {
-                    if (vlan.Id == 0)
-                        continue;
-
                     if (vlan.OnUplink)
                         _vlanMap[vlan.Id] = true;
 

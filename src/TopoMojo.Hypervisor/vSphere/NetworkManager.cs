@@ -96,16 +96,13 @@ namespace TopoMojo.Hypervisor.vSphere
 
                         _pgAllocation.Add(pg.Net, pg);
 
-                        if (pg.VlanId > 0)
-                        {
-                            _vlanManager.Activate(new Vlan[] {
-                                new Vlan {
-                                    Id = pg.VlanId,
-                                    Name = pg.Net,
-                                    OnUplink = sw == _client.UplinkSwitch
-                                }
-                            });
-                        }
+                        _vlanManager.Activate(new Vlan[] {
+                            new Vlan {
+                                Id = pg.VlanId,
+                                Name = pg.Net,
+                                OnUplink = sw == _client.UplinkSwitch
+                            }
+                        });
 
                         if (_swAllocation.ContainsKey(sw))
                             _swAllocation[sw] += 1;
