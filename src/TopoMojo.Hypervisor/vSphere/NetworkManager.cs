@@ -67,7 +67,7 @@ namespace TopoMojo.Hypervisor.vSphere
             }
 
             //remove empties
-            await Clean();
+            await Clean(null, true);
         }
 
         public async Task Provision(VmTemplate template)
@@ -134,28 +134,27 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
-        public async Task Clean()
-        {
-            await Clean(null, true);
-        }
-
-        public async Task Clean(string tag)
-        {
-            await Clean(tag, false);
-        }
-
-        public async Task Clean(string tag, bool all)
+        public async Task Clean(string tag, bool all = false)
         {
             await Task.Delay(0);
             lock(_pgAllocation)
             {
+                IEnumerable<PortGroupAllocation> q = all
+                    ? _pgAllocation.Values
+                    : _pgAllocation.Values.Where(p => p.Net.EndsWith(tag))
+                ;
+
                 //find empties with no associated vm's
-                foreach (var pg in _pgAllocation.Values.Where(p => !all ? p.Net.Tag() == tag : true).ToArray())
+                foreach (var pg in q.ToArray())
                 {
-                    if (pg.Net.Tag().HasValue()
-                        && pg.Counter < 1
-                        && !_vmCache.Values.Any(v => v.Name.EndsWith(pg.Net.Tag()))
-                    )
+                    string id = pg.Net.Tag();
+
+                    // skip untagged portgroups
+                    if (string.IsNullOrEmpty(id))
+                        continue;
+
+                    // if no vm's available to attach
+                    if (_vmCache.Values.Any(v => v.Name.EndsWith(id)).Equals(false))
                     {
                         RemovePortgroup(pg.Key).Wait();
 
