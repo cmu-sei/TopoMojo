@@ -134,12 +134,15 @@ namespace TopoMojo.Hypervisor.vSphere
                 {
                     string net = dvpg.GetProperty("name") as string;
                     
+                    if (net.Contains("#").Equals(false))
+                        continue;
+
+                    if (string.IsNullOrEmpty(_client.TenantId).Equals(false) && net.Contains(_client.TenantId).Equals(false))
+                        continue;
+
                     if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
                         continue;
-
-                    if (net.Contains("#") && string.IsNullOrEmpty(_client.TenantId).Equals(false) && net.Contains(_client.TenantId).Equals(false))
-                        continue;
-
+                        
                     if (
                         config.defaultPortConfig is VMwareDVSPortSetting
                         && ((VMwareDVSPortSetting)config.defaultPortConfig).vlan is VmwareDistributedVirtualSwitchVlanIdSpec

@@ -227,12 +227,15 @@ namespace TopoMojo.Hypervisor.vSphere
                 if (config.distributedVirtualSwitch.Value == _client.dvs.Value)
                 {
                     string net = dvpg.GetProperty("name") as string;
-                    
-                    if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
+
+                    if (net.Contains("#").Equals(false))
                         continue;
 
-                    if (net.Contains("#") && string.IsNullOrEmpty(_client.TenantId).Equals(false) && net.Contains(_client.TenantId).Equals(false))
-                            continue;
+                    if (string.IsNullOrEmpty(_client.TenantId).Equals(false) && net.Contains(_client.TenantId).Equals(false))
+                        continue;
+
+                    if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
+                        continue;
 
                     if (
                         config.defaultPortConfig is VMwareDVSPortSetting

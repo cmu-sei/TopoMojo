@@ -109,10 +109,13 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 string net = pg.spec.name;
 
-                if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
+                if (net.Contains("#").Equals(false))
+                        continue;
+
+                if (string.IsNullOrEmpty(_client.TenantId).Equals(false) && net.Contains(_client.TenantId).Equals(false))
                     continue;
 
-                if (net.Contains("#") && string.IsNullOrEmpty(_client.TenantId).Equals(false) && net.Contains(_client.TenantId).Equals(false))
+                if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
                     continue;
 
                 if (net.Contains("#"))
