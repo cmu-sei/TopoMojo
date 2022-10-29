@@ -1126,9 +1126,6 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 Vm vm = LoadVm(obj);
 
-                if (vm.Name.ToTenant() != _config.Tenant)
-                    continue;
-
                 if (vm != null)
                 {
                     //_logger.LogDebug($"refreshing cache [{_config.Host}] found: {vm.Name}");
@@ -1236,7 +1233,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 return null;
             }
 
-            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
+            if (vm.Name.Contains("#") && vm.Name.ToTenant() == _config.Tenant)
+                _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
 
             return vm;
         }
