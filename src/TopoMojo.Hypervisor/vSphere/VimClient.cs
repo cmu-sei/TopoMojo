@@ -1128,7 +1128,6 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 if (vm != null)
                 {
-                    //_logger.LogDebug($"refreshing cache [{_config.Host}] found: {vm.Name}");
                     list.Add(vm);
                 }
             }
@@ -1233,8 +1232,10 @@ namespace TopoMojo.Hypervisor.vSphere
                 return null;
             }
 
-            if (vm.Name.Contains("#") && vm.Name.ToTenant() == _config.Tenant)
-                _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
+            if (vm.Name.Contains("#").Equals(false) || vm.Name.ToTenant() != _config.Tenant)
+                return null;
+            
+            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
 
             return vm;
         }
