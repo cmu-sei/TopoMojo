@@ -125,5 +125,20 @@ namespace TopoMojo.Hypervisor.Extensions
                 ? string.Format("{0}..{1}", s.Substring(0, 4), s.Substring(s.Length - 4))
                 : s;
         }
+
+        public static string ToTenant(this string s)
+        {
+            char[] hex = new char[]{ '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+            string r = "";
+            char[] c = s.Tag().ToLower().ToCharArray();
+            for (int i = 0; i < c.Length; i++)
+            {
+                if (hex.Contains(c[i]))
+                    break;
+                else
+                    r += c[i];
+            }
+            return r;
+        }
     }
 }

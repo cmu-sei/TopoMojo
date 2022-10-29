@@ -78,7 +78,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 string vmName = obj.GetProperty("name").ToString();
 
-                if (string.IsNullOrEmpty(_client.TenantId).Equals(false) && vmName.Contains(_client.TenantId).Equals(false))
+                if (vmName.ToTenant() != _client.TenantId)
                     continue;
 
                 VirtualHardware hardware = obj.GetProperty("config.hardware") as VirtualHardware;
@@ -110,9 +110,9 @@ namespace TopoMojo.Hypervisor.vSphere
                 string net = pg.spec.name;
 
                 if (net.Contains("#").Equals(false))
-                        continue;
+                    continue;
 
-                if (string.IsNullOrEmpty(_client.TenantId).Equals(false) && net.Contains(_client.TenantId).Equals(false))
+                if (net.ToTenant() != _client.TenantId)
                     continue;
 
                 if (Regex.Match(net, _client.ExcludeNetworkMask).Success)

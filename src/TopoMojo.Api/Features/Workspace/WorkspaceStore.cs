@@ -153,7 +153,7 @@ namespace TopoMojo.Api.Data
             return results;
         }
 
-        public async Task<Workspace> Clone(string id)
+        public async Task<Workspace> Clone(string id, string tenantId)
         {
             var entity = await base.List()
                 .AsNoTracking()
@@ -162,8 +162,11 @@ namespace TopoMojo.Api.Data
                 .FirstOrDefaultAsync(w => w.Id == id)
             ;
 
-            entity.Id = Guid.NewGuid().ToString("n");
             entity.Name += "-CLONE";
+            entity.Id = Guid.NewGuid().ToString("n");
+            
+            if (string.IsNullOrEmpty(tenantId).Equals(false))
+                entity.Id = tenantId + entity.Id.Substring(0, entity.Id.Length - tenantId.Length);
 
             foreach (var worker in entity.Workers)
                 worker.WorkspaceId = entity.Id;

@@ -189,7 +189,7 @@ namespace TopoMojo.Api.Services
         public async Task<Workspace> Clone(string id)
         {
             return Mapper.Map<Workspace>(
-                await _store.Clone(id)
+                await _store.Clone(id, _options.Tenant)
             );
         }
 

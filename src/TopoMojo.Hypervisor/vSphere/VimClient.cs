@@ -34,9 +34,6 @@ namespace TopoMojo.Hypervisor.vSphere
             _hostPrefix = _config.Host.Split('.').FirstOrDefault();
             Task sessionMonitorTask = MonitorSession();
             Task taskMonitorTask = MonitorTasks();
-
-            if (!string.IsNullOrEmpty(_config.Tenant))
-                _tenantId = "#" + _config.Tenant;
         }
 
         private readonly VlanManager _vlanman;
@@ -54,7 +51,6 @@ namespace TopoMojo.Hypervisor.vSphere
         ManagedObjectReference _props, _vdm, _file;
         ManagedObjectReference _datacenter, _dsns, _vms, _res, _pool, _dvs;
         string _dvsuuid = "";
-        string _tenantId = "";
         int _pollInterval = 1000;
         int _syncInterval = 30000;
         int _taskMonitorInterval = 3000;
@@ -1052,7 +1048,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 vmFolder = _vms,
                 UplinkSwitch = _config.Uplink,
                 ExcludeNetworkMask = _config.ExcludeNetworkMask,
-                TenantId = _tenantId
+                TenantId = _config.Tenant
             };
 
             if (_config.IsVCenter)
@@ -1127,7 +1123,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 Vm vm = LoadVm(obj);
 
-                if (string.IsNullOrEmpty(_tenantId).Equals(false) && vm.Name.Contains(_tenantId).Equals(false))
+                if (vm.Name.ToTenant() != _config.Tenant)
                     continue;
 
                 if (vm != null)

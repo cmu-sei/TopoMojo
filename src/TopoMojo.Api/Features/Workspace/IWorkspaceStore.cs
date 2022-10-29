@@ -21,7 +21,7 @@ namespace TopoMojo.Api.Data.Abstractions
         Task<bool> CheckUserWorkspaceLimit(string userId);
         Task<bool> HasActiveGames(string id);
         Task<Workspace[]> DeleteStale(DateTimeOffset staleAfter, bool published, bool dryrun = true);
-        Task<Workspace> Clone(string id);
+        Task<Workspace> Clone(string id, string tenantId);
         IQueryable<Template> ListScopedTemplates();
         Task<int> CheckGamespaceCount(string id);
         Task DeleteWithTemplates(string id, Action<IEnumerable<Template>> templateAction);
