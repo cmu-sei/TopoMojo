@@ -34,6 +34,9 @@ namespace TopoMojo.Hypervisor.vSphere
             _hostPrefix = _config.Host.Split('.').FirstOrDefault();
             Task sessionMonitorTask = MonitorSession();
             Task taskMonitorTask = MonitorTasks();
+
+            if (_config.Tenant == null)
+                _config.Tenant = "";
         }
 
         private readonly VlanManager _vlanman;
