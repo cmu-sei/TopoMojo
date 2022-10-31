@@ -73,12 +73,9 @@ namespace TopoMojo.Hypervisor.vSphere
             ObjectContent[] oc = response.returnval;
             foreach (ObjectContent obj in oc)
             {
-                // if (!obj.IsInPool(_client.pool))
-                //     continue;
-
                 string vmName = obj.GetProperty("name").ToString();
 
-                if (vmName.ToTenant() != _client.TenantId)
+                if (!IsTenantVm(vmName))
                     continue;
 
                 VirtualHardware hardware = obj.GetProperty("config.hardware") as VirtualHardware;
@@ -109,13 +106,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 string net = pg.spec.name;
 
-                if (net.Contains("#").Equals(false))
-                    continue;
-
-                if (net.ToTenant() != _client.TenantId)
-                    continue;
-
-                if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
+                if (!IsTenantNet(net))
                     continue;
 
                 if (net.Contains("#"))

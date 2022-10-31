@@ -179,6 +179,19 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
+        public bool IsTenantVm(string name)
+        {
+            return name.ToTenant() == _client.TenantId;
+        }
+
+        public bool IsTenantNet(string net)
+        {
+            return net.Contains("#")
+                ? net.ToTenant() == _client.TenantId
+                : _vlanManager.Contains(net)
+            ;
+        }
+
         private Dictionary<string, PortGroupAllocation> GetKeyMap()
         {
             //transform name dictionary to key dictionary

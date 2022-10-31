@@ -94,7 +94,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 string vmName = obj.GetProperty("name").ToString();
                 
-                if (vmName.ToTenant() != _client.TenantId)
+                if (!IsTenantVm(vmName))
                     continue;
 
                 VirtualMachineConfigInfo config = obj.GetProperty("config") as VirtualMachineConfigInfo;
@@ -134,15 +134,9 @@ namespace TopoMojo.Hypervisor.vSphere
                 {
                     string net = dvpg.GetProperty("name") as string;
                     
-                    if (net.Contains("#").Equals(false))
+                    if (!IsTenantNet(net))
                         continue;
 
-                    if (net.ToTenant() != _client.TenantId)
-                        continue;
-
-                    if (Regex.Match(net, _client.ExcludeNetworkMask).Success)
-                        continue;
-                        
                     if (
                         config.defaultPortConfig is VMwareDVSPortSetting
                         && ((VMwareDVSPortSetting)config.defaultPortConfig).vlan is VmwareDistributedVirtualSwitchVlanIdSpec
