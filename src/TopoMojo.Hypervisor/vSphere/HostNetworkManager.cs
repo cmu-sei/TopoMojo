@@ -123,12 +123,20 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public override async Task RemovePortgroup(string pgReference)
         {
-            await _client.vim.RemovePortGroupAsync(_client.net, pgReference);
+            try
+            {
+                await _client.vim.RemovePortGroupAsync(_client.net, pgReference);
+            }
+            catch {}
         }
 
         public override async Task RemoveSwitch(string sw)
         {
-            await _client.vim.RemoveVirtualSwitchAsync(_client.net, sw);
+            try
+            {
+                await _client.vim.RemoveVirtualSwitchAsync(_client.net, sw);
+            }
+            catch {}
         }
 
         public override void UpdateEthernetCardBacking(VirtualEthernetCard card, string portgroupName)

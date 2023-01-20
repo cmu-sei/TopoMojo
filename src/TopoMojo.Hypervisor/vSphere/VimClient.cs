@@ -113,14 +113,14 @@ namespace TopoMojo.Hypervisor.vSphere
             if (vm.State == VmPowerState.Running)
             {
                 ManagedObjectReference task = await _vim.PowerOffVM_TaskAsync(vm.AsVim());
-                
+
                 TaskInfo info = await WaitForVimTask(task);
-                
+
                 if (info.state == TaskInfoState.success || (info.error?.localizedMessage.ToLower().Contains("powered off") ?? false))
                     vm.State = VmPowerState.Off;
                 else
                     throw new Exception(info.error.localizedMessage);
-                
+
                 _vmCache.TryUpdate(vm.Id, vm, vm);
             }
 
@@ -866,7 +866,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
                         if (_sic is null)
                             throw new Exception("Failed to retrieve ServiceContent from vmware sdk.");
-                            
+
                         _config.IsVCenter = _sic.about?.apiType == "VirtualCenter";
                         _props = _sic.propertyCollector;
                         _vdm = _sic.virtualDiskManager;
@@ -1065,7 +1065,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 _dvsuuid = dvs?.GetProperty("uuid").ToString();
                 netSettings.dvs = dvs?.obj;
                 netSettings.DvsUuid = _dvsuuid;
-                
+
                 if (_config.IsNsxNetwork || _config.Uplink.StartsWith("nsx."))
                 {
                     _netman = new NsxNetworkManager(
@@ -1101,6 +1101,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 );
             }
 
+            await ReloadVmCache();
             await _netman.Initialize();
 
         }
@@ -1228,13 +1229,13 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (!vm.Id.HasValue())
             {
-                _logger.LogDebug($"{this.Name} found a vm without an Id");
+                _logger.LogWarning($"{this.Name} found a vm without an Id");
                 return null;
             }
 
             if (vm.Name.Contains("#").Equals(false) || vm.Name.ToTenant() != _config.Tenant)
                 return null;
-            
+
             _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
 
             return vm;
