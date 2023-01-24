@@ -833,12 +833,12 @@ namespace TopoMojo.Hypervisor.vSphere
             return info;
         }
 
-        private async Task Connect()
+        private Task Connect()
         {
             _lastAction = DateTimeOffset.UtcNow;
-            await Task.Delay(0);
+
             if (_vim != null && _vim.State == CommunicationState.Opened)
-                return;
+                return Task.CompletedTask;
 
             //only want one client object created, so first one through wins
             //everyone else wait here
@@ -873,19 +873,26 @@ namespace TopoMojo.Hypervisor.vSphere
                         _file = _sic.fileManager;
                         _dsns = _sic.datastoreNamespaceManager;
 
-                        _logger.LogDebug($"Connected {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds} seconds");
+                        _logger.LogDebug($"Connected {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds}s");
 
                         sp = DateTimeOffset.Now;
-                        _logger.LogInformation($"logging into {_config.Host}...[{_config.User}]");
+                        _logger.LogInformation($"Authenticating {_config.Host}...[{_config.User}]");
                         _session = client.LoginAsync(_sic.sessionManager, _config.User, _config.Password, null).Result;
-                        _logger.LogDebug($"Authenticated {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds} seconds");
+                        _logger.LogDebug($"Authenticated {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds}s");
 
                         sp = DateTimeOffset.Now;
                         _logger.LogDebug($"Initializing {_config.Host}...");
                         InitReferences(client).Wait();
-                        _logger.LogDebug($"Initialized {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds} seconds");
+                        _logger.LogDebug($"Initialized {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds}s");
 
                         _vim = client;
+
+                        sp = DateTimeOffset.Now;
+                        _logger.LogDebug($"Loading {_config.Host}...");
+                        ReloadVmCache().Wait();
+                        _netman.Clean().Wait();
+                        _logger.LogDebug($"Loaded {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds}s");
+
                     }
                     catch (Exception ex)
                     {
@@ -893,6 +900,8 @@ namespace TopoMojo.Hypervisor.vSphere
                     }
                 }
             }
+
+            return Task.CompletedTask;
         }
 
         public async Task Disconnect()
@@ -1101,7 +1110,6 @@ namespace TopoMojo.Hypervisor.vSphere
                 );
             }
 
-            await ReloadVmCache();
             await _netman.Initialize();
 
         }
@@ -1273,7 +1281,6 @@ namespace TopoMojo.Hypervisor.vSphere
         private async Task MonitorSession()
         {
             _logger.LogDebug($"{_config.Host}: starting cache loop");
-            await Task.Delay(0);
             await Connect();
 
             while (true)

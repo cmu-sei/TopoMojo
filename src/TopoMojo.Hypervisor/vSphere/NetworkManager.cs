@@ -66,8 +66,6 @@ namespace TopoMojo.Hypervisor.vSphere
                     map[vmnet.NetworkMOR].Counter += 1;
             }
 
-            //remove empties
-            await Clean(null, true);
         }
 
         public async Task Provision(VmTemplate template)
@@ -134,12 +132,12 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
-        public async Task Clean(string tag, bool all = false)
+        public async Task Clean(string tag = null)
         {
             await Task.Delay(0);
             lock(_pgAllocation)
             {
-                IEnumerable<PortGroupAllocation> q = all
+                IEnumerable<PortGroupAllocation> q = string.IsNullOrEmpty(tag)
                     ? _pgAllocation.Values
                     : _pgAllocation.Values.Where(p => p.Net.EndsWith(tag))
                 ;
