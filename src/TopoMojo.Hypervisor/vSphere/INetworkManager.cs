@@ -21,7 +21,7 @@ namespace TopoMojo.Hypervisor.vSphere
         Task Initialize();
         Task Provision(VmTemplate template);
         Task Unprovision(ManagedObjectReference vmMOR);
-        Task Clean(string tag, bool all = false);
+        Task Clean(string tag = null);
         string Resolve(string net);
     }
 }
