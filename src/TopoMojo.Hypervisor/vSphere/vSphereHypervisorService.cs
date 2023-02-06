@@ -69,21 +69,28 @@ namespace TopoMojo.Hypervisor.vSphere
         public async Task<Vm> Refresh(VmTemplate template)
         {
             string target = template.Name + "#" + template.IsolationTag;
+
             Vm vm = await Load(target);
+
             if (vm == null)
             {
                 vm = new Vm() { Name = target, Status = "created" };
-                int progress = await VerifyDisks(template);
-                if (progress == 100)
+
+                int[] progress = await VerifyDisks(template);
+
+                if (progress.Length == 0 || progress.Sum() == 100 * progress.Length)
+                {
                     vm.Status = "initialized";
-                else
-                    if (progress >= 0)
-                    {
-                        vm.Task = new VmTask { Name = "initializing", Progress = progress };
-                    }
+                }
+                else if (progress.Sum() >= 0)
+                {
+                    vm.Task = new VmTask {
+                        Name = "initializing",
+                        Progress = progress.Sum() / progress.Length
+                    };
+                }
             }
 
-            //include task
             return vm;
         }
         public async Task<Vm> Deploy(VmTemplate template, bool privileged = false)
@@ -99,12 +106,9 @@ namespace TopoMojo.Hypervisor.vSphere
             NormalizeTemplate(template, host.Options, privileged);
             _logger.LogDebug("deploy: normalized "+ template.Name);
 
-            if (!template.Disks.IsEmpty())
-            {
-                bool found = await host.FileExists(template.Disks[0].Path);
-                if (!found)
-                    throw new Exception("Template disks have not been prepared.");
-            }
+            // ensure disks exists
+            if (template.Disks.Any() && (await VerifyNormalizedDisks(template, host)).Any(i => i < 100))
+                throw new Exception("Template disks have not been prepared.");
 
             if (!host.Options.IsNsxNetwork && !host.Options.Uplink.StartsWith("nsx."))
             {
@@ -320,82 +324,96 @@ namespace TopoMojo.Hypervisor.vSphere
             return CheckProgress(q.ToArray());
         }
 
-        public async Task<int> VerifyDisks(VmTemplate template)
+        public async Task<int[]> VerifyDisks(VmTemplate template)
         {
-            if (template.Disks.Length == 0)
-                return 100; //show good if no disks to verify
+            VimClient host = FindHostByRandom();
 
-            foreach (VimClient vhost in _hostCache.Values)
+            NormalizeTemplate(template, host.Options);
+
+            return await VerifyNormalizedDisks(template, host);
+        }
+
+        private async Task<int[]> VerifyNormalizedDisks(VmTemplate template, VimClient host)
+        {
+            var result = new int[template.Disks.Length];
+
+            int index = 0;
+            foreach (var disk in template.Disks)
             {
-                int progress = await vhost.TaskProgress(template.Id);
-                if (progress >= 0)
-                    return progress;
+                // check running tasks
+                foreach (VimClient vhost in _hostCache.Values)
+                {
+                    result[index] = await vhost.TaskProgress(disk.Path);
+                    if (result[index] >= 0)
+                        break;
+                }
+
+                // check file existence
+                if (result[index] < 0)
+                    result[index] = (await host.FileExists(disk.Path)) ? 100 : -1;
+
+                index += 1;
             }
 
-            // string pattern = @"blank-(\d+)([^\.]+)";
-            // Match match = Regex.Match(template.Disks[0].Path, pattern);
-            // if (match.Success)
-            // {
-            //     return 100; //show blank disk as created
-            // }
-
-            VimClient host = FindHostByRandom();
-            NormalizeTemplate(template, host.Options);
-            // if (template.Disks.Length > 0)
-            // {
-                _logger.LogDebug(template.Source + " " + template.Disks[0].Path);
-                if (await host.FileExists(template.Disks[0].Path))
-                {
-                    return 100;
-                }
-            // }
-            return -1;
+            return result;
         }
 
         public async Task<int> CreateDisks(VmTemplate template)
         {
-            if (template.Disks.Length == 0)
-                return -1;
+            VimClient host = FindHostByRandom();
 
-            int progress = await VerifyDisks(template);
-            if (progress < 0)
+            NormalizeTemplate(template, host.Options);
+
+            int[] progress = await VerifyNormalizedDisks(template, host);
+
+            if (progress.Length == 0)
+                return 100;
+
+            int index = 0;
+            foreach (var disk in template.Disks)
             {
-                VimClient host = FindHostByRandom();
-                if (template.Disks[0].Source.HasValue()) {
-                    Task cloneTask = host.CloneDisk(template.Id, template.Disks[0].Source, template.Disks[0].Path);
-                    progress = 0;
+                if (progress[index] >= 0)
+                    continue;
+
+                if (disk.Source.HasValue())
+                {
+                    await host.CloneDisk(disk.Source, disk.Path);
+                    progress[index] = 0;
                 } else {
-                    await host.CreateDisk(template.Disks[0]);
-                    progress = 100;
+                    await host.CreateDisk(disk);
+                    progress[index] = 100;
                 }
+                index += 1;
             }
-            return progress;
+
+            return 0;
         }
 
-        public async Task<int> DeleteDisks(VmTemplate template)
+        public async Task DeleteDisks(VmTemplate template)
         {
-            if (template.Disks.Length == 0)
-                return -1;
+            int[] progress = await VerifyDisks(template);
 
-            int progress = await VerifyDisks(template);
-            if (progress < 0)
-                return -1;
+            VimClient host = FindHostByRandom();
 
-            if (progress == 100)
+            int index = 0;
+            foreach (VmDisk disk in template.Disks)
             {
-                VimClient host = FindHostByRandom();
-                foreach (VmDisk disk in template.Disks)
-                {
-                    //protect stock disks; only delete a disk if it is local to the workspace
-                    //i.e. the disk folder matches the workspaceId
-                    if (template.IsolationTag.HasValue() && disk.Path.Contains(template.IsolationTag))
-                    {
-                        Task deleteTask = host.DeleteDisk(disk.Path);
-                    }
-                }
-                return -1;
+                // skip missing and pending
+                if (progress[index] < 100)
+                    continue;
+
+                // protect stock disks; only delete a disk if it is local to the workspace
+                // i.e. the disk folder matches the workspaceId
+                if (
+                    string.IsNullOrEmpty(template.IsolationTag) ||
+                    disk.Path.Contains(template.IsolationTag).Equals(false)
+                ) continue;
+
+                // delete disk
+                await host.DeleteDisk(disk.Path);
+
+                index += 1;
             }
-            throw new Exception("Cannot delete disk that isn't fully created.");
         }
 
         public async Task<VmConsole> Display(string id)

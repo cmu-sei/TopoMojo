@@ -51,25 +51,34 @@ namespace TopoMojo.Hypervisor.vMock
 
         public async Task<Vm> Refresh(VmTemplate template)
         {
-            Vm vm = null;
-            NormalizeTemplate(template, _optPod);
-            string key = template.Name; //template.IsolationTag + "-" + template.Id;
-            vm = (await Find(key)).FirstOrDefault();
-            if (vm != null)
+            string target = template.Name + "#" + template.IsolationTag;
+
+            Vm vm = (await Find(target)).FirstOrDefault();
+
+            if (vm == null)
             {
+                vm = new Vm() { Name = target, Status = "created" };
 
-                vm.Status = "deployed";
-                //IncludeTask(key, vm);
+                int[] progress = await VerifyDisks(template);
 
+                if (progress.Length == 0 || progress.Sum() == 100 * progress.Length)
+                {
+                    vm.Status = "initialized";
+                }
+                else if (progress.Sum() >= 0)
+                {
+                    vm.Task = new VmTask {
+                        Name = "initializing",
+                        Progress = progress.Sum() / progress.Length
+                    };
+                }
             }
             else
             {
-                vm = new Vm() { Name = template.Name, Status = "created" };
-                if (VerifyDisks(template).Result == 100)
-                    vm.Status = "initialized";
+                vm.Status = "deployed";
             }
 
-            IncludeTask(key, vm);
+            IncludeTask(target, vm);
             return vm;
         }
 
@@ -79,7 +88,7 @@ namespace TopoMojo.Hypervisor.vMock
             {
                 VmTask task = _tasks[key];
                 float elapsed = (int)DateTimeOffset.UtcNow.Subtract(task.WhenCreated).TotalSeconds;
-                task.Progress = (int) Math.Min(100, (elapsed / 10) * 100);
+                task.Progress = (int)Math.Min(100, (elapsed / 10) * 100);
                 if (task.Progress == 100)
                 {
                     _tasks.Remove(key);
@@ -95,32 +104,32 @@ namespace TopoMojo.Hypervisor.vMock
             string key = template.Name;
             //string key = template.IsolationTag + "-" + template.Id;
             Vm vm = null;
-            if (!_vms.ContainsKey(key))
+
+            if (_vms.ContainsKey(key))
             {
-                if (template.Disks.Length > 0)
-                {
-                    if (template.Disks[0].Path.Contains("blank"))
-                        throw new Exception("Disks have not been prepared");
-                    if (VerifyDisks(template).Result != 100)
-                        throw new Exception("Disks have not been prepared.");
-                }
-                await Delay();
-                vm = new Vm
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Name = template.Name,
-                    Path = "[mock] pod/vm",
-                    Status = "deployed"
-                };
-                _logger.LogDebug($"deployed vm {vm.Name}");
-                _vms.Add(vm.Id, vm);
-            }
-            else
-            {
+                _logger.LogDebug($"vm {vm.Name} already deployed");
                 vm = _vms[key];
                 vm.Status = "deployed";
-                _logger.LogDebug($"vm {vm.Name} already deployed");
+                return vm;
             }
+
+            if (
+                template.Disks.Any() &&
+                VerifyNormalizedDisks(template).Result.Any(i => i < 100)
+            ) throw new Exception("Disks have not been prepared.");
+
+            await Delay();
+
+            vm = new Vm
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = template.Name,
+                Path = "[mock] pod/vm",
+                Status = "deployed"
+            };
+
+            _logger.LogDebug($"deployed vm {vm.Name}");
+            _vms.Add(vm.Id, vm);
             return vm;
         }
 
@@ -135,7 +144,8 @@ namespace TopoMojo.Hypervisor.vMock
             int test = _rand.Next(9);
             if (vm is Vm && test == 0)
             {
-                vm.Question = new VmQuestion {
+                vm.Question = new VmQuestion
+                {
                     Id = Guid.NewGuid().ToString(),
                     Prompt = "This vm has a question you must answer. Would you like to answer it?",
                     DefaultChoice = "yes",
@@ -156,29 +166,29 @@ namespace TopoMojo.Hypervisor.vMock
             switch (op.Type)
             {
                 case VmOperationType.Start:
-                vm = await Start(op.Id);
-                break;
+                    vm = await Start(op.Id);
+                    break;
 
                 case VmOperationType.Stop:
-                vm = await Stop(op.Id);
-                break;
+                    vm = await Stop(op.Id);
+                    break;
 
                 case VmOperationType.Reset:
-                vm = await Stop(op.Id);
-                vm = await Start(op.Id);
-                break;
+                    vm = await Stop(op.Id);
+                    vm = await Start(op.Id);
+                    break;
 
                 case VmOperationType.Save:
-                vm = await Save(op.Id);
-                break;
+                    vm = await Save(op.Id);
+                    break;
 
                 case VmOperationType.Revert:
-                vm = await Revert(op.Id);
-                break;
+                    vm = await Revert(op.Id);
+                    break;
 
                 case VmOperationType.Delete:
-                vm = await Delete(op.Id);
-                break;
+                    vm = await Delete(op.Id);
+                    break;
             }
             return vm;
         }
@@ -205,7 +215,7 @@ namespace TopoMojo.Hypervisor.vMock
                 throw new InvalidOperationException();
 
             Vm vm = TryFind(id);
-            vm.Task = new VmTask { Id = id, Name = "saving", WhenCreated = DateTimeOffset.UtcNow};
+            vm.Task = new VmTask { Id = id, Name = "saving", WhenCreated = DateTimeOffset.UtcNow };
             _tasks.Add(vm.Name, vm.Task);
             await Delay();
             return vm;
@@ -240,109 +250,82 @@ namespace TopoMojo.Hypervisor.vMock
         {
             await Task.Delay(0);
             return (term.HasValue())
-            ?  _vms.Values.Where(o=> o.Id.Contains(term) || o.Name.Contains(term)).ToArray()
+            ? _vms.Values.Where(o => o.Id.Contains(term) || o.Name.Contains(term)).ToArray()
             : _vms.Values.ToArray();
         }
 
         List<MockDisk> _disks = new List<MockDisk>();
         public async Task<int> CreateDisks(VmTemplate template)
         {
-            NormalizeTemplate(template, _optPod);
-            string key = template.Name; //template.IsolationTag + "-" + template.Id;
-            Vm vm = (await Find(key)).FirstOrDefault();
-            if (vm != null)
+            int[] progress = await VerifyDisks(template);
+
+            if (progress.Length == 0)
                 return 100;
 
-
-            int progress = await VerifyDisks(template);
-            if (progress < 0)
+            int index = 0;
+            foreach (var disk in template.Disks)
             {
-                VmDisk disk = template.Disks.First();
-                // if (!_tasks.ContainsKey(key))
-                //     _tasks.Add(key, new VmTask {
-                //         Name = "initializing",
-                //         WhenCreated = DateTimeOffset.UtcNow,
-                //         Id = key
-                //     });
-                _logger.LogDebug("disk: creating " + disk.Path);
+                if (progress[index] >= 0)
+                    continue;
+
                 _disks.Add(new MockDisk
                 {
-                    CreatedAt = DateTimeOffset.Now,
                     Path = disk.Path,
-                    Disk = disk
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    Disk = new VmDisk()
                 });
-            }
-            return progress;
-        }
 
-        public async Task<int> CreateDisksOld(VmTemplate template)
-        {
-            int progress = await VerifyDisks(template);
-            if (progress < 0)
-            {
-                VmDisk disk = template.Disks.First();
-                _logger.LogDebug("disk: creating " + disk.Path);
-                _disks.Add(new MockDisk
-                {
-                    CreatedAt = DateTimeOffset.Now,
-                    Path = disk.Path,
-                    Disk = disk
-                });
+                progress[index] = 100;
+                index += 1;
             }
+
             return 0;
         }
 
-        public async Task<int> VerifyDisks(VmTemplate template)
+        public async Task<int[]> VerifyDisks(VmTemplate template)
+        {
+            NormalizeTemplate(template, _optPod);
+            return await VerifyNormalizedDisks(template);
+        }
+        public async Task<int[]> VerifyNormalizedDisks(VmTemplate template)
         {
             await Delay();
 
-            NormalizeTemplate(template, _optPod);
-            int progress = -1;
-            VmDisk disk = template.Disks.FirstOrDefault();
-            if (disk != null)
+            int[] test = new int[] {};
+            Console.WriteLine(test.Sum());
+
+            var result = new int[template.Disks.Length];
+
+            int index = 0;
+            foreach (var disk in template.Disks)
             {
-
                 if (disk.Path.Contains("blank-"))
-                    return 100;
-
-                MockDisk mock = _disks.FirstOrDefault(o=>o.Path == disk.Path);
-                if (mock == null)
-                {    _disks.Add(new MockDisk
-                    {
-                        CreatedAt = DateTimeOffset.Now,
-                        Path = disk.Path,
-                        Disk = disk
-                    });
+                {
+                    result[index] = 100;
+                } else {
+                    // check file existence
+                    result[index] = _disks.Any(d => d.Path == disk.Path) ? 100 : -1;
                 }
-                progress = 100;
-                // if (mock != null)
-                // {
-                //     float elapsed = (int)DateTimeOffset.Now.Subtract(mock.CreatedAt).TotalSeconds;
-                //     progress = (int) Math.Min(100, (elapsed / 10) * 100);
-                // }
+
+                index += 1;
             }
-            return progress;
+
+            return result;
         }
 
 
-        public async Task<int> DeleteDisks(VmTemplate template)
+        public async Task DeleteDisks(VmTemplate template)
         {
-            int progress = await VerifyDisks(template);
-            if (progress < 0)
-                return -1;
-
-            if (progress == 100)
+            int[] progress = await VerifyDisks(template);
+            int index = 0;
+            foreach (var disk in template.Disks)
             {
-                VmDisk disk = template.Disks.First();
-                MockDisk mock = _disks.FirstOrDefault(o=>o.Path == disk.Path);
-                if (mock != null)
-                {
-                    _logger.LogDebug("disk: deleting " + disk.Path);
-                    _disks.Remove(mock);
-                    return -1;
-                }
+                MockDisk mock = _disks.FirstOrDefault(o => o.Path == disk.Path);
+                if (mock is null || progress[index] < 100)
+                    continue;
+                _logger.LogDebug("disk: deleting " + disk.Path);
+                _disks.Remove(mock);
             }
-            throw new Exception("Cannot delete disk that isn't fully created.");
         }
 
         public async Task<VmConsole> Display(string id)
@@ -352,13 +335,13 @@ namespace TopoMojo.Hypervisor.vMock
             return vm is null
                 ? new VmConsole()
                 : new VmConsole
-                    {
-                        Id = vm.Id,
-                        Name = vm.Name.Untagged(),
-                        IsolationId = vm.Name.Tag(),
-                        Url = "https://mock.topomojo.local/ticket/12345678",
-                        IsRunning = vm.State == VmPowerState.Running
-                    }
+                {
+                    Id = vm.Id,
+                    Name = vm.Name.Untagged(),
+                    IsolationId = vm.Name.Tag(),
+                    Url = "https://mock.topomojo.local/ticket/12345678",
+                    IsRunning = vm.State == VmPowerState.Running
+                }
             ;
         }
 
@@ -392,13 +375,15 @@ namespace TopoMojo.Hypervisor.vMock
             foreach (VmDisk disk in template.Disks)
             {
                 if (!disk.Path.StartsWith(option.DiskStore)
-                ) {
+                )
+                {
                     DatastorePath dspath = new DatastorePath(disk.Path);
                     dspath.Merge(option.DiskStore);
                     disk.Path = dspath.ToString();
                 }
                 if (disk.Source.HasValue() && !disk.Source.StartsWith(option.DiskStore)
-                ) {
+                )
+                {
                     DatastorePath dspath = new DatastorePath(disk.Source);
                     dspath.Merge(option.DiskStore);
                     disk.Source = dspath.ToString();
@@ -453,7 +438,7 @@ namespace TopoMojo.Hypervisor.vMock
 
         private async Task Delay()
         {
-            int x = _rand.Next(500,2500);
+            int x = _rand.Next(500, 2500);
             Console.WriteLine($"delay: {x}");
             await Task.Delay(x);
         }
