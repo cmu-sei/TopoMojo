@@ -436,46 +436,58 @@ namespace TopoMojo.Hypervisor.vSphere
         public async Task<int> TaskProgress(string id)
         {
             await Connect();
-            int progress = -1;
-            if (_taskMap.ContainsKey(id))
+
+            // no task
+            if (_taskMap.ContainsKey(id).Equals(false))
+                return -1;
+
+            // initialized task
+            if (_taskMap[id] is null)
+                return 0;
+
+            int progress = 0;
+            int taskprogress = 0;
+            string state = "";
+            string msg = "";
+
+            // active task
+            try
             {
-                if (_taskMap[id] != null)
+                _taskMap[id] = await GetVimTaskInfo(_taskMap[id].task);
+                state = _taskMap[id].state.ToString();
+                taskprogress = _taskMap[id].progress;
+
+                switch (_taskMap[id].state)
                 {
-                    try
-                    {
+                    case TaskInfoState.error:
+                        progress = 100;
+                        msg = string.Format("{0} - {1}",
+                            _taskMap[id].description.message,
+                            _taskMap[id].error.localizedMessage
+                        );
+                    break;
 
-                        _taskMap[id] = await GetVimTaskInfo(_taskMap[id].task);
-                        switch (_taskMap[id].state)
-                        {
-                            case TaskInfoState.error:
-                                string msg = _taskMap[id].description.message + " - " +
-                                    _taskMap[id].error.localizedMessage;
-                                _taskMap.Remove(id);
-                                throw new Exception(msg);
-                            // break;
+                    case TaskInfoState.success:
+                        progress = 100;
+                    break;
 
-                            case TaskInfoState.success:
-                                progress = 100;
-                                _taskMap.Remove(id);
-                                _logger.LogDebug($"TaskProgress: {id} {_taskMap[id].state} {progress}%");
-                                break;
-
-                            default:
-                                progress = _taskMap[id].progress;
-                                break;
-                        }
-                    }
-                    catch
-                    {
-                        //if checking on a task that has expired, clear it.
-                        _taskMap.Remove(id);
-                    }
-                }
-                else
-                {
-                    return 0;
+                    default:
+                        progress = _taskMap[id].progress;
+                    break;
                 }
             }
+            catch
+            {
+                progress = 100;
+            }
+            finally
+            {
+                if (progress == 100)
+                    _taskMap.Remove(id);
+            }
+
+            _logger.LogDebug($"TaskProgress: {id} {state} {taskprogress}% resolved:{progress}% {msg}");
+
             return progress;
         }
 
@@ -578,7 +590,7 @@ namespace TopoMojo.Hypervisor.vSphere
                             info = await WaitForVimTask(task);
 
                             if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {pattern}; found {((HostDatastoreBrowserSearchResults[])info.result)?.Length}");
+                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {pattern}; found [{((HostDatastoreBrowserSearchResults[])info.result)?.Length}]");
 
                             if (info.result != null)
                                 results.AddRange((HostDatastoreBrowserSearchResults[])info.result);
@@ -601,7 +613,7 @@ namespace TopoMojo.Hypervisor.vSphere
                         info = await WaitForVimTask(task);
 
                         if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching {dsPath.FolderPath} for {pattern}; found {((HostDatastoreBrowserSearchResults[])info.result)?.Length}");
+                                _logger.LogDebug($"searching {dsPath.FolderPath} for {pattern}; found [{((HostDatastoreBrowserSearchResults)info.result).file?.Length ?? 0}]");
 
                         if (info.result != null)
                             results.Add((HostDatastoreBrowserSearchResults)info.result);
@@ -615,9 +627,6 @@ namespace TopoMojo.Hypervisor.vSphere
                             if (result != null && result.file != null && result.file.Length > 0)
                             {
                                 string fp = result.folderPath;
-
-                                if (_config.DebugVerbose)
-                                    _logger.LogDebug($"search datastore found {list.Count} results.");
 
                                 if (oldRoot.HasValue())
                                     fp = fp.Replace(dsPath.TopLevelFolder, oldRoot);
@@ -645,20 +654,20 @@ namespace TopoMojo.Hypervisor.vSphere
             }
 
             if (_config.DebugVerbose)
-                _logger.LogDebug($"search datastore found {list.Count} results.");
+                _logger.LogDebug($"search datastore found [{list.Count}] results.");
 
             return list.ToArray();
         }
 
-        public async Task<int> CloneDisk(string templateId, string source, string dest)
+        public async Task CloneDisk(string source, string dest)
         {
             ManagedObjectReference task = null;
-            TaskInfo info = null;
             string pattern = @"blank-(\d+)([^\.]+)";
 
             await Connect();
 
-            _taskMap.Add(templateId, null);
+            // register task for monitoring
+            _taskMap.Add(dest, null);
 
             await MakeDirectories(dest);
 
@@ -692,13 +701,7 @@ namespace TopoMojo.Hypervisor.vSphere
             // sometimes returns blank info, so wait a sec to prevent race
             await Task.Delay(1000);
 
-            info = await GetVimTaskInfo(task);
-
-            _taskMap[templateId] = info;
-
-            _logger.LogDebug($"TaskProgress: {templateId} {info.state} {info.progress}% cloned");
-
-            return info.progress;
+            _taskMap[dest] = await GetVimTaskInfo(task);
         }
 
         public async Task CreateDisk(string name, string type, string adapter, int size)
@@ -734,7 +737,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 {
                     diskType = "thin",
                     adapterType = adapter,
-                    capacityKb = disk.Size * 1000 * 1000,
+                    capacityKb = disk.Size * 1024 * 1024,
                     profile = null
                 }
             );
@@ -857,6 +860,18 @@ namespace TopoMojo.Hypervisor.vSphere
                         DateTimeOffset sp = DateTimeOffset.Now;
                         _logger.LogDebug($"Instantiating client {_config.Host}...");
                         VimPortTypeClient client = new VimPortTypeClient(VimPortTypeClient.EndpointConfiguration.VimPort, _config.Url);
+
+                        if (_config.IgnoreCertificateErrors)
+                        {
+                            client.ClientCredentials.ServiceCertificate.SslCertificateAuthentication =
+                                new System.ServiceModel.Security.X509ServiceCertificateAuthentication()
+                                {
+                                    CertificateValidationMode = System.ServiceModel.Security.X509CertificateValidationMode.None,
+                                    RevocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck
+                                }
+                            ;
+                        }
+
                         _logger.LogDebug($"client: [{client}]");
                         _logger.LogDebug($"Instantiated {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds} seconds");
 

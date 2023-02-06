@@ -25,6 +25,7 @@ namespace TopoMojo.Hypervisor
         public string Tenant { get; set; } = "";
         public bool IsNsxNetwork { get; set; }
         public bool DebugVerbose { get; set; }
+        public bool IgnoreCertificateErrors { get; set; }
         public SddcConfiguration Sddc { get; set; } = new SddcConfiguration();
     }
 

@@ -23,8 +23,8 @@ namespace TopoMojo.Hypervisor
         Task<Vm> Refresh(VmTemplate template);
         Task<Vm[]> Find(string searchText);
         Task<int> CreateDisks(VmTemplate template);
-        Task<int> VerifyDisks(VmTemplate template);
-        Task<int> DeleteDisks(VmTemplate template);
+        Task<int[]> VerifyDisks(VmTemplate template);
+        Task DeleteDisks(VmTemplate template);
         Task<VmConsole> Display(string id);
         Task<Vm> Answer(string id, VmAnswer answer);
         // Task<TemplateOptions> GetTemplateOptions(string key);
