@@ -11,6 +11,7 @@ namespace TopoMojo.Api.Models
     public class Gamespace
     {
         public string Id { get; set; }
+        public string WorkspaceId { get; set; }
         public string ManagerId { get; set; }
         public string ManagerName { get; set; }
         public string Audience { get; set; }
@@ -34,6 +35,7 @@ namespace TopoMojo.Api.Models
     public class GameState
     {
         public string Id { get; set; }
+        public string WorkspaceId { get; set; }
         public string Name { get; set; }
         public string Slug => Name.ToSlug();
         public string ManagerId { get; set; }
@@ -84,7 +86,7 @@ namespace TopoMojo.Api.Models
         public string GamespaceId { get; set; }
         public string Token { get; set; }
     }
-    
+
     public class GamespaceSearch: Search
     {
         public const string FilterAll = "all";
