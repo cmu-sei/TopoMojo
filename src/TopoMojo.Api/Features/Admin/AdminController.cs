@@ -47,22 +47,6 @@ namespace TopoMojo.Api.Controllers
         private readonly IMemoryCache _localCache;
 
         /// <summary>
-        /// Show application version info.
-        /// </summary>
-        /// <returns></returns>
-        [HttpGet("api/version")]
-        [SwaggerOperation(OperationId = "GetAppVersion")]
-        [AllowAnonymous]
-        public ActionResult<AppVersionInfo> GetAppVersionInfo()
-        {
-            return Ok(new AppVersionInfo
-            {
-                Commit = Environment.GetEnvironmentVariable("COMMIT")
-                    ?? "no version info provided"
-            });
-        }
-
-        /// <summary>
         /// Post an announcement to users.
         /// </summary>
         /// <param name="text"></param>

@@ -357,6 +357,20 @@ namespace TopoMojo.Api.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Show application version info.
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("api/version")]
+        [SwaggerOperation(OperationId = "GetAppVersion")]
+        public ActionResult<AppVersionInfo> GetAppVersionInfo()
+        {
+            return Ok(new AppVersionInfo
+            {
+                Commit = Environment.GetEnvironmentVariable("COMMIT")
+                    ?? "no version info provided"
+            });
+        }
     }
 
 }
