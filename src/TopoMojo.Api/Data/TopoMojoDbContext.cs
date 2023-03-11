@@ -34,8 +34,8 @@ namespace TopoMojo.Api.Data
             });
 
             builder.Entity<Template>(b => {
-                b.HasOne(t => t.Workspace).WithMany(w => w.Templates).OnDelete(DeleteBehavior.Restrict);
-                b.HasOne(t => t.Parent).WithMany(p => p.Children).OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(t => t.Workspace).WithMany(w => w.Templates).OnDelete(DeleteBehavior.Cascade);
+                b.HasOne(t => t.Parent).WithMany().OnDelete(DeleteBehavior.SetNull);
                 b.Property(w => w.Id).HasMaxLength(KEYLENGTH);
                 b.Property(w => w.ParentId).HasMaxLength(KEYLENGTH);
                 b.Property(g => g.WorkspaceId).HasMaxLength(KEYLENGTH);

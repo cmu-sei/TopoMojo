@@ -16,10 +16,13 @@ namespace TopoMojo.Api.Models
         public string Iso { get; set; }
         public string Guestinfo { get; set; }
         public bool IsHidden { get; set; }
+        public bool IsLinked { get; set; }
         public string ParentId { get; set; }
+        public string ParentName { get; set; }
         public int Replicas { get; set; }
         public int Variant { get; set; }
         public string WorkspaceId { get; set; }
+        public string WorkspaceName { get; set; }
     }
 
     public class ChangedTemplate
@@ -35,11 +38,25 @@ namespace TopoMojo.Api.Models
         public int Variant { get; set; }
     }
 
+    public class TemplateDetail
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string Audience { get; set; }
+        public string Networks { get; set; }
+        public string Guestinfo { get; set; }
+        public string Detail { get; set; }
+        public bool IsPublished { get; set; }
+        public bool IsLinked { get; set; }
+        public TemplateDetail Parent { get; set; }
+    }
+
     public class NewTemplateDetail: TemplateDetail
     {
     }
 
-    public class TemplateDetail
+    public class ChangedTemplateDetail
     {
         public string Id { get; set; }
         public string Name { get; set; }
@@ -61,12 +78,26 @@ namespace TopoMojo.Api.Models
         public string WorkspaceName { get; set; }
         public string ParentId { get; set; }
         public string ParentName { get; set; }
+        public bool IsLinked { get; set; }
         public bool IsPublished { get; set; }
     }
 
     public class TemplateLink
     {
         public string TemplateId { get; set; }
+        public string WorkspaceId { get; set; }
+    }
+
+    public class TemplateClone
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+    }
+
+    public class TemplateReLink
+    {
+        public string TemplateId { get; set; }
+        public string ParentId { get; set; }
         public string WorkspaceId { get; set; }
     }
 
@@ -94,5 +125,6 @@ namespace TopoMojo.Api.Models
 
         public string aud { get; set; }
         public string pid { get; set; }
+        public string sib { get; set; }
     }
 }

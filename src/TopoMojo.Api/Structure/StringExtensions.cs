@@ -174,41 +174,35 @@ namespace TopoMojo.Api.Extensions
 
         public static int ToSeconds(this string ts)
         {
-            if (ts == string.Empty)
+            if (ts.ValidSimpleTimespan().Equals(false))
                 return 0;
 
-            if (int.TryParse(ts.Substring(0, ts.Length - 1), out int value))
+            int value = int.Parse(ts[..^1]);
+            int factor = ts[^1..].First() switch
             {
-                char type = ts.Trim().ToCharArray().Last();
-                int factor = 1;
+                'y' => 86400 * 365,
+                'w' => 86400 * 7,
+                'd' => 86400,
+                'h' => 3600,
+                'm' => 60,
+                _ => 1
+            };
 
-                switch (type)
-                {
-                    case 'y':
-                    factor = 86400 * 365;
-                    break;
+            return value * factor;
+        }
 
-                    case 'w':
-                    factor = 86400 * 7;
-                    break;
+        public static bool ValidSimpleTimespan(this string ts)
+        {
+            if (string.IsNullOrEmpty(ts))
+                return false;
 
-                    case 'd':
-                    factor = 86400;
-                    break;
-
-                    case 'h':
-                    factor = 3600;
-                    break;
-
-                    case 'm':
-                    factor = 60;
-                    break;
-                }
-
-                return value * factor;
+            if (int.TryParse(ts[..^1], out int value))
+            {
+                string type = ts[^1..];
+                return "ywdms".Contains(type);
             }
 
-            throw new ArgumentException("invalid simple-timespan");
+            return false;
         }
 
         public static DateTimeOffset ToDatePast(this string ts)

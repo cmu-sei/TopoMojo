@@ -61,6 +61,23 @@ namespace TopoMojo.Api.Controllers
             return Ok(result);
         }
 
+        [HttpGet("api/template/{id}/siblings")]
+        [SwaggerOperation(OperationId = "ListSiblings")]
+        [Authorize]
+        public async Task<ActionResult<TemplateSummary[]>> ListSiblings(string id, [FromQuery] bool pub)
+        {
+            await Validate(new Entity { Id = id });
+
+            AuthorizeAny(
+                () => Actor.IsAdmin,
+                () => _svc.CanEdit(id, Actor.Id).Result
+            );
+
+            var result = await _svc.ListSiblings(id, pub);
+
+            return Ok(result);
+        }
+
         /// <summary>
         /// Load a template.
         /// </summary>
@@ -145,7 +162,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => _svc.CanEditWorkspace(model.WorkspaceId, Actor.Id).Result
+                () => _svc.CanEdit(model.TemplateId, Actor.Id).Result
             );
 
             var result = await _svc.Link(model, Actor.IsCreator);
@@ -173,6 +190,30 @@ namespace TopoMojo.Api.Controllers
             );
 
             var result = await _svc.Unlink(model);
+
+            SendBroadcast(result, "updated");
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Change a template's parent.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [HttpPost("api/template/relink")]
+        [SwaggerOperation(OperationId = "ReLinkTemplate")]
+        [Authorize]
+        public async Task<ActionResult<Template>> ReLinkTemplate([FromBody]TemplateReLink model)
+        {
+            await Validate(model);
+
+            AuthorizeAny(
+                () => Actor.IsAdmin,
+                () => _svc.CanEdit(model.TemplateId, Actor.Id).Result
+            );
+
+            var result = await _svc.ReLink(model);
 
             SendBroadcast(result, "updated");
 
@@ -218,6 +259,25 @@ namespace TopoMojo.Api.Controllers
         }
 
         /// <summary>
+        /// Clone template.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [HttpPost("api/template/clone")]
+        [SwaggerOperation(OperationId = "CloneTemplateDetail")]
+        [Authorize(AppConstants.AdminOnlyPolicy)]
+        public async Task<ActionResult<TemplateDetail>> CloneTemplateDetail([FromBody]TemplateClone model)
+        {
+            await Validate(model);
+
+            AuthorizeAll();
+
+            return Ok(
+                await _svc.Clone(model)
+            );
+        }
+
+        /// <summary>
         /// Update template detail.
         /// </summary>
         /// <param name="model"></param>
@@ -225,7 +285,7 @@ namespace TopoMojo.Api.Controllers
         [HttpPut("api/template-detail")]
         [SwaggerOperation(OperationId = "ConfigureTemplateDetail")]
         [Authorize(AppConstants.AdminOnlyPolicy)]
-        public async Task<ActionResult> ConfigureTemplateDetail([FromBody]TemplateDetail model)
+        public async Task<ActionResult> ConfigureTemplateDetail([FromBody]ChangedTemplateDetail model)
         {
             await Validate(model);
 

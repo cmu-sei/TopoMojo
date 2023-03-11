@@ -34,8 +34,17 @@ namespace TopoMojo.Api.Validators
             if (model is TemplateLink)
                 return _validate(model as TemplateLink);
 
+            if (model is TemplateReLink)
+                return _validate(model as TemplateReLink);
+
             if (model is NewTemplateDetail)
                 return _validate(model as NewTemplateDetail);
+
+            if (model is ChangedTemplateDetail)
+                return _validate(model as ChangedTemplateDetail);
+
+            if (model is TemplateClone)
+                return _validate(model as TemplateClone);
 
             if (model is TemplateDetail)
                 return _validate(model as TemplateDetail);
@@ -59,10 +68,38 @@ namespace TopoMojo.Api.Validators
             await Task.CompletedTask;
         }
 
+        private async Task _validate(ChangedTemplateDetail model)
+        {
+            if ((await Exists(model.Id)).Equals(false))
+                throw new ResourceNotFound();
+
+            await Task.CompletedTask;
+        }
+
         private async Task _validate(NewTemplateDetail model)
         {
             if ((await Exists(model.Id)).Equals(true))
                 throw new ResourceAlreadyExists();
+
+            await Task.CompletedTask;
+        }
+
+        private async Task _validate(TemplateClone model)
+        {
+            if ((await Exists(model.Id)).Equals(false))
+                throw new ResourceNotFound();
+
+            await Task.CompletedTask;
+        }
+
+        private async Task _validate(TemplateReLink model)
+        {
+            if (
+                (await Exists(model.TemplateId)).Equals(false) ||
+                (await Exists(model.ParentId)).Equals(false) ||
+                (await _store.Retrieve(model.TemplateId))?.WorkspaceId != model.WorkspaceId
+            )
+                throw new ResourceNotFound();
 
             await Task.CompletedTask;
         }

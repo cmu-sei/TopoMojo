@@ -12,6 +12,7 @@ namespace TopoMojo.Api.Models
         public string Id { get; set; }
         public string Name { get; set; }
         public string Description { get; set; }
+        public string Tags { get; set; }
         public string Author { get; set; }
         public string Audience { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
@@ -38,10 +39,13 @@ namespace TopoMojo.Api.Models
     {
         public string Name { get; set; }
         public string Description { get; set; }
+        public string Tags { get; set; }
         public string Audience { get; set; }
         public string Author { get; set; }
         public string Challenge { get; set; }
         public string Document { get; set; }
+        public string TemplateScope { get; set; }
+        public int TemplateLimit { get; set; }
     }
 
     public class RestrictedChangedWorkspace
@@ -49,6 +53,7 @@ namespace TopoMojo.Api.Models
         public string Id { get; set; }
         public string Name { get; set; }
         public string Description { get; set; }
+        public string Tags { get; set; }
         public string Author { get; set; }
         public string Audience { get; set; }
     }
@@ -58,6 +63,7 @@ namespace TopoMojo.Api.Models
         public string Id { get; set; }
         public string Name { get; set; }
         public string Description { get; set; }
+        public string Tags { get; set; }
         public string Author { get; set; }
         public string Audience { get; set; }
         public string TemplateScope { get; set; }

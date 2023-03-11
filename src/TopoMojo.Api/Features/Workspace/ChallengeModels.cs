@@ -9,6 +9,7 @@ namespace TopoMojo.Api.Models
     public class ChallengeSpec
     {
         public string Text { get; set; }
+        public string Markdown { get; set; }
         public double Score { get; set; }
         public DateTimeOffset LastScoreTime { get; set; }
         public int MaxPoints { get; set; }

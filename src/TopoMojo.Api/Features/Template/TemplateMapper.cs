@@ -25,6 +25,8 @@ namespace TopoMojo.Api
 
             CreateMap<NewTemplateDetail, Data.Template>();
 
+            CreateMap<ChangedTemplateDetail, Data.Template>();
+
             CreateMap<ChangedTemplate, Data.Template>();
 
             CreateMap<Data.Template, ConvergedTemplate>()

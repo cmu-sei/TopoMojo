@@ -153,21 +153,27 @@ namespace TopoMojo.Api.Services
         /// <param name="model"></param>
         /// <param name="subjectId"></param>
         /// <param name="subjectName"></param>
+        /// <param name="sudo"></param>
         /// <returns>Workspace</returns>
-        public async Task<Workspace> Create(NewWorkspace model, string subjectId, string subjectName)
+        public async Task<Workspace> Create(NewWorkspace model, string subjectId, string subjectName, bool sudo = false)
         {
             var workspace = Mapper.Map<Data.Workspace>(model);
-            
+
+            if (!sudo)
+            {
+                workspace.TemplateLimit = _options.DefaultTemplateLimit;
+                workspace.TemplateScope = "";
+            }
+
             workspace.Id = Guid.NewGuid().ToString("n");
-            workspace.TemplateLimit = _options.DefaultTemplateLimit;
             workspace.WhenCreated = DateTimeOffset.UtcNow;
             workspace.LastActivity = DateTimeOffset.UtcNow;
 
-            if (workspace.Challenge.IsEmpty())
-                workspace.Challenge = JsonSerializer.Serialize<ChallengeSpec>(
-                    new ChallengeSpec(),
-                    jsonOptions
-                );
+            if (workspace.Name.IsEmpty())
+                workspace.Name = "Workspace Title";
+
+            if (workspace.TemplateLimit == 0)
+                workspace.TemplateLimit = _options.DefaultTemplateLimit;
 
             workspace.Workers.Add(new Data.Worker
             {
@@ -175,10 +181,10 @@ namespace TopoMojo.Api.Services
                 SubjectName = subjectName,
                 Permission = Permission.Manager
             });
-            
+
             if (string.IsNullOrEmpty(_options.Tenant).Equals(false))
                 workspace.Id = _options.Tenant + workspace.Id.Substring(0, workspace.Id.Length - _options.Tenant.Length);
-            
+
             workspace = await _store.Create(workspace);
 
             // TODO: consider handling document here
@@ -235,10 +241,28 @@ namespace TopoMojo.Api.Services
         {
             var entity = await _store.Retrieve(id);
 
-            string spec = entity.Challenge ??
-                JsonSerializer.Serialize<ChallengeSpec>(new ChallengeSpec());
+            ChallengeSpec spec = string.IsNullOrEmpty(entity.Challenge)
+                ? new()
+                : JsonSerializer.Deserialize<ChallengeSpec>(entity.Challenge, jsonOptions)
+            ;
 
-            return JsonSerializer.Deserialize<ChallengeSpec>(spec, jsonOptions);
+            spec.Markdown = (await LoadMarkdown(entity.Id)).Split("<!-- cut -->").First()
+                ?? $"# {entity.Name}"
+            ;
+            return spec;
+        }
+
+        private async Task<string> LoadMarkdown(string id)
+        {
+            string path = System.IO.Path.Combine(
+                _options.DocPath,
+                id
+            ) + ".md";
+
+            return id.NotEmpty() && System.IO.File.Exists(path)
+                ? await System.IO.File.ReadAllTextAsync(path)
+                : String.Empty
+            ;
         }
 
         public async Task UpdateChallenge(string id, ChallengeSpec spec)

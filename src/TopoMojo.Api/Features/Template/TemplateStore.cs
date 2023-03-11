@@ -24,6 +24,7 @@ namespace TopoMojo.Api.Data
                 : base.List().Where(t =>
                     t.Name.ToLower().Contains(term) ||
                     t.Id.StartsWith(term) ||
+                    t.WorkspaceId.StartsWith(term) ||
                     t.Audience.Contains(term)
                 );
         }

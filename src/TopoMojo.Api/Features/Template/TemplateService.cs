@@ -14,6 +14,7 @@ using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Hypervisor;
 using TopoMojo.Api.Models;
+using System.Text.RegularExpressions;
 
 namespace TopoMojo.Api.Services
 {
@@ -38,13 +39,16 @@ namespace TopoMojo.Api.Services
         public async Task<TemplateSummary[]> List(TemplateSearch search, bool sudo, CancellationToken ct = default(CancellationToken))
         {
             var q = _store.List(search.Term)
-                .Include(t => t.Workspace) as IQueryable<Data.Template>;
+                .Include(t => t.Workspace)
+                .Include(t => t.Parent)
+                as IQueryable<Data.Template>
+            ;
 
             if (sudo && search.pid.NotEmpty())
                 q = q.Where(t => t.ParentId == search.pid);
 
             if (!sudo || search.WantsPublished)
-                q = q.Where(t => t.IsPublished && t.Audience == null);
+                q = q.Where(t => t.IsPublished);
 
             q = q.OrderBy(t => t.Name);
 
@@ -54,9 +58,33 @@ namespace TopoMojo.Api.Services
             if (search.Take > 0)
                 q = q.Take(search.Take);
 
-            return Mapper.Map<TemplateSummary[]>(
-                await q.ToArrayAsync(ct)
-            );
+            return await Mapper.ProjectTo<TemplateSummary>(q)
+                .ToArrayAsync(ct)
+            ;
+        }
+
+        public async Task<TemplateSummary[]> ListSiblings(string id, bool published)
+        {
+            var entity = await _store.Load(id);
+
+            if (entity.Parent is null)
+                return new TemplateSummary[]{};
+
+            var list = await Mapper.ProjectTo<TemplateSummary>(
+                _store.List().Where(t => t.ParentId == entity.ParentId)
+            ).ToArrayAsync();
+
+            var query = list.Where(t => t.Id != id);
+
+            if (published)
+            {
+                query = query.Where(t =>
+                    t.IsPublished ||
+                    t.Audience.HasAnyToken(entity.Workspace?.Audience)
+                );
+            }
+
+            return query.ToArray();
         }
 
         public async Task<Template> Load(string id)
@@ -84,7 +112,7 @@ namespace TopoMojo.Api.Services
 
         public async Task<TemplateDetail> LoadDetail(string id)
         {
-            var template = await _store.Retrieve(id);
+            var template = await _store.Retrieve(id, q => q.Include(t => t.Parent));
 
             return Mapper.Map<TemplateDetail>(template);
         }
@@ -100,13 +128,38 @@ namespace TopoMojo.Api.Services
             return Mapper.Map<TemplateDetail>(t);
         }
 
-        public async Task<TemplateDetail> Configure(TemplateDetail template)
+        public async Task<TemplateDetail> Configure(ChangedTemplateDetail template)
         {
             var entity = await _store.Retrieve(template.Id);
 
-            Mapper.Map<TemplateDetail, Data.Template>(template, entity);
+            Mapper.Map<ChangedTemplateDetail, Data.Template>(template, entity);
 
             await _store.Update(entity);
+
+            return Mapper.Map<TemplateDetail>(entity);
+        }
+
+        public async Task<TemplateDetail> Clone(TemplateClone model)
+        {
+            var entity = await _store.DbContext.Templates
+                .AsNoTracking()
+                .FirstOrDefaultAsync(w => w.Id == model.Id)
+            ;
+
+            string suffix = "-CLONE";
+            var match = Regex.Match(entity.Name, @"v(\d+)$");
+            if (match.Success && Int32.TryParse(match.Groups[1].ValueSpan, out int version))
+            {
+                suffix = $"v{version + 1}";
+                entity.Name = entity.Name[0..match.Index];
+            }
+
+            entity.ParentId = entity.Id;
+            entity.IsLinked = false;
+            entity.Id = Guid.NewGuid().ToString("n");
+            entity.Name = model.Name ?? $"{entity.Name}{suffix}";
+
+            await _store.Create(entity);
 
             return Mapper.Map<TemplateDetail>(entity);
         }
@@ -119,16 +172,34 @@ namespace TopoMojo.Api.Services
 
             await _store.Update(entity);
 
+            return Mapper.Map<Template>(await _store.LoadWithParent(entity.Id));
+        }
+
+        /// <summary>
+        /// associate cloned template to a new source
+        /// </summary>
+        /// <remarks>
+        /// Supports source template revisions by allowing association with a new source
+        /// </remarks>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        public async Task<Template> ReLink(TemplateReLink model)
+        {
+            var entity = await _store.LoadWithParent(model.TemplateId);
+            var source = await _store.LoadWithParent(model.ParentId);
+
+            if (entity.ParentId != source.ParentId)
+                throw new TemplateNotPublished();
+
+            entity.ParentId = source.Id;
+
+            await _store.Update(entity);
+
             return Mapper.Map<Template>(entity);
         }
 
         public async Task<Template> Link(TemplateLink newlink, bool sudo)
         {
-            var entity = await _store.Retrieve(newlink.TemplateId);
-
-            if (entity.IsPublished.Equals(false))
-                throw new TemplateNotPublished();
-
             if (!sudo && await _store.AtTemplateLimit(newlink.WorkspaceId))
                 throw new TemplateLimitReached();
 
@@ -136,14 +207,20 @@ namespace TopoMojo.Api.Services
                 .FirstOrDefaultAsync(w => w.Id == newlink.WorkspaceId)
             ;
 
-            string name = entity.Name.Length > 60
-                ? entity.Name.Substring(0, 60)
+            var entity = await _store.Retrieve(newlink.TemplateId);
+
+            if (entity.IsPublished.Equals(false) && entity.Audience.HasAnyToken(workspace.Audience).Equals(false))
+                throw new TemplateNotPublished();
+
+            string name = entity.Name.Length > 64
+                ? entity.Name.Substring(0, 64)
                 : entity.Name
             ;
 
             var newTemplate = new Data.Template
             {
                 ParentId = entity.Id,
+                IsLinked = true,
                 WorkspaceId = workspace.Id,
                 Name = $"{name}-{new Random().Next(100, 999).ToString()}",
                 Description = entity.Description,
@@ -173,7 +250,7 @@ namespace TopoMojo.Api.Services
 
                 entity.Detail = tu.ToString();
 
-                entity.Parent = null;
+                entity.IsLinked = false;
 
                 await _store.Update(entity);
             }

@@ -110,12 +110,12 @@ namespace TopoMojo.Api.Controllers
             );
 
             return Ok(
-                await _svc.Create(model, Actor.Id, Actor.Name)
+                await _svc.Create(model, Actor.Id, Actor.Name, Actor.IsCreator)
             );
         }
 
         /// <summary>
-        /// Create a new workspace.
+        /// Clone a workspace.
         /// </summary>
         /// <param name="id">Workspace Id to clone</param>
         /// <returns>A new workspace.</returns>
