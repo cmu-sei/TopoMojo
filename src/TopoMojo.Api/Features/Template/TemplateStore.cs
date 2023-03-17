@@ -19,14 +19,18 @@ namespace TopoMojo.Api.Data
 
         public override IQueryable<Template> List(string term = null)
         {
-            return term.IsEmpty()
-                ? base.List()
-                : base.List().Where(t =>
-                    t.Name.ToLower().Contains(term) ||
-                    t.Id.StartsWith(term) ||
-                    t.WorkspaceId.StartsWith(term) ||
-                    t.Audience.Contains(term)
-                );
+            if (term.IsEmpty())
+                return base.List();
+
+            string x = term.ToLower();
+
+            return base.List().Where(t =>
+                t.Name.ToLower().Contains(x) ||
+                t.Id.StartsWith(x) ||
+                t.WorkspaceId.StartsWith(x) ||
+                t.Audience.ToLower().Contains(x) ||
+                t.Workspace.Name.ToLower().StartsWith(x)
+            );
         }
 
         public async Task<Template> Load(string id)
