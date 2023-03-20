@@ -30,6 +30,7 @@ namespace TopoMojo.Api.Models
         public string Name { get; set; }
         public string Slug => Name.ToSlug();
         public string Description { get; set; }
+        public string Text { get; set; }
         public string Audience { get; set; }
         public string Author { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
@@ -91,8 +92,11 @@ namespace TopoMojo.Api.Models
     {
         public string aud { get; set; }
         public string scope { get; set; }
+        public int doc { get; set; }
         public bool WantsAudience => string.IsNullOrEmpty(aud).Equals(false);
-        public bool WantsPlayable => Filter.Contains("play") && scope.NotEmpty();
+        public bool WantsManaged => Filter.Contains("my");
+        public bool WantsDoc => doc > 0;
+        public bool WantsPartialDoc => doc == 1;
     }
 
     public class ClientAudience
