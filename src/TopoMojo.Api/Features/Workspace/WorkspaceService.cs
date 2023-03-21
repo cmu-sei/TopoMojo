@@ -26,7 +26,7 @@ namespace TopoMojo.Api.Services
             ILogger<WorkspaceService> logger,
             IMapper mapper,
             CoreOptions options
-        ) : base (logger, mapper, options)
+        ) : base(logger, mapper, options)
         {
             _store = workspaceStore;
             _gamespaceStore = gamespaceStore;
@@ -43,19 +43,29 @@ namespace TopoMojo.Api.Services
         /// <returns>Array of WorkspaceSummary</returns>
         public async Task<WorkspaceSummary[]> List(WorkspaceSearch search, string subjectId, bool sudo, CancellationToken ct = default(CancellationToken))
         {
+            WorkspaceSummary[] result;
+
+            // add default audience to actor's list of allowed audiences
             search.scope += " " + _options.DefaultUserScope;
 
-            // TODO: change this to use tags (efcore many-to-many)
+            // refine to just requested audience
+            if (search.WantsAudience)
+                search.scope = search.aud;
 
-            if (search.WantsPlayable)
-                return await ListPlayable(search, ct);
+            // convert to array
+            var scopes = search.scope.Split(
+                AppConstants.InlineListSeparators,
+                StringSplitOptions.RemoveEmptyEntries
+            );
 
             var q = _store.List(search.Term);
 
-            if (search.WantsAudience)
-                q = q.Where(w => w.Audience.Contains(search.aud));
+            // if not admin, filter on allowed scopes
+            if (!sudo)
+                q = q.Where(w => scopes.Contains(w.Audience));
 
-            else if (!sudo)
+            // if wants "my", filter where actor is worker
+            if (search.WantsManaged)
                 q = q.Where(p => p.Workers.Any(w => w.SubjectId == subjectId));
 
             q = search.Sort == "age"
@@ -68,42 +78,16 @@ namespace TopoMojo.Api.Services
             if (search.Take > 0)
                 q = q.Take(search.Take);
 
-            return Mapper.Map<WorkspaceSummary[]>(
+            result = Mapper.Map<WorkspaceSummary[]>(
                 await q.ToArrayAsync(ct)
             );
-        }
 
-        private async Task<WorkspaceSummary[]> ListPlayable(WorkspaceSearch search, CancellationToken ct = default(CancellationToken))
-        {
-            // TODO: change this to use tags (efcore many-to-many)
+            // fill document text if requested
+            if (search.WantsDoc)
+                foreach (var ws in result)
+                    ws.Text = await LoadMarkdown(ws.Id, search.WantsPartialDoc);
 
-            var scopes = search.scope.Split(
-                AppConstants.InlineListSeparators,
-                StringSplitOptions.RemoveEmptyEntries
-            );
-
-            var data = await _store.List(search.Term)
-                .Where(w => !string.IsNullOrEmpty(w.Audience))
-                .ToArrayAsync()
-            ;
-
-            var q = data.AsQueryable()
-                .Where(w => w.Audience.HasAnyToken(search.scope))
-            ;
-
-            q = search.Sort == "age"
-                ? q.OrderByDescending(w => w.WhenCreated)
-                : q.OrderBy(w => w.Name);
-
-            if (search.Skip > 0)
-                q = q.Skip(search.Skip);
-
-            if (search.Take > 0)
-                q = q.Take(search.Take);
-
-            return Mapper.Map<WorkspaceSummary[]>(
-                q
-            );
+            return result;
 
         }
 
@@ -117,7 +101,6 @@ namespace TopoMojo.Api.Services
 
             q = q.Include(t => t.Templates)
                     .Include(t => t.Workers)
-                    // .ThenInclude(w => w.Person)
             ;
 
             q = search.Sort == "age"
@@ -153,21 +136,27 @@ namespace TopoMojo.Api.Services
         /// <param name="model"></param>
         /// <param name="subjectId"></param>
         /// <param name="subjectName"></param>
+        /// <param name="sudo"></param>
         /// <returns>Workspace</returns>
-        public async Task<Workspace> Create(NewWorkspace model, string subjectId, string subjectName)
+        public async Task<Workspace> Create(NewWorkspace model, string subjectId, string subjectName, bool sudo = false)
         {
             var workspace = Mapper.Map<Data.Workspace>(model);
-            
+
+            if (!sudo)
+            {
+                workspace.TemplateLimit = _options.DefaultTemplateLimit;
+                workspace.TemplateScope = "";
+            }
+
             workspace.Id = Guid.NewGuid().ToString("n");
-            workspace.TemplateLimit = _options.DefaultTemplateLimit;
             workspace.WhenCreated = DateTimeOffset.UtcNow;
             workspace.LastActivity = DateTimeOffset.UtcNow;
 
-            if (workspace.Challenge.IsEmpty())
-                workspace.Challenge = JsonSerializer.Serialize<ChallengeSpec>(
-                    new ChallengeSpec(),
-                    jsonOptions
-                );
+            if (workspace.Name.IsEmpty())
+                workspace.Name = "Workspace Title";
+
+            if (workspace.TemplateLimit == 0)
+                workspace.TemplateLimit = _options.DefaultTemplateLimit;
 
             workspace.Workers.Add(new Data.Worker
             {
@@ -175,10 +164,10 @@ namespace TopoMojo.Api.Services
                 SubjectName = subjectName,
                 Permission = Permission.Manager
             });
-            
+
             if (string.IsNullOrEmpty(_options.Tenant).Equals(false))
                 workspace.Id = _options.Tenant + workspace.Id.Substring(0, workspace.Id.Length - _options.Tenant.Length);
-            
+
             workspace = await _store.Create(workspace);
 
             // TODO: consider handling document here
@@ -235,10 +224,30 @@ namespace TopoMojo.Api.Services
         {
             var entity = await _store.Retrieve(id);
 
-            string spec = entity.Challenge ??
-                JsonSerializer.Serialize<ChallengeSpec>(new ChallengeSpec());
+            ChallengeSpec spec = string.IsNullOrEmpty(entity.Challenge)
+                ? new()
+                : JsonSerializer.Deserialize<ChallengeSpec>(entity.Challenge, jsonOptions)
+            ;
 
-            return JsonSerializer.Deserialize<ChallengeSpec>(spec, jsonOptions);
+            return spec;
+        }
+
+        private async Task<string> LoadMarkdown(string id, bool aboveCut)
+        {
+            string path = System.IO.Path.Combine(
+                _options.DocPath,
+                id
+            ) + ".md";
+
+            string text = id.NotEmpty() && System.IO.File.Exists(path)
+                ? await System.IO.File.ReadAllTextAsync(path)
+                : String.Empty
+            ;
+
+            return aboveCut
+                ? text.Split(AppConstants.MarkdownCutLine).First()
+                : text
+            ;
         }
 
         public async Task UpdateChallenge(string id, ChallengeSpec spec)
@@ -261,7 +270,8 @@ namespace TopoMojo.Api.Services
 
             await _pod.DeleteAll(id);
 
-            await _store.DeleteWithTemplates(id, async templates => {
+            await _store.DeleteWithTemplates(id, async templates =>
+            {
 
                 var disktasks = Mapper.Map<ConvergedTemplate[]>(templates)
                     .Select(ct => _pod.DeleteDisks(ct.ToVirtualTemplate()))
@@ -318,7 +328,7 @@ namespace TopoMojo.Api.Services
             var workspace = await _store.Retrieve(id);
 
             if (workspace.TemplateScope.IsEmpty())
-                return new TemplateSummary[] {};
+                return new TemplateSummary[] { };
 
             var templates = (await _store.ListScopedTemplates().ToArrayAsync())
                 .Where(t => t.Audience.HasAnyToken(workspace.TemplateScope))

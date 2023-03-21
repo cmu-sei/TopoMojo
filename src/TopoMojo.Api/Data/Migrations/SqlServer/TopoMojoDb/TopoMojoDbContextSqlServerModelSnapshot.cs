@@ -198,6 +198,9 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                     b.Property<bool>("IsHidden")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsLinked")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("bit");
 
@@ -341,6 +344,9 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                     b.Property<string>("ShareCode")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Tags")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("TemplateLimit")
                         .HasColumnType("int");
 
@@ -393,14 +399,14 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
             modelBuilder.Entity("TopoMojo.Api.Data.Template", b =>
                 {
                     b.HasOne("TopoMojo.Api.Data.Template", "Parent")
-                        .WithMany("Children")
+                        .WithMany()
                         .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("TopoMojo.Api.Data.Workspace", "Workspace")
                         .WithMany("Templates")
                         .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Parent");
 
@@ -421,11 +427,6 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
             modelBuilder.Entity("TopoMojo.Api.Data.Gamespace", b =>
                 {
                     b.Navigation("Players");
-                });
-
-            modelBuilder.Entity("TopoMojo.Api.Data.Template", b =>
-                {
-                    b.Navigation("Children");
                 });
 
             modelBuilder.Entity("TopoMojo.Api.Data.User", b =>

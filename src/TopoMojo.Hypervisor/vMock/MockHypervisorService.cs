@@ -113,10 +113,10 @@ namespace TopoMojo.Hypervisor.vMock
                 return vm;
             }
 
-            if (
-                template.Disks.Any() &&
-                VerifyNormalizedDisks(template).Result.Any(i => i < 100)
-            ) throw new Exception("Disks have not been prepared.");
+            // if (
+            //     template.Disks.Any() &&
+            //     VerifyNormalizedDisks(template).Result.Any(i => i < 100)
+            // ) throw new Exception("Disks have not been prepared.");
 
             await Delay();
 

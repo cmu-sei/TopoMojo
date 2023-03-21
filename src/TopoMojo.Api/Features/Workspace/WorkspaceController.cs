@@ -42,6 +42,9 @@ namespace TopoMojo.Api.Controllers
         /// <remarks>
         /// ?aud=value retrieves item published to that audience,
         /// if the requestor is allowed that scope
+        /// filter=my retrieves where actor is worker
+        /// doc=1 includes "above the cut" portion of workspace document markdown
+        /// doc=2 includes full workspace document markdown
         /// sort: age for newest first; default is alpha
         /// </remarks>
         /// <param name="search"></param>
@@ -110,12 +113,12 @@ namespace TopoMojo.Api.Controllers
             );
 
             return Ok(
-                await _svc.Create(model, Actor.Id, Actor.Name)
+                await _svc.Create(model, Actor.Id, Actor.Name, Actor.IsCreator)
             );
         }
 
         /// <summary>
-        /// Create a new workspace.
+        /// Clone a workspace.
         /// </summary>
         /// <param name="id">Workspace Id to clone</param>
         /// <returns>A new workspace.</returns>

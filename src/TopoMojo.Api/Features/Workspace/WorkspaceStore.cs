@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TopoMojo.Api.Data.Abstractions;
@@ -27,6 +28,7 @@ namespace TopoMojo.Api.Data
 
                 q = q.Where(t =>
                     t.Name.ToLower().Contains(term) ||
+                    t.Tags.ToLower().Contains(term) ||
                     t.Description.ToLower().Contains(term) ||
                     t.Author.ToLower().Contains(term) ||
                     t.Audience.ToLower().Contains(term) ||
@@ -41,8 +43,8 @@ namespace TopoMojo.Api.Data
         {
             return await base.Retrieve(id, query => query
                 .Include(t => t.Workers)
-                .Include(t => t.Templates)
-                    .ThenInclude(p => p.Parent)
+                .Include(t => t.Templates).ThenInclude(p => p.Parent)
+                // .Include(t => t.Templates).ThenInclude(p => p.Source)
             );
         }
 
@@ -78,8 +80,9 @@ namespace TopoMojo.Api.Data
         public async Task DeleteWithTemplates(string id, Action<IEnumerable<Data.Template>> templateAction)
         {
             var entity = await Retrieve(id, q =>
-                q.Include(w => w.Templates.Where(t => !t.Children.Any()))
+                q.Include(w => w.Templates)
             );
+                // q.Include(w => w.Templates.Where(t => !t.Children.Any()))
 
             templateAction.Invoke(entity.Templates);
 
@@ -162,9 +165,18 @@ namespace TopoMojo.Api.Data
                 .FirstOrDefaultAsync(w => w.Id == id)
             ;
 
-            entity.Name += "-CLONE";
+            // TODO: auto-bump version
+            string suffix = "-CLONE";
+            var match = Regex.Match(entity.Name, @"v(\d+)$");
+            if (match.Success && Int32.TryParse(match.Groups[1].ValueSpan, out int version))
+            {
+                suffix = $"v{version + 1}";
+                entity.Name = entity.Name[0..match.Index];
+            }
+
+            entity.Name += suffix;
             entity.Id = Guid.NewGuid().ToString("n");
-            
+
             if (string.IsNullOrEmpty(tenantId).Equals(false))
                 entity.Id = tenantId + entity.Id.Substring(0, entity.Id.Length - tenantId.Length);
 
@@ -173,13 +185,20 @@ namespace TopoMojo.Api.Data
 
             foreach (Template template in entity.Templates)
             {
+                string sourceId = template.Id;
+
                 template.Id = Guid.NewGuid().ToString("n");
+
+                if (template.Name.EndsWith(match.Value))
+                    template.Name = template.Name[0..^match.Length] + suffix;
 
                 if (template.Iso?.Contains(id) ?? false)
                     template.Iso = "";
 
                 if (template.IsLinked)
                     continue;
+
+                template.ParentId = sourceId;
 
                 var tu = new Services.TemplateUtility(template.Detail);
 
@@ -197,8 +216,8 @@ namespace TopoMojo.Api.Data
             return DbContext.Templates
                 .Include(t => t.Workspace)
                 .Where(t =>
-                    t.ParentId == null &&
-                    t.IsPublished &&
+                    // t.ParentId == null &&
+                    // t.IsPublished &&
                     t.Audience != null
                 )
             ;

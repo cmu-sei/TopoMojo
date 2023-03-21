@@ -13,6 +13,7 @@ namespace TopoMojo.Api.Data
         public string Name { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
         public string Description { get; set; }
+        public string Tags { get; set; }
         public string Author { get; set; }
         public string Audience { get; set; }
         public string ShareCode { get; set; }

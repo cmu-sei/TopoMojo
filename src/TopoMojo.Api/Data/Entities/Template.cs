@@ -19,6 +19,7 @@ namespace TopoMojo.Api.Data
         public string Guestinfo { get; set; }
         public bool IsHidden { get; set; }
         public bool IsPublished { get; set; }
+        public bool IsLinked { get; set; }
         public string Detail { get; set; }
         public string ParentId { get; set; }
         public int Replicas { get; set; }
@@ -26,7 +27,5 @@ namespace TopoMojo.Api.Data
         public virtual Template Parent { get; set; }
         public string WorkspaceId { get; set; }
         public virtual Workspace Workspace { get; set; }
-        public virtual ICollection<Template> Children { get; set; } = new List<Template>();
-        [NotMapped] public bool IsLinked => string.IsNullOrEmpty(ParentId).Equals(false);
     }
 }
