@@ -52,7 +52,7 @@ namespace TopoMojo.Api.Services
 
         public async Task<Gamespace[]> List(GamespaceSearch search, string subjectId, bool sudo, bool observer, string scope, CancellationToken ct = default(CancellationToken))
         {
-            
+
             var query = (observer && search.WantsAll)
                 ? _store.List(search.Term) // dashboard list - admin or observer
                 : _store.ListByUser(subjectId) // side panel browser - anyone
@@ -78,14 +78,14 @@ namespace TopoMojo.Api.Services
             query = query.Include(g => g.Workspace);
 
             var data = await query.ToArrayAsync();
-            
+
             // filter only when user is observer (but not admin)
             // select gamespaces with matching workspace audience / user scope
             if (search.WantsAll && observer && !sudo)
-            { 
+            {
                 // complex string splitting done after all querying completed
                 data = data
-                    .Where(g => g.Workspace.Audience.HasAnyToken(scope)) 
+                    .Where(g => g.Workspace.Audience.HasAnyToken(scope))
                     .ToArray();
             }
 
@@ -100,7 +100,7 @@ namespace TopoMojo.Api.Services
             {
                 Name = ctx.Workspace.Name,
 
-                Markdown = (await LoadMarkdown(ctx.Workspace.Id)).Split("<!-- cut -->").First()
+                Markdown = (await LoadMarkdown(ctx.Workspace.Id, true))
                     ?? $"# {ctx.Workspace.Name}"
             };
         }
@@ -246,7 +246,7 @@ namespace TopoMojo.Api.Services
 
             if (string.IsNullOrEmpty(_options.Tenant).Equals(false))
                 ctx.Gamespace.Id = _options.Tenant + ctx.Gamespace.Id.Substring(0, ctx.Gamespace.Id.Length - _options.Tenant.Length);
-                
+
             var gamespace = ctx.Gamespace;
 
             foreach (var player in ctx.Request.Players)
@@ -259,10 +259,10 @@ namespace TopoMojo.Api.Services
                     }
                 );
             }
-            
+
             if (gamespace.Players.Any())
                 gamespace.Players.First().Permission = Permission.Manager;
-            
+
             // clone challenge
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", jsonOptions);
 
@@ -297,7 +297,7 @@ namespace TopoMojo.Api.Services
             // apply transforms
             foreach (var kvp in spec.Transforms)
                 sb.Replace($"##{kvp.Key}##", kvp.Value);
-                
+
             gamespace.Challenge = sb.ToString();
 
             await _store.Create(gamespace);
@@ -425,11 +425,11 @@ namespace TopoMojo.Api.Services
                 // if value doesn't specify index, use index from prior transform
                 if (seg.Length > 1 && !int.TryParse(seg[1], out count))
                     count = index;
-                
+
                 options = seg.Last()
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .ToList();
-                
+
                 result = options[Math.Min(count, options.Count - 1)];
                 break;
 
@@ -547,7 +547,7 @@ namespace TopoMojo.Api.Services
             return new GameState
             {
                 Name = workspace.Name,
-                Markdown = (await LoadMarkdown(workspace.Id)).Split("<!-- cut -->").First()
+                Markdown = (await LoadMarkdown(workspace.Id, true))
                     ?? $"# {workspace.Name}"
             };
         }
@@ -555,7 +555,7 @@ namespace TopoMojo.Api.Services
         {
             var state = Mapper.Map<GameState>(gamespace);
 
-            state.Markdown = await LoadMarkdown(gamespace.Workspace?.Id)
+            state.Markdown = await LoadMarkdown(gamespace.Workspace?.Id, false)
                 ?? $"# {gamespace.Name}";
 
             if (!preview && !gamespace.HasStarted)
@@ -969,16 +969,21 @@ namespace TopoMojo.Api.Services
             return ctx;
         }
 
-        private async Task<string> LoadMarkdown(string id)
+        private async Task<string> LoadMarkdown(string id, bool aboveCut)
         {
             string path = System.IO.Path.Combine(
                 _options.DocPath,
                 id
             ) + ".md";
 
-            return id.NotEmpty() && System.IO.File.Exists(path)
+            string text = id.NotEmpty() && System.IO.File.Exists(path)
                 ? await System.IO.File.ReadAllTextAsync(path)
-                : String.Empty
+                : null
+            ;
+
+            return aboveCut
+                ? text.Split(AppConstants.MarkdownCutLine).First()
+                : text
             ;
         }
 

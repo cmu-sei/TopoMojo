@@ -24,8 +24,9 @@ namespace TopoMojo.Api
 
             Settings = Configuration.Get<AppSettings>() ?? new AppSettings();
 
+            Settings.Core.DocPath = Settings.FileUpload.DocRoot;
             Settings.Pod.Tenant = Settings.Core.Tenant;
-            
+
             Settings.Cache.SharedFolder = Path.Combine(
                 env.ContentRootPath,
                 Settings.Cache.SharedFolder ?? ""
