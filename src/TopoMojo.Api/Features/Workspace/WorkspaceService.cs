@@ -60,13 +60,16 @@ namespace TopoMojo.Api.Services
 
             var q = _store.List(search.Term);
 
-            // if not admin, filter on allowed scopes
+            // if not admin
             if (!sudo)
-                q = q.Where(w => scopes.Contains(w.Audience));
-
-            // if wants "my", filter where actor is worker
-            if (search.WantsManaged)
-                q = q.Where(p => p.Workers.Any(w => w.SubjectId == subjectId));
+            {
+                if (search.WantsManaged)
+                    // filter where actor is worker
+                    q = q.Where(p => p.Workers.Any(w => w.SubjectId == subjectId));
+                else
+                    // filter on allowed scopes
+                    q = q.Where(w => scopes.Contains(w.Audience));
+            }
 
             q = search.Sort == "age"
                 ? q.OrderByDescending(w => w.WhenCreated)
