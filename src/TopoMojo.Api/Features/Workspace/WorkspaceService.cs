@@ -45,45 +45,61 @@ namespace TopoMojo.Api.Services
         {
             WorkspaceSummary[] result;
 
-            // add default audience to actor's list of allowed audiences
-            search.scope += " " + _options.DefaultUserScope;
-
             // refine to just requested audience
             if (search.WantsAudience)
                 search.scope = search.aud;
-
-            // convert to array
-            var scopes = search.scope.Split(
-                AppConstants.InlineListSeparators,
-                StringSplitOptions.RemoveEmptyEntries
-            );
+            else
+                search.scope += " " + _options.DefaultUserScope;
 
             var q = _store.List(search.Term);
 
             // if not admin
-            if (!sudo)
+            if (!sudo && search.WantsManaged)
+                q = q.Where(p => p.Workers.Any(w => w.SubjectId == subjectId));
+
+            if (sudo || search.WantsManaged)
             {
                 if (search.WantsManaged)
-                    // filter where actor is worker
                     q = q.Where(p => p.Workers.Any(w => w.SubjectId == subjectId));
-                else
-                    // filter on allowed scopes
-                    q = q.Where(w => scopes.Contains(w.Audience));
+
+                q = search.Sort == "age"
+                    ? q.OrderByDescending(w => w.WhenCreated)
+                    : q.OrderBy(w => w.Name)
+                ;
+
+                if (search.Skip > 0)
+                    q = q.Skip(search.Skip);
+
+                if (search.Take > 0)
+                    q = q.Take(search.Take);
+
+                result = Mapper.Map<WorkspaceSummary[]>(
+                    await q.ToArrayAsync(ct)
+                );
             }
+            else
+            {
+                // ugly local audience compare
 
-            q = search.Sort == "age"
-                ? q.OrderByDescending(w => w.WhenCreated)
-                : q.OrderBy(w => w.Name);
+                result = Mapper.Map<WorkspaceSummary[]>(
+                    await q.ToArrayAsync(ct)
+                );
 
-            if (search.Skip > 0)
-                q = q.Skip(search.Skip);
+                var tmp = result.AsQueryable().Where(w => w.Audience.HasAnyToken(search.scope));
 
-            if (search.Take > 0)
-                q = q.Take(search.Take);
+                tmp = search.Sort == "age"
+                    ? tmp.OrderByDescending(w => w.WhenCreated)
+                    : tmp.OrderBy(w => w.Name)
+                ;
 
-            result = Mapper.Map<WorkspaceSummary[]>(
-                await q.ToArrayAsync(ct)
-            );
+                if (search.Skip > 0)
+                    tmp = tmp.Skip(search.Skip);
+
+                if (search.Take > 0)
+                    tmp = tmp.Take(search.Take);
+
+                result = tmp.ToArray();
+            }
 
             // fill document text if requested
             if (search.WantsDoc)
@@ -326,15 +342,17 @@ namespace TopoMojo.Api.Services
             return Mapper.Map<JoinCode>(workspace);
         }
 
-        public async Task<TemplateSummary[]> GetScopedTemplates(string id)
+        public async Task<TemplateSummary[]> GetScopedTemplates(string id, string actor_scope)
         {
             var workspace = await _store.Retrieve(id);
 
-            if (workspace.TemplateScope.IsEmpty())
+            string scope = $"{workspace.TemplateScope} {actor_scope}";
+
+            if (scope.IsEmpty())
                 return new TemplateSummary[] { };
 
             var templates = (await _store.ListScopedTemplates().ToArrayAsync())
-                .Where(t => t.Audience.HasAnyToken(workspace.TemplateScope))
+                .Where(t => t.Audience.HasAnyToken(scope))
                 .ToArray()
             ;
 

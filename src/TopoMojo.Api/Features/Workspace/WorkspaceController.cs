@@ -303,7 +303,7 @@ namespace TopoMojo.Api.Controllers
             );
 
             return Ok(
-                await _svc.GetScopedTemplates(id)
+                await _svc.GetScopedTemplates(id, Actor.Scope)
             );
         }
 

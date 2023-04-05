@@ -80,7 +80,7 @@ namespace TopoMojo.Api.Services
             {
                 query = query.Where(t =>
                     t.IsPublished ||
-                    t.Audience.HasAnyToken(entity.Workspace?.Audience)
+                    t.Audience.HasAnyToken(entity.Workspace?.TemplateScope)
                 );
             }
 
@@ -100,6 +100,14 @@ namespace TopoMojo.Api.Services
                 .Where(t => t.Id == id)
                 .SelectMany(t => t.Workspace.Workers)
                 .AnyAsync(w => w.SubjectId == actorId);
+        }
+
+        internal async Task<bool> HasValidAudience(string tid, string wid, string actor_scope)
+        {
+            var entity = await _store.Retrieve(tid);
+            var workspace = await _store.DbContext.Workspaces.FindAsync(wid);
+            string scope = $"{workspace.TemplateScope} {actor_scope}";
+            return entity.IsPublished || entity.Audience.HasAnyToken(scope);
         }
 
         internal async Task<bool> CanEditWorkspace(string id, string actorId)
@@ -208,9 +216,6 @@ namespace TopoMojo.Api.Services
             ;
 
             var entity = await _store.Retrieve(newlink.TemplateId);
-
-            if (entity.IsPublished.Equals(false) && entity.Audience.HasAnyToken(workspace.Audience).Equals(false))
-                throw new TemplateNotPublished();
 
             string name = entity.Name.Length > 64
                 ? entity.Name.Substring(0, 64)
@@ -325,12 +330,11 @@ namespace TopoMojo.Api.Services
         /// </summary>
         /// <param name="id">Template Id</param>
         /// <returns></returns>
-        public async Task CheckHealth(string id)
+        public async Task<bool> CheckHealth(string id)
         {
             var template = await GetDeployableTemplate(id);
             var vm = await _pod.Refresh(template);
-            if (vm.Status == "created") // healthy is 'initialized' for existing template
-                throw new Exception("unhealthy");
+            return vm.Status == "initialized"; // healthy is 'initialized' for existing template
         }
     }
 }

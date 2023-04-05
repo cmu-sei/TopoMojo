@@ -162,7 +162,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => _svc.CanEdit(model.TemplateId, Actor.Id).Result
+                () => _svc.HasValidAudience(model.TemplateId, model.WorkspaceId, Actor.Scope).Result
             );
 
             var result = await _svc.Link(model, Actor.IsCreator);
@@ -311,8 +311,10 @@ namespace TopoMojo.Api.Controllers
         [AllowAnonymous]
         public async Task<ActionResult> CheckHealth([FromRoute]string id)
         {
-            await _svc.CheckHealth(id);
-            return Ok();
+            bool healthy = await _svc.CheckHealth(id);
+            if (healthy)
+                return Ok();
+            return BadRequest();
         }
 
         private void SendBroadcast(Template template, string action)
