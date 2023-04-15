@@ -43,6 +43,9 @@ namespace Microsoft.Extensions.DependencyInjection
                     opt.Cookie = new CookieBuilder
                     {
                         Name = AppConstants.CookieScheme,
+                        HttpOnly = true,
+                        SecurePolicy = CookieSecurePolicy.SameAsRequest,
+                        SameSite = SameSiteMode.Strict
                     };
                     opt.Events.OnRedirectToAccessDenied = ctx => {
                         ctx.HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
