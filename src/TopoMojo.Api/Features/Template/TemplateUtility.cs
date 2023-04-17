@@ -86,7 +86,7 @@ namespace TopoMojo.Api.Services
                 if (nets.Length == 0) nets = new string[]{ "lan" };
 
                 for (int i = nics.Count; i > nets.Length; i--)
-                    nics.RemoveAt(i);
+                    nics.RemoveAt(i-1);
 
                 for (int i = 0; i < nets.Length; i++)
                 {

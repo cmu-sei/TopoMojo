@@ -982,7 +982,7 @@ namespace TopoMojo.Api.Services
             ;
 
             return aboveCut
-                ? text.Split(AppConstants.MarkdownCutLine).First()
+                ? text?.Split(AppConstants.MarkdownCutLine).First()
                 : text
             ;
         }
