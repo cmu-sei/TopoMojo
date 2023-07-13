@@ -64,9 +64,9 @@ namespace TopoMojo.Api.Controllers
 
             if (Actor.IsObserver && !Actor.IsAdmin)
             {
-                // filter by scope/audience: ensure all VMs come from workspaces w/ audiences 
+                // filter by scope/audience: ensure all VMs come from workspaces w/ audiences
                 // within this user's scope or they are manager
-                vms = vms.Where(vm => 
+                vms = vms.Where(vm =>
                     CanManageVm(vm.Name, Actor).Result
                 ).ToArray();
             }
@@ -456,7 +456,8 @@ namespace TopoMojo.Api.Controllers
         private async Task<bool> CanManageVm(string id, User actor)
         {
             string isolationTag = await GetVmIsolationTag(id);
-            return (actor.IsObserver && await _userService.CanInteractWithAudience(actor.Scope, isolationTag)) ||
+            return actor.Id == isolationTag ||
+                (actor.IsObserver && await _userService.CanInteractWithAudience(actor.Scope, isolationTag)) ||
                 (await _userService.CanInteract(actor.Id, isolationTag));
         }
 
