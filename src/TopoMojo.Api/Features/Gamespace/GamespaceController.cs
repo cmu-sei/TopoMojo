@@ -112,6 +112,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
+                () => id == Actor.Id,  // from valid grader_apikey
                 () => _svc.CanInteract(id, Actor.Id).Result
             );
 
@@ -130,7 +131,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => Actor.IsObserver && _svc.HasValidUserScopeGamespace(id, Actor.Scope).Result 
+                () => Actor.IsObserver && _svc.HasValidUserScopeGamespace(id, Actor.Scope).Result
             );
 
             return Ok(
@@ -238,7 +239,7 @@ namespace TopoMojo.Api.Controllers
             );
 
             var result = await _svc.Start(id, Actor.IsBuilder);
-            
+
             SendBroadcast(result, "UPDATE");
 
             return Ok(result);
@@ -262,7 +263,7 @@ namespace TopoMojo.Api.Controllers
             );
 
             var result = await _svc.Stop(id);
-            
+
             SendBroadcast(result, "UPDATE");
 
             return Ok(result);
@@ -286,7 +287,7 @@ namespace TopoMojo.Api.Controllers
             );
 
             var result = await _svc.Complete(id);
-            
+
             SendBroadcast(result, "UPDATE");
 
             return Ok(result);
@@ -311,7 +312,7 @@ namespace TopoMojo.Api.Controllers
             );
 
             var result = await _svc.Grade(model);
-            
+
             SendBroadcast(result, "UPDATE");
 
             return Ok(result);
@@ -418,7 +419,7 @@ namespace TopoMojo.Api.Controllers
 
             return Ok();
         }
-        
+
         /// <summary>
         /// Accept an invitation to a gamespace.
         /// </summary>
