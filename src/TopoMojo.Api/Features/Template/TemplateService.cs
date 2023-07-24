@@ -166,6 +166,7 @@ namespace TopoMojo.Api.Services
             entity.IsLinked = false;
             entity.Id = Guid.NewGuid().ToString("n");
             entity.Name = model.Name ?? $"{entity.Name}{suffix}";
+            entity.IsPublished = false;
 
             await _store.Create(entity);
 
