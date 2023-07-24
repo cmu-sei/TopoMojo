@@ -433,6 +433,10 @@ namespace TopoMojo.Api.Services
                 result = options[Math.Min(count, options.Count - 1)];
                 break;
 
+                case "ipv4":
+                result = seg.Last().ToRandomIPv4();
+                break;
+
                 case "int":
                 default:
                 int min = 0;

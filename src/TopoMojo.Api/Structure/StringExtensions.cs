@@ -281,5 +281,34 @@ namespace TopoMojo.Api.Extensions
 
             return A.Intersect(B).Count() == B.Length;
         }
+
+        public static string ToRandomIPv4(this string s)
+        {
+            string result = "";
+            try
+            {
+                var net = s.Split("/");
+                var addr_string = (net.First() + ".0.0.0.0").Split(".");
+
+                uint addr =
+                    uint.Parse(addr_string[0]) << 24 |
+                    uint.Parse(addr_string[1]) << 16 |
+                    uint.Parse(addr_string[2]) << 8 |
+                    uint.Parse(addr_string[3])
+                ;
+
+                uint mask = 0xFFFFFFFF << (32 - int.Parse(net.Last()));
+                if (~mask > 0)
+                {
+                    uint host = (uint) new Random().Next(1,((int)~mask));
+                    addr |= host;
+                }
+
+                result = $"{addr>>24&0xff}.{addr>>16&0xff}.{addr>>8&0xff}.{addr&0xff}";
+            }
+            catch {}
+
+            return result;
+        }
     }
 }
