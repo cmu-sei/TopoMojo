@@ -199,6 +199,7 @@ namespace TopoMojo.Api.Data
                     continue;
 
                 template.ParentId = sourceId;
+                template.IsPublished = false;
 
                 var tu = new Services.TemplateUtility(template.Detail);
 
