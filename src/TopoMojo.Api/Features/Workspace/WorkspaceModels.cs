@@ -30,6 +30,7 @@ namespace TopoMojo.Api.Models
         public string Name { get; set; }
         public string Slug => Name.ToSlug();
         public string Description { get; set; }
+        public string Tags { get; set; }
         public string Text { get; set; }
         public string Audience { get; set; }
         public string Author { get; set; }
