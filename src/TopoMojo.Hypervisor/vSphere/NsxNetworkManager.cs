@@ -227,7 +227,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 if (config.distributedVirtualSwitch.Value == _client.dvs.Value)
                 {
                     string net = dvpg.GetProperty("name") as string;
-                    
+
                     if (!IsTenantNet(net))
                         continue;
 
@@ -262,21 +262,18 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 await InitClient();
 
-                // slight delay
-                await Task.Delay(1500);
-
                 var response = await _sddc.DeleteAsync(
                     $"{_apiUrl}/{_apiSegments}/{pga.Net.Replace("#","%23")}"
                 );
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Console.WriteLine("error removing net");
+                    _logger.LogWarning($"error removing net: {pga.Net} {response.StatusCode} {response.ReasonPhrase} {await response.Content.ReadAsStringAsync()}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                _logger.LogWarning($"error removing net: {ex.Message}");
             }
         }
 

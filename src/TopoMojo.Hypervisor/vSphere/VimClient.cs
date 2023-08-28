@@ -59,6 +59,7 @@ namespace TopoMojo.Hypervisor.vSphere
         int _taskMonitorInterval = 3000;
         string _hostPrefix = "";
         DateTimeOffset _lastAction;
+        private bool _dirtyNets;
 
         public string Name
         {
@@ -203,7 +204,7 @@ namespace TopoMojo.Hypervisor.vSphere
             //delete the vm.
             await Connect();
             Vm vm = _vmCache[id];
-            string tag = vm.Name.Tag();
+            // string tag = vm.Name.Tag();
 
             _logger.LogDebug($"Delete: stopping vm {vm.Name}");
             await Stop(id);
@@ -218,9 +219,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             _vmCache.TryRemove(vm.Id, out vm);
 
-            await Task.Delay(500);
-
-            await _netman.Clean(tag);
+            _dirtyNets = true;
 
             vm.Status = "initialized";
             return vm;
@@ -1310,6 +1309,10 @@ namespace TopoMojo.Hypervisor.vSphere
                     if (_vim != null && _vim.State == CommunicationState.Opened)
                     {
                         await ReloadVmCache();
+                        if (_dirtyNets) {
+                            await _netman.Clean();
+                            _dirtyNets = false;
+                        }
                     }
                 }
                 catch (Exception ex)
