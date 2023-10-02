@@ -153,6 +153,7 @@ namespace TopoMojo.Api
         public int DefaultTemplateLimit { get; set; } = 3;
         public int ReplicaLimit { get; set; } = 5;
         public bool AllowUnprivilegedVmReconfigure { get; set; }
+        public bool AllowPrivilegedNetworkIsolationExemption { get; set; }
         public string DefaultUserScope { get; set; } = "everyone";
         public string GameEngineIsoFolder { get; set; } = "static";
         public string ConsoleHost { get; set; }

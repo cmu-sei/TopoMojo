@@ -123,7 +123,7 @@ namespace TopoMojo.Api.Controllers
 
             AuthorizeAny(
                 () => Actor.IsAdmin,
-                () => CanManageVmOperation(op, Actor).Result
+                () => CanManageVmOperation(op).Result
             );
 
             Vm vm = await _pod.ChangeState(op);
@@ -175,14 +175,16 @@ namespace TopoMojo.Api.Controllers
             if (
                 Actor.IsBuilder.Equals(false) &&
                 change.Key == "net" &&
-                change.Value.Contains("#").Equals(false) &&
+                change.Value.Contains('#').Equals(false) &&
                 _options.AllowUnprivilegedVmReconfigure.Equals(false)
             )
             {
                 throw new ActionForbidden();
             }
 
-            Vm vm = await _pod.ChangeConfiguration(id, change);
+            bool sudo = Actor.IsBuilder && _options.AllowPrivilegedNetworkIsolationExemption;
+
+            Vm vm = await _pod.ChangeConfiguration(id, change, sudo);
 
             SendBroadcast(vm, "change");
 
@@ -258,7 +260,7 @@ namespace TopoMojo.Api.Controllers
                 Actor.IsBuilder.Equals(false) &&
                 _options.AllowUnprivilegedVmReconfigure.Equals(false)
             ) {
-                opt.Net = opt.Net.Where(x => x.Contains("#")).ToArray();
+                opt.Net = opt.Net.Where(x => x.Contains('#')).ToArray();
             }
 
             return Ok(opt);
@@ -290,8 +292,8 @@ namespace TopoMojo.Api.Controllers
             string target = "";
             string qs = "";
             string internalHost = src.Host.Split('.').First();
-            string domain = Request.Host.Value.IndexOf(".") >= 0
-                        ? Request.Host.Value.Substring(Request.Host.Value.IndexOf(".")+1)
+            string domain = Request.Host.Value.Contains('.')
+                        ? Request.Host.Value[(Request.Host.Value.IndexOf('.') + 1)..]
                         : Request.Host.Value;
 
             switch (_pod.Options.TicketUrlHandler.ToLower())
@@ -391,7 +393,7 @@ namespace TopoMojo.Api.Controllers
             }
 
             // SendBroadcast(vm, "deploy");
-            VmState state = new VmState
+            VmState state = new()
             {
                 Id = template.Id.ToString(),
                 Name = vm.Name.Untagged(),
@@ -461,7 +463,7 @@ namespace TopoMojo.Api.Controllers
                 (await _userService.CanInteract(actor.Id, isolationTag));
         }
 
-        private async Task<bool> CanManageVmOperation(VmOperation op, User actor)
+        private async Task<bool> CanManageVmOperation(VmOperation op)
         {
             return op.Type == VmOperationType.Delete
                 ? await CanDeleteVm(op.Id, Actor.Id)
@@ -471,7 +473,7 @@ namespace TopoMojo.Api.Controllers
         private async Task<string> GetVmIsolationTag(string id)
         {
             // id here can be name#isolationId, vm-id, or just isolationId
-            return id.Contains("#")
+            return id.Contains('#')
                 ? id.Tag()
                 : (await _pod.Load(id))?.Name.Tag() ?? id
             ;
@@ -479,7 +481,7 @@ namespace TopoMojo.Api.Controllers
 
         private void SendBroadcast(Vm vm, string action)
         {
-            VmState state = new VmState
+            VmState state = new()
             {
                 Id = vm.Id,
                 Name = vm.Name.Untagged(),

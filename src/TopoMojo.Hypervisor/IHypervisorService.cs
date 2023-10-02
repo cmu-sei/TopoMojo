@@ -17,7 +17,7 @@ namespace TopoMojo.Hypervisor
         Task StopAll(string target);
         Task DeleteAll(string target);
         Task<Vm> ChangeState(VmOperation op);
-        Task<Vm> ChangeConfiguration(string id, VmKeyValue change);
+        Task<Vm> ChangeConfiguration(string id, VmKeyValue change, bool privileged = false);
         Task<Vm> Deploy(VmTemplate template, bool privileged = false);
         Task SetAffinity(string isolationTag, Vm[] vms, bool start);
         Task<Vm> Refresh(VmTemplate template);
