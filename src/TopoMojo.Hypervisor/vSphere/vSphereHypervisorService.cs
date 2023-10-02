@@ -273,13 +273,11 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
-        public async Task<Vm> ChangeConfiguration(string id, VmKeyValue change)
+        public async Task<Vm> ChangeConfiguration(string id, VmKeyValue change, bool sudo = false)
         {
             _logger.LogDebug("changing " + id + " " + change.Key + "=" + change.Value);
 
             var ctx = GetVmContext(id);
-
-            VmOptions vmo = null;
 
             var segments = change.Value.Split(':');
             string val = segments.First();
@@ -302,9 +300,9 @@ namespace TopoMojo.Hypervisor.vSphere
                 };
             }
 
-            if (change.Key == "net" && !change.Value.StartsWith("_none_"))
+            if (change.Key == "net" && !sudo && !change.Value.StartsWith("_none_"))
             {
-                vmo = await GetVmNetOptions(ctx.Vm.Name.Tag());
+                var vmo = await GetVmNetOptions(ctx.Vm.Name.Tag());
                 if (!vmo.Net.Contains(val))
                     throw new InvalidOperationException();
             }
@@ -456,10 +454,10 @@ namespace TopoMojo.Hypervisor.vSphere
             string publicFolder = Guid.Empty.ToString();
 
             isos.AddRange(
-                (await host.GetFiles(host.Options.IsoStore + id + "/*.iso", false))
+                await host.GetFiles(host.Options.IsoStore + id + "/*.iso", false)
             );
             isos.AddRange(
-                (await host.GetFiles(host.Options.IsoStore + publicFolder + "/*.iso", false))
+                await host.GetFiles(host.Options.IsoStore + publicFolder + "/*.iso", false)
             );
 
             //translate actual path to display path
