@@ -239,7 +239,7 @@ namespace TopoMojo.Hypervisor.vMock
             return vm;
         }
 
-        public async Task<Vm> ChangeConfiguration(string id, VmKeyValue change)
+        public async Task<Vm> ChangeConfiguration(string id, VmKeyValue change, bool sudo = false)
         {
             Vm vm = TryFind(id);
             await Delay();
