@@ -59,7 +59,6 @@ namespace TopoMojo.Hypervisor.vSphere
         int _taskMonitorInterval = 3000;
         string _hostPrefix = "";
         DateTimeOffset _lastAction;
-        private bool _dirtyNets;
 
         public string Name
         {
@@ -218,8 +217,6 @@ namespace TopoMojo.Hypervisor.vSphere
             await _vim.DeleteDatastoreFile_TaskAsync(_sic.fileManager, folder, _datacenter);
 
             _vmCache.TryRemove(vm.Id, out vm);
-
-            _dirtyNets = true;
 
             vm.Status = "initialized";
             return vm;
@@ -1102,6 +1099,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 else
                 {
                     _netman = new DistributedNetworkManager(
+                        _logger,
                         netSettings,
                         _vmCache,
                         _vlanman
@@ -1118,9 +1116,10 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
 
                 _netman = new HostNetworkManager(
-                  netSettings,
-                  _vmCache,
-                  _vlanman
+                    _logger,
+                    netSettings,
+                    _vmCache,
+                    _vlanman
                 );
             }
 
@@ -1296,6 +1295,7 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             _logger.LogDebug($"{_config.Host}: starting cache loop");
             await Connect();
+            int step = 0;
 
             while (true)
             {
@@ -1309,9 +1309,8 @@ namespace TopoMojo.Hypervisor.vSphere
                     if (_vim != null && _vim.State == CommunicationState.Opened)
                     {
                         await ReloadVmCache();
-                        if (_dirtyNets) {
+                        if (step == 0) {
                             await _netman.Clean();
-                            _dirtyNets = false;
                         }
                     }
                 }
@@ -1329,6 +1328,8 @@ namespace TopoMojo.Hypervisor.vSphere
                     if (_vim == null)
                         await Connect();
                 }
+
+                step = (step+1)%2;
             }
             // _logger.LogDebug("sessionMonitor ended.");
         }
