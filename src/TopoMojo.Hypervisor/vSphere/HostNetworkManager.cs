@@ -8,16 +8,18 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using VimClient;
 using TopoMojo.Hypervisor.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
     public class HostNetworkManager : NetworkManager
     {
         public HostNetworkManager(
+            ILogger logger,
             VimReferences settings,
             ConcurrentDictionary<string, Vm> vmCache,
             VlanManager vlanManager
-        ) : base(settings, vmCache, vlanManager)
+        ) : base(logger, settings, vmCache, vlanManager)
         {
 
         }

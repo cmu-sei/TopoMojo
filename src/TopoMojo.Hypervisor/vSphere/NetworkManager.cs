@@ -7,16 +7,19 @@ using System.Linq;
 using System.Threading.Tasks;
 using VimClient;
 using TopoMojo.Hypervisor.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
     public abstract class NetworkManager : INetworkManager
     {
         public NetworkManager(
+            ILogger logger,
             VimReferences settings,
             ConcurrentDictionary<string, Vm> vmCache,
             VlanManager vlanManager
         ){
+            _logger = logger;
             _client = settings;
             _vmCache = vmCache;
             _vlanManager = vlanManager;
@@ -29,6 +32,7 @@ namespace TopoMojo.Hypervisor.vSphere
         protected Dictionary<string, PortGroupAllocation> _pgAllocation;
         protected Dictionary<string, int> _swAllocation;
         protected ConcurrentDictionary<string, Vm> _vmCache;
+        protected ILogger _logger;
 
         public async Task Initialize()
         {
@@ -135,6 +139,8 @@ namespace TopoMojo.Hypervisor.vSphere
         public async Task Clean(string tag = null)
         {
             await Task.Delay(0);
+            _logger.LogDebug($"cleaning nets [{tag}]");
+
             lock(_pgAllocation)
             {
                 IEnumerable<PortGroupAllocation> q = string.IsNullOrEmpty(tag)
@@ -151,13 +157,12 @@ namespace TopoMojo.Hypervisor.vSphere
                     if (string.IsNullOrEmpty(id))
                         continue;
 
-                    // if no vm's available to attach
+                    // remove if no vm's available to attach
                     if (_vmCache.Values.Any(v => v.Name.EndsWith(id)).Equals(false))
                     {
+                        _logger.LogDebug($"removing net {pg.Net}");
                         RemovePortgroup(pg.Key).Wait();
-
                         _pgAllocation.Remove(pg.Net);
-
                         _vlanManager.Deactivate(pg.Net);
 
                         if (_swAllocation.ContainsKey(pg.Switch))
@@ -170,7 +175,6 @@ namespace TopoMojo.Hypervisor.vSphere
                     if (_swAllocation[sw] < 1 && sw.Contains("#"))
                     {
                         RemoveSwitch(sw).Wait();
-
                         _swAllocation.Remove(sw);
                     }
                 }
@@ -212,7 +216,7 @@ namespace TopoMojo.Hypervisor.vSphere
         protected async Task<TaskInfo> WaitForVimTask(ManagedObjectReference task)
         {
             int i = 0;
-            TaskInfo info = new TaskInfo();
+            TaskInfo info;
 
             //iterate the search until complete or timeout occurs
             do
@@ -228,7 +232,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 info = (TaskInfo)oc[0].propSet[0].val;
                 i++;
 
-            } while ((info.state == TaskInfoState.running || info.state == TaskInfoState.queued));
+            } while (info.state == TaskInfoState.running || info.state == TaskInfoState.queued);
 
             //return the task info
             return info;

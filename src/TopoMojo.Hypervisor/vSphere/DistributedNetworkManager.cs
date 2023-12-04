@@ -8,16 +8,18 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using VimClient;
 using TopoMojo.Hypervisor.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
     public class DistributedNetworkManager : NetworkManager
     {
         public DistributedNetworkManager(
+            ILogger logger,
             VimReferences settings,
             ConcurrentDictionary<string, Vm> vmCache,
             VlanManager vlanManager
-        ) : base(settings, vmCache, vlanManager)
+        ) : base(logger, settings, vmCache, vlanManager)
         {
 
         }
@@ -93,7 +95,7 @@ namespace TopoMojo.Hypervisor.vSphere
             foreach (ObjectContent obj in oc)
             {
                 string vmName = obj.GetProperty("name").ToString();
-                
+
                 if (!IsTenantVm(vmName))
                     continue;
 
@@ -133,7 +135,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 if (config.distributedVirtualSwitch.Value == _client.dvs.Value)
                 {
                     string net = dvpg.GetProperty("name") as string;
-                    
+
                     if (!IsTenantNet(net))
                         continue;
 

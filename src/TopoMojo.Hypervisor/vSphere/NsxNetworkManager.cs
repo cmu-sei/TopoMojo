@@ -26,15 +26,12 @@ namespace TopoMojo.Hypervisor.vSphere
             ConcurrentDictionary<string, Vm> vmCache,
             VlanManager vlanManager,
             SddcConfiguration sddcConfig
-        ) : base(settings, vmCache, vlanManager)
+        ) : base(logger, settings, vmCache, vlanManager)
         {
-            _logger = logger;
             _config = sddcConfig;
             _apiUrl = _config.ApiUrl;
             _apiSegments = _config.SegmentApiPath;
         }
-
-        public ILogger _logger { get; }
 
         private readonly SddcConfiguration _config;
         private HttpClient _sddc;
