@@ -13,6 +13,7 @@ namespace TopoMojo.Hypervisor.vSphere
         public int Counter { get; set; }
         public int VlanId { get; set; }
         public string Switch { get; set; }
+        public DateTimeOffset Timestamp { get; set; }
     }
 
     public class VmNetwork

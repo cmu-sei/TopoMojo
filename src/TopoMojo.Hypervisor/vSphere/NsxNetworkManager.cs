@@ -149,13 +149,14 @@ namespace TopoMojo.Hypervisor.vSphere
             int count = 0;
             PortGroupAllocation pga = null;
 
-            while (pga == null && count < 10)
+            while (response.IsSuccessStatusCode && pga == null && count < 10)
             {
                 // slight delay
                 await Task.Delay(1500);
 
                 count += 1;
 
+                // TODO: fetch single portgroup
                 pga = (await LoadPortGroups())
                     .FirstOrDefault(p => p.Net == eth.Net);
 
@@ -229,8 +230,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         continue;
 
                     if (
-                        config.defaultPortConfig is VMwareDVSPortSetting
-                        && ((VMwareDVSPortSetting)config.defaultPortConfig).vlan is VmwareDistributedVirtualSwitchVlanIdSpec
+                        config.defaultPortConfig is VMwareDVSPortSetting setting
+                        && setting.vlan is VmwareDistributedVirtualSwitchVlanIdSpec
                     )
                     {
                         list.Add(
@@ -248,14 +249,14 @@ namespace TopoMojo.Hypervisor.vSphere
             return list.ToArray();
         }
 
-        public override async Task RemovePortgroup(string pgReference)
+        public override async Task<bool> RemovePortgroup(string pgReference)
         {
             try
             {
                 var pga = _pgAllocation.Values.FirstOrDefault(v => v.Key == pgReference);
 
                 if (pga == null || !pga.Net.Contains("#"))
-                    return;
+                    return false;
 
                 await InitClient();
 
@@ -267,11 +268,14 @@ namespace TopoMojo.Hypervisor.vSphere
                 {
                     _logger.LogWarning($"error removing net: {pga.Net} {response.StatusCode} {response.ReasonPhrase} {await response.Content.ReadAsStringAsync()}");
                 }
+
+                return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
                 _logger.LogWarning($"error removing net: {ex.Message}");
             }
+            return false;
         }
 
         public override Task RemoveSwitch(string sw)

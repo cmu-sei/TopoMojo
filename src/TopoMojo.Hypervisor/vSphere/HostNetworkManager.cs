@@ -123,13 +123,14 @@ namespace TopoMojo.Hypervisor.vSphere
             return list.ToArray();
         }
 
-        public override async Task RemovePortgroup(string pgReference)
+        public override async Task<bool> RemovePortgroup(string pgReference)
         {
             try
             {
                 await _client.vim.RemovePortGroupAsync(_client.net, pgReference);
             }
             catch {}
+            return true;
         }
 
         public override async Task RemoveSwitch(string sw)
@@ -145,8 +146,8 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             if (card != null)
             {
-                if (card.backing is VirtualEthernetCardNetworkBackingInfo)
-                    ((VirtualEthernetCardNetworkBackingInfo)card.backing).deviceName = portgroupName;
+                if (card.backing is VirtualEthernetCardNetworkBackingInfo info)
+                    info.deviceName = portgroupName;
 
                 card.connectable = new VirtualDeviceConnectInfo()
                 {

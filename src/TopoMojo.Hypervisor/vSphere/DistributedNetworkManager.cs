@@ -140,8 +140,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         continue;
 
                     if (
-                        config.defaultPortConfig is VMwareDVSPortSetting
-                        && ((VMwareDVSPortSetting)config.defaultPortConfig).vlan is VmwareDistributedVirtualSwitchVlanIdSpec
+                        config.defaultPortConfig is VMwareDVSPortSetting setting
+                        && setting.vlan is VmwareDistributedVirtualSwitchVlanIdSpec spec
                     )
                     {
                         list.Add(
@@ -149,7 +149,7 @@ namespace TopoMojo.Hypervisor.vSphere
                             {
                                 Net = net,
                                 Key = dvpg.obj.AsString(),
-                                VlanId = ((VmwareDistributedVirtualSwitchVlanIdSpec)((VMwareDVSPortSetting)config.defaultPortConfig).vlan).vlanId,
+                                VlanId = spec.vlanId,
                                 Switch = _client.UplinkSwitch
                             }
                         );
@@ -160,13 +160,14 @@ namespace TopoMojo.Hypervisor.vSphere
             return list.ToArray();
         }
 
-        public override async Task RemovePortgroup(string pgReference)
+        public override async Task<bool> RemovePortgroup(string pgReference)
         {
             try
             {
                 await _client.vim.Destroy_TaskAsync(pgReference.AsReference());
             }
             catch { }
+            return true;
         }
 
         public override Task RemoveSwitch(string sw)
