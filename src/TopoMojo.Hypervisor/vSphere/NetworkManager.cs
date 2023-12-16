@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using VimClient;
 using TopoMojo.Hypervisor.Extensions;
 using Microsoft.Extensions.Logging;
+using System;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
@@ -34,9 +35,16 @@ namespace TopoMojo.Hypervisor.vSphere
         protected ConcurrentDictionary<string, Vm> _vmCache;
         protected ILogger _logger;
 
+        readonly int _clean_network_buffer_minutes = -2;
+
         public async Task Initialize()
         {
-            _pgAllocation = (await LoadPortGroups()).ToDictionary(p => p.Net);
+            DateTimeOffset ts = DateTimeOffset.UtcNow.AddMinutes(_clean_network_buffer_minutes - 1);
+            var existing = await LoadPortGroups();
+            foreach (var pg in existing)
+                pg.Timestamp = ts;
+
+            _pgAllocation = existing.ToDictionary(p => p.Net);
 
             _vlanManager.Activate(
                 _pgAllocation.Values.Select(p => new Vlan
@@ -94,6 +102,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     if (!_pgAllocation.ContainsKey(eth.Net))
                     {
                         var pg = AddPortGroup(sw, eth).Result;
+                        pg.Timestamp = DateTimeOffset.UtcNow;
                         pg.Counter = 1;
 
                         _pgAllocation.Add(pg.Net, pg);
@@ -148,20 +157,25 @@ namespace TopoMojo.Hypervisor.vSphere
                     : _pgAllocation.Values.Where(p => p.Net.EndsWith(tag))
                 ;
 
-                //find empties with no associated vm's
+                // exclude non-tagged and recently-added portgroups
+                DateTimeOffset mark = DateTimeOffset.UtcNow.AddMinutes(_clean_network_buffer_minutes);
+                q = q.Where(p => p.Net.Contains('#') && p.Timestamp < mark)
+                    .OrderBy(p => p.Timestamp)
+                ;
+
+                // find portgroups with no associated vm's
                 foreach (var pg in q.ToArray())
                 {
                     string id = pg.Net.Tag();
 
-                    // skip untagged portgroups
-                    if (string.IsNullOrEmpty(id))
+                    // if vm's still exist, skip
+                    if (_vmCache.Values.Any(v => v.Name.EndsWith(id)))
                         continue;
 
-                    // remove if no vm's available to attach
-                    if (_vmCache.Values.Any(v => v.Name.EndsWith(id)).Equals(false))
+                    _logger.LogDebug($"try removing net {pg.Net}");
+
+                    if (RemovePortgroup(pg.Key).Result)
                     {
-                        _logger.LogDebug($"removing net {pg.Net}");
-                        RemovePortgroup(pg.Key).Wait();
                         _pgAllocation.Remove(pg.Net);
                         _vlanManager.Deactivate(pg.Net);
 
@@ -209,7 +223,7 @@ namespace TopoMojo.Hypervisor.vSphere
         public abstract Task<VmNetwork[]> GetVmNetworks(ManagedObjectReference managedObjectReference);
         public abstract Task<PortGroupAllocation[]> LoadPortGroups();
         public abstract Task<PortGroupAllocation> AddPortGroup(string sw, VmNet eth);
-        public abstract Task RemovePortgroup(string pgReference);
+        public abstract Task<bool> RemovePortgroup(string pgReference);
         public abstract Task AddSwitch(string sw);
         public abstract Task RemoveSwitch(string sw);
 
