@@ -133,10 +133,14 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public override async Task<PortGroupAllocation> AddPortGroup(string sw, VmNet eth)
         {
+            int resolution_delay_ms = 1500;
+
+            // ensure api client is ready
             await InitClient();
 
             string url = $"{_apiUrl}/{_apiSegments}/{eth.Net.Replace("#","%23")}";
 
+            // fire api to create net
             var response = await _sddc.PutAsync(
                 url,
                 new StringContent(
@@ -149,21 +153,36 @@ namespace TopoMojo.Hypervisor.vSphere
             int count = 0;
             PortGroupAllocation pga = null;
 
-            while (response.IsSuccessStatusCode && pga == null && count < 10)
+            if (response.IsSuccessStatusCode)
             {
-                // slight delay
-                await Task.Delay(1500);
+                // if create was successful, poll until we get the new network key
+                while (pga == null && count < 15)
+                {
+                    // slight delay
+                    await Task.Delay(resolution_delay_ms);
 
-                count += 1;
+                    count += 1;
 
-                // TODO: fetch single portgroup
-                pga = (await LoadPortGroups())
-                    .FirstOrDefault(p => p.Net == eth.Net);
+                    // TODO: fetch single portgroup
+                    pga = (await LoadPortGroups())
+                        .FirstOrDefault(p => p.Net == eth.Net);
+                }
 
             }
+            else
+            {
+                // create failed; see if the network exists
+                // TODO: fetch single portgroup
+                    pga = (await LoadPortGroups())
+                        .FirstOrDefault(p => p.Net == eth.Net);
+            }
 
+            // without the portgroup the vm will fail so might as well throw here
             if (pga == null)
                 throw new Exception($"Failed to create net {eth.Net}");
+
+            // we created or found the network; track how long it took
+            _logger.LogDebug("Resolving created network took {}s", count * resolution_delay_ms);
 
             return pga;
 
