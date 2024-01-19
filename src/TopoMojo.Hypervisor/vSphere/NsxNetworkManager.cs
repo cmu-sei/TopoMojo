@@ -25,15 +25,16 @@ namespace TopoMojo.Hypervisor.vSphere
             VimReferences settings,
             ConcurrentDictionary<string, Vm> vmCache,
             VlanManager vlanManager,
-            SddcConfiguration sddcConfig
-        ) : base(logger, settings, vmCache, vlanManager)
+            SddcConfiguration sddcConfig,
+            HypervisorServiceConfiguration config
+        ) : base(logger, settings, vmCache, vlanManager, config)
         {
-            _config = sddcConfig;
-            _apiUrl = _config.ApiUrl;
-            _apiSegments = _config.SegmentApiPath;
+            _sddcConfig = sddcConfig;
+            _apiUrl = _sddcConfig.ApiUrl;
+            _apiSegments = _sddcConfig.SegmentApiPath;
         }
 
-        private readonly SddcConfiguration _config;
+        private readonly SddcConfiguration _sddcConfig;
         private HttpClient _sddc;
         private DateTimeOffset authExpiration = DateTimeOffset.MinValue;
         private string _apiUrl;
@@ -47,8 +48,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 return;
 
             if (
-                string.IsNullOrEmpty(_config.ApiKey).Equals(false) &&
-                string.IsNullOrEmpty(_config.AuthUrl).Equals(false)
+                string.IsNullOrEmpty(_sddcConfig.ApiKey).Equals(false) &&
+                string.IsNullOrEmpty(_sddcConfig.AuthUrl).Equals(false)
             )
             {
                 await InitClientViaRest();
@@ -56,8 +57,8 @@ namespace TopoMojo.Hypervisor.vSphere
             }
 
             if (
-                string.IsNullOrEmpty(_config.CertificatePath).Equals(false) &&
-                File.Exists(_config.CertificatePath)
+                string.IsNullOrEmpty(_sddcConfig.CertificatePath).Equals(false) &&
+                File.Exists(_sddcConfig.CertificatePath)
             ) {
                 InitClientWithCertificate();
                 return;
@@ -68,11 +69,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private void InitClientWithCertificate()
         {
-            _logger.LogDebug($"NSX auth with certificate {_config.CertificatePath}");
+            _logger.LogDebug($"NSX auth with certificate {_sddcConfig.CertificatePath}");
 
             var clientcert = new X509Certificate2(
-                _config.CertificatePath,
-                _config.CertificatePassword,
+                _sddcConfig.CertificatePath,
+                _sddcConfig.CertificatePassword,
                 X509KeyStorageFlags.MachineKeySet |
                 X509KeyStorageFlags.PersistKeySet |
                 X509KeyStorageFlags.Exportable
@@ -82,7 +83,10 @@ namespace TopoMojo.Hypervisor.vSphere
 
             handler.ClientCertificates.Add(clientcert);
 
-            _sddc = new HttpClient(handler);
+            _sddc = new HttpClient(handler)
+            {
+                Timeout = new TimeSpan(0, 0, _config.SendTimeoutSeconds)
+            };
 
             authExpiration = clientcert.NotAfter;
 
@@ -90,24 +94,26 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private async Task InitClientViaRest()
         {
-            _logger.LogDebug($"NSX auth with rest to {_config.AuthUrl}");
+            _logger.LogDebug($"NSX auth with rest to {_sddcConfig.AuthUrl}");
 
             if (DateTimeOffset.UtcNow.CompareTo(authExpiration) < 0)
                 return;
 
-            _sddc = new HttpClient();
-
+            _sddc = new HttpClient
+            {
+                Timeout = new TimeSpan(0, 0, _config.SendTimeoutSeconds)
+            };
             var content = new FormUrlEncodedContent(
                 new KeyValuePair<string,string>[] {
                     new KeyValuePair<string,string>(
                         "refresh_token",
-                        _config.ApiKey
+                        _sddcConfig.ApiKey
                     )
                 }
             );
 
             var response = await _sddc.PostAsync(
-                _config.AuthUrl,
+                _sddcConfig.AuthUrl,
                 content
             );
 
@@ -119,11 +125,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
             authExpiration = DateTimeOffset.UtcNow.AddSeconds(auth.expires_in);
 
-            _sddc.DefaultRequestHeaders.Add(_config.AuthTokenHeader, auth.access_token);
+            _sddc.DefaultRequestHeaders.Add(_sddcConfig.AuthTokenHeader, auth.access_token);
 
-            if (!string.IsNullOrEmpty(_config.MetadataUrl))
+            if (!string.IsNullOrEmpty(_sddcConfig.MetadataUrl))
             {
-                string meta = await _sddc.GetStringAsync(_config.MetadataUrl);
+                string meta = await _sddc.GetStringAsync(_sddcConfig.MetadataUrl);
 
                 var sddc = JsonSerializer.Deserialize<SddcResponse>(meta);
 

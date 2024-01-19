@@ -18,8 +18,9 @@ namespace TopoMojo.Hypervisor.vSphere
             ILogger logger,
             VimReferences settings,
             ConcurrentDictionary<string, Vm> vmCache,
-            VlanManager vlanManager
-        ) : base(logger, settings, vmCache, vlanManager)
+            VlanManager vlanManager,
+            HypervisorServiceConfiguration config
+        ) : base(logger, settings, vmCache, vlanManager, config)
         {
 
         }

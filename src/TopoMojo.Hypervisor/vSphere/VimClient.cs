@@ -12,6 +12,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using VimClient;
 using TopoMojo.Hypervisor.Extensions;
+using System.ServiceModel.Channels;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
@@ -855,7 +856,20 @@ namespace TopoMojo.Hypervisor.vSphere
                     {
                         DateTimeOffset sp = DateTimeOffset.Now;
                         _logger.LogDebug($"Instantiating client {_config.Host}...");
-                        VimPortTypeClient client = new VimPortTypeClient(VimPortTypeClient.EndpointConfiguration.VimPort, _config.Url);
+
+                        // VimPortTypeClient.GetDefaultBinding(); // hmm, static methods not available here
+                        var binding = new BasicHttpBinding
+                        {
+                            MaxBufferSize = int.MaxValue,
+                            ReaderQuotas = System.Xml.XmlDictionaryReaderQuotas.Max,
+                            MaxReceivedMessageSize = int.MaxValue,
+                            AllowCookies = true,
+                            SendTimeout = new TimeSpan(0, 0, _config.SendTimeoutSeconds)
+                        };
+
+                        var endpoint = new EndpointAddress(_config.Url);
+
+                        VimPortTypeClient client = new VimPortTypeClient(binding, endpoint);
 
                         if (_config.IgnoreCertificateErrors)
                         {
@@ -1093,7 +1107,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         netSettings,
                         _vmCache,
                         _vlanman,
-                        _config.Sddc
+                        _config.Sddc,
+                        _config
                     );
                 }
                 else
@@ -1102,7 +1117,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         _logger,
                         netSettings,
                         _vmCache,
-                        _vlanman
+                        _vlanman,
+                        _config
                     );
                 }
             }
@@ -1119,7 +1135,8 @@ namespace TopoMojo.Hypervisor.vSphere
                     _logger,
                     netSettings,
                     _vmCache,
-                    _vlanman
+                    _vlanman,
+                    _config
                 );
             }
 

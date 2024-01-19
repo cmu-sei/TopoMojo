@@ -21,6 +21,7 @@ namespace TopoMojo.Hypervisor
         public Dictionary<string,string> TicketUrlHostMap { get; set; } = new Dictionary<string, string>();
         public VlanConfiguration Vlan { get; set; } = new VlanConfiguration();
         public int KeepAliveMinutes { get; set; } = 10;
+        public int SendTimeoutSeconds { get; set; } = 60;
         public string ExcludeNetworkMask { get; set; } = "topomojo";
         public string Tenant { get; set; } = "";
         public bool IsNsxNetwork { get; set; }

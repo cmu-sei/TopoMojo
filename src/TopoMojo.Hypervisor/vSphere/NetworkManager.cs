@@ -18,7 +18,8 @@ namespace TopoMojo.Hypervisor.vSphere
             ILogger logger,
             VimReferences settings,
             ConcurrentDictionary<string, Vm> vmCache,
-            VlanManager vlanManager
+            VlanManager vlanManager,
+            HypervisorServiceConfiguration config
         ){
             _logger = logger;
             _client = settings;
@@ -26,12 +27,14 @@ namespace TopoMojo.Hypervisor.vSphere
             _vlanManager = vlanManager;
             _pgAllocation = new Dictionary<string, PortGroupAllocation>();
             _swAllocation = new Dictionary<string, int>();
+            _config = config;
         }
 
         protected VimReferences _client;
         protected readonly VlanManager _vlanManager;
         protected Dictionary<string, PortGroupAllocation> _pgAllocation;
         protected Dictionary<string, int> _swAllocation;
+        protected HypervisorServiceConfiguration _config;
         protected ConcurrentDictionary<string, Vm> _vmCache;
         protected ILogger _logger;
 
