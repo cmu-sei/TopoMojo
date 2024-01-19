@@ -858,14 +858,24 @@ namespace TopoMojo.Hypervisor.vSphere
                         _logger.LogDebug($"Instantiating client {_config.Host}...");
 
                         // VimPortTypeClient.GetDefaultBinding(); // hmm, static methods not available here
-                        var binding = new BasicHttpBinding
-                        {
-                            MaxBufferSize = int.MaxValue,
-                            ReaderQuotas = System.Xml.XmlDictionaryReaderQuotas.Max,
-                            MaxReceivedMessageSize = int.MaxValue,
-                            AllowCookies = true,
-                            SendTimeout = new TimeSpan(0, 0, _config.SendTimeoutSeconds)
-                        };
+                        Binding binding = _config.Url.StartsWith("https:")
+                            ? new BasicHttpsBinding
+                                {
+                                    MaxBufferSize = int.MaxValue,
+                                    ReaderQuotas = System.Xml.XmlDictionaryReaderQuotas.Max,
+                                    MaxReceivedMessageSize = int.MaxValue,
+                                    AllowCookies = true,
+                                    SendTimeout = new TimeSpan(0, 0, _config.SendTimeoutSeconds)
+                                } as Binding
+                            : new BasicHttpBinding
+                                {
+                                    MaxBufferSize = int.MaxValue,
+                                    ReaderQuotas = System.Xml.XmlDictionaryReaderQuotas.Max,
+                                    MaxReceivedMessageSize = int.MaxValue,
+                                    AllowCookies = true,
+                                    SendTimeout = new TimeSpan(0, 0, _config.SendTimeoutSeconds)
+                                } as Binding
+                        ;
 
                         var endpoint = new EndpointAddress(_config.Url);
 
