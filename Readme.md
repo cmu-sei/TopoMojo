@@ -21,8 +21,11 @@ Goals:
 
 Build with Docker, or:
 1. Install .Net Core SDK 3.1
-2. `dotnet run`
-3. Browse to `http://localhost:5000/api`
+2. Clone the repository, e.g. `git clone https://github.com/cmu-sei/TopoMojo.git`
+3. `dotnet build`
+4. `cd src/TopoMojo.Api`
+5. `dotnet run`
+6. Browse to `http://localhost:5000/api`
 
 *NOTE*: The separate `topomojo-ui` repository holds the user interface
 for this api.
