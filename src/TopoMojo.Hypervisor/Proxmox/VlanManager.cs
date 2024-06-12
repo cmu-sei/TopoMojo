@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TopoMojo.Hypervisor.Extensions;
 
-namespace TopoMojo.Hypervisor.vSphere
+namespace TopoMojo.Hypervisor.Proxmox
 {
     public class VlanManager
     {

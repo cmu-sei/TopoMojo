@@ -21,7 +21,7 @@ namespace TopoMojo.Hypervisor
         public VmTask Task { get; set; }
     }
 
-    public enum VmPowerState { Off, Running, Suspended}
+    public enum VmPowerState { Off, Running, Suspended }
 
     public class VmQuestion
     {
@@ -51,12 +51,13 @@ namespace TopoMojo.Hypervisor
         public DateTimeOffset WhenCreated { get; set; }
     }
 
-    public class VmOptions {
+    public class VmOptions
+    {
         public string[] Iso { get; set; }
         public string[] Net { get; set; }
     }
 
-     public class VmOperation
+    public class VmOperation
     {
         public string Id { get; set; }
         public VmOperationType Type { get; set; }
@@ -79,6 +80,7 @@ namespace TopoMojo.Hypervisor
         public string IsolationId { get; set; }
         public string Name { get; set; }
         public string Url { get; set; }
+        public string Ticket { get; set; }
         public bool IsRunning { get; set; }
     }
 }
