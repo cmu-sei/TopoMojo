@@ -181,6 +181,14 @@ namespace TopoMojo.Api.Services
 
                 i += 1;
             }
+
+            // Proxmox
+            // TODO: Move to separate method?
+            if (!string.IsNullOrEmpty(_template.Template))
+            {
+                _template.ParentTemplate = _template.Template;
+                _template.Template = _template.Name;
+            }
         }
 
         public override string ToString()

@@ -79,6 +79,7 @@ namespace TopoMojo.Api
         public string TopoRoot { get; set; } = "wwwroot";
         public string IsoRoot { get; set; } = "wwwroot/isos";
         public string DocRoot { get; set; } = "wwwroot/docs";
+        public bool SupportsSubfolders { get; set; } = true;
     }
 
     public class HeaderOptions

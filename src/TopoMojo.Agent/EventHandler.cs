@@ -72,8 +72,9 @@ public class EventHandler
         var since = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("u");
 
         var dispatches = await Mojo.ListDispatchesAsync(
-            Config.GroupId, 
+            Config.GroupId,
             since,
+            false,
             "", null, null, "", new string[] { "pending" }
         );
 
@@ -165,7 +166,7 @@ public class EventHandler
         {
             try
             {
-                
+
                 if (!connected)
                 {
                     await Hub.StartAsync();

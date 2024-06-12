@@ -10,6 +10,7 @@ using TopoMojo.Api;
 using TopoMojo.Api.Data;
 using TopoMojo.Hypervisor;
 using TopoMojo.Api.Services;
+using TopoMojo.Hypervisor.Proxmox;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -135,7 +136,15 @@ namespace Microsoft.Extensions.DependencyInjection
             }
             else
             {
-                services.AddSingleton<IHypervisorService, TopoMojo.Hypervisor.vSphere.vSphereHypervisorService>();
+                if (config.HypervisorType == HypervisorType.Proxmox)
+                {
+                    // give proxmox Random.Shared since it's not directly available in netstandard2.0
+                    services.AddProxmoxHypervisor(Random.Shared);
+                }
+                else
+                {
+                    services.AddSingleton<IHypervisorService, TopoMojo.Hypervisor.vSphere.vSphereHypervisorService>();
+                }
             }
 
             services.AddSingleton<HypervisorServiceConfiguration>(sp => config);

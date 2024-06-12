@@ -143,18 +143,26 @@ namespace TopoMojo.Api.Controllers
 
         private string BuildDestinationPath(string filename, string key)
         {
-            string path = Path.Combine(
-                _config.IsoRoot,
-                key.SanitizePath()
-            );
+            if (_config.SupportsSubfolders)
+            {
+                string path = Path.Combine(
+                    _config.IsoRoot,
+                    key.SanitizePath()
+                );
 
-            if (!Directory.Exists(path))
-                Directory.CreateDirectory(path);
+                if (!Directory.Exists(path))
+                    Directory.CreateDirectory(path);
 
-            return Path.Combine(
-                path,
-                filename.Replace(" ", "").SanitizeFilename()
-            );
+                return Path.Combine(
+                    path,
+                    filename.Replace(" ", "").SanitizeFilename()
+                );
+            }
+            else
+            {
+                var fileName = $"{key.SanitizePath()}#{filename.Replace(" ", "").SanitizeFilename()}";
+                return Path.Combine(_config.IsoRoot, fileName);
+            }
         }
 
     }
