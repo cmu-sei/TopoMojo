@@ -21,7 +21,7 @@ namespace TopoMojo.Hypervisor
         public VmTask Task { get; set; }
     }
 
-    public enum VmPowerState { Off, Running, Suspended }
+    public enum VmPowerState { Off, Running, Suspended}
 
     public class VmQuestion
     {
@@ -51,13 +51,12 @@ namespace TopoMojo.Hypervisor
         public DateTimeOffset WhenCreated { get; set; }
     }
 
-    public class VmOptions
-    {
+    public class VmOptions {
         public string[] Iso { get; set; }
         public string[] Net { get; set; }
     }
 
-    public class VmOperation
+     public class VmOperation
     {
         public string Id { get; set; }
         public VmOperationType Type { get; set; }

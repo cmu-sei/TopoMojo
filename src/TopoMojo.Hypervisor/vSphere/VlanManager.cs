@@ -12,10 +12,9 @@ namespace TopoMojo.Hypervisor.vSphere
     public class VlanManager
     {
 
-        public VlanManager(
+        public VlanManager (
             VlanConfiguration options
-        )
-        {
+        ) {
             _options = options;
             InitVlans();
         }
@@ -34,7 +33,7 @@ namespace TopoMojo.Hypervisor.vSphere
             }
 
             //set admin reservations
-            _vlans = new Dictionary<string, Vlan>();
+            _vlans = new Dictionary<string,Vlan>();
             foreach (Vlan vlan in _options.Reservations)
             {
                 _vlans.Add(vlan.Name, vlan);
@@ -49,7 +48,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public void Activate(Vlan[] vlans)
         {
-            lock (_vlanMap)
+            lock(_vlanMap)
             {
                 foreach (Vlan vlan in vlans)
                 {
@@ -68,7 +67,7 @@ namespace TopoMojo.Hypervisor.vSphere
             if (!net.Contains("#"))
                 return;
 
-            lock (_vlanMap)
+            lock(_vlanMap)
             {
                 if (_vlans.ContainsKey(net))
                 {
@@ -105,15 +104,14 @@ namespace TopoMojo.Hypervisor.vSphere
                             {
                                 eth.Vlan = id;
                                 _vlanMap[id] = true;
-                                _vlans.Add(eth.Net, new Vlan { Name = eth.Net, Id = id, OnUplink = true });
+                                _vlans.Add(eth.Net, new Vlan { Name  = eth.Net, Id = id, OnUplink = true });
                             }
                             else
                             {
                                 throw new Exception("Unable to reserve a vlan for " + eth.Net);
                             }
                         }
-                        else
-                        {
+                        else {
                             //get highest vlan in this isolation group
                             id = 100;
                             foreach (string key in _vlans.Keys.Where(k => k.EndsWith(template.IsolationTag)))

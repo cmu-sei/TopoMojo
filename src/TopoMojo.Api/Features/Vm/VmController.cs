@@ -54,7 +54,7 @@ namespace TopoMojo.Api.Controllers
         [SwaggerOperation(OperationId = "ListVms")]
         [Authorize]
 
-        public async Task<ActionResult<Vm[]>> ListVms([FromQuery] string filter)
+        public async Task<ActionResult<Vm[]>> ListVms([FromQuery]string filter)
         {
             AuthorizeAny(
                 () => Actor.IsObserver
@@ -117,7 +117,7 @@ namespace TopoMojo.Api.Controllers
         [HttpPut("api/vm")]
         [SwaggerOperation(OperationId = "ChangeVm")]
         [Authorize(AppConstants.AnyUserPolicy)]
-        public async Task<ActionResult<Vm>> ChangeVm([FromBody] VmOperation op)
+        public async Task<ActionResult<Vm>> ChangeVm([FromBody]VmOperation op)
         {
             await Validate(op);
 
@@ -259,8 +259,7 @@ namespace TopoMojo.Api.Controllers
             if (
                 Actor.IsBuilder.Equals(false) &&
                 _options.AllowUnprivilegedVmReconfigure.Equals(false)
-            )
-            {
+            ) {
                 opt.Net = opt.Net.Where(x => x.Contains('#')).ToArray();
             }
 
@@ -301,28 +300,28 @@ namespace TopoMojo.Api.Controllers
             {
                 case "local-app":
                     target = $"{Request.Host.Value}{Request.PathBase}{internalHost}";
-                    break;
+                break;
 
                 case "external-domain":
                     target = $"{internalHost}.{domain}";
-                    break;
+                break;
 
                 case "host-map":
                     var map = _pod.Options.TicketUrlHostMap;
                     if (map.ContainsKey(src.Host))
                         target = map[src.Host];
-                    break;
+                break;
 
                 // TODO: make this default after publishing change
                 case "none":
                 case "":
-                    break;
+                break;
 
                 case "querystring":
                 default:
                     qs = $"?vmhost={src.Host}";
                     target = _options.ConsoleHost;
-                    break;
+                break;
             }
 
             if (target.NotEmpty())
@@ -345,7 +344,7 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<Vm>> ResolveVmFromTemplate(string id)
         {
-            var template = await _templateService.GetDeployableTemplate(id, null);
+            var template  = await _templateService.GetDeployableTemplate(id, null);
 
             string name = $"{template.Name}#{template.IsolationTag}";
 
@@ -369,7 +368,7 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<Vm>> DeployVm(string id)
         {
-            VmTemplate template = await _templateService
+            VmTemplate template  = await _templateService
                 .GetDeployableTemplate(id, null)
             ;
 
@@ -420,7 +419,7 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<int>> InitializeVmTemplate(string id)
         {
-            VmTemplate template = await _templateService.GetDeployableTemplate(id, null);
+            VmTemplate template  = await _templateService.GetDeployableTemplate(id, null);
 
             string name = $"{template.Name}#{template.IsolationTag}";
 
@@ -474,7 +473,7 @@ namespace TopoMojo.Api.Controllers
         private async Task<string> GetVmIsolationTag(string id)
         {
             // id here can be name#isolationId, vm-id, or just isolationId
-            return id.Contains("#")
+            return id.Contains('#')
                 ? id.Tag()
                 : (await _pod.Load(id))?.Name.Tag() ?? id
             ;

@@ -42,7 +42,7 @@ namespace TopoMojo.Hypervisor.vSphere
         private Dictionary<string, VimClient> _affinityMap;
         private ConcurrentDictionary<string, Vm> _vmCache;
 
-        public HypervisorServiceConfiguration Options { get { return _options; } }
+        public HypervisorServiceConfiguration Options { get {return _options;}}
 
         public async Task ReloadHost(string hostname)
         {
@@ -84,8 +84,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
                 else if (progress.Sum() >= 0)
                 {
-                    vm.Task = new VmTask
-                    {
+                    vm.Task = new VmTask {
                         Name = "initializing",
                         Progress = progress.Sum() / progress.Length
                     };
@@ -105,7 +104,7 @@ namespace TopoMojo.Hypervisor.vSphere
             _logger.LogDebug("deploy: host " + host.Name);
 
             NormalizeTemplate(template, host.Options, privileged);
-            _logger.LogDebug("deploy: normalized " + template.Name);
+            _logger.LogDebug("deploy: normalized "+ template.Name);
 
             // ensure disks exists
             if (template.Disks.Any() && (await VerifyNormalizedDisks(template, host)).Any(i => i < 100))
@@ -134,7 +133,7 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await Task.Delay(0);
 
-            Vm vm = _vmCache.Values.Where(o => o.Id == id || o.Name == id).FirstOrDefault();
+            Vm vm = _vmCache.Values.Where(o=>o.Id == id || o.Name == id).FirstOrDefault();
 
             if (vm != null)
                 CheckProgress(vm);
@@ -165,29 +164,29 @@ namespace TopoMojo.Hypervisor.vSphere
             switch (op.Type)
             {
                 case VmOperationType.Start:
-                    vm = await Start(op.Id);
-                    break;
+                vm = await Start(op.Id);
+                break;
 
                 case VmOperationType.Reset:
-                    vm = await Stop(op.Id);
-                    vm = await Start(op.Id);
-                    break;
+                vm = await Stop(op.Id);
+                vm = await Start(op.Id);
+                break;
 
                 case VmOperationType.Stop:
-                    vm = await Stop(op.Id);
-                    break;
+                vm = await Stop(op.Id);
+                break;
 
                 case VmOperationType.Save:
-                    vm = await Save(op.Id);
-                    break;
+                vm = await Save(op.Id);
+                break;
 
                 case VmOperationType.Revert:
-                    vm = await Revert(op.Id);
-                    break;
+                vm = await Revert(op.Id);
+                break;
 
                 case VmOperationType.Delete:
-                    vm = await Delete(op.Id);
-                    break;
+                vm = await Delete(op.Id);
+                break;
             }
             return vm;
         }
@@ -224,7 +223,7 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             _logger.LogDebug("deleting " + id);
             var ctx = GetVmContext(id);
-            Vm vm = await ctx.Host.Delete(ctx.Vm.Id);
+            Vm vm =  await ctx.Host.Delete(ctx.Vm.Id);
             RefreshAffinity(); //TODO: fix race condition here
             return vm;
         }
@@ -318,7 +317,7 @@ namespace TopoMojo.Hypervisor.vSphere
             IEnumerable<Vm> q = _vmCache.Values;
 
             if (term.HasValue())
-                q = q.Where(o => o.Id.Contains(term) || o.Name.Contains(term));
+                q =  q.Where(o=>o.Id.Contains(term) || o.Name.Contains(term));
 
             return CheckProgress(q.ToArray());
         }
@@ -378,9 +377,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 {
                     await host.CloneDisk(disk.Source, disk.Path);
                     progress[index] = 0;
-                }
-                else
-                {
+                } else {
                     await host.CreateDisk(disk);
                     progress[index] = 100;
                 }
@@ -437,7 +434,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 info.Url = await ctx.Host.GetTicket(ctx.Vm.Id);
 
             }
-            catch { }
+            catch  {}
 
             return info;
         }
@@ -466,8 +463,7 @@ namespace TopoMojo.Hypervisor.vSphere
             //translate actual path to display path
             isos = isos.Select(x => x.Replace(host.Options.IsoStore, "").Trim()).ToList();
 
-            return new VmOptions
-            {
+            return new VmOptions {
                 Iso = isos.ToArray()
             };
         }
@@ -475,8 +471,7 @@ namespace TopoMojo.Hypervisor.vSphere
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
             await Task.Delay(0);
-            return new VmOptions
-            {
+            return new VmOptions {
                 Net = _vlanman.FindNetworks(id)
             };
         }
@@ -503,16 +498,14 @@ namespace TopoMojo.Hypervisor.vSphere
             foreach (VmDisk disk in template.Disks)
             {
                 if (!disk.Path.StartsWith(option.DiskStore)
-                )
-                {
+                ) {
                     DatastorePath dspath = new DatastorePath(disk.Path);
                     dspath.Merge(option.DiskStore);
                     disk.Path = dspath.ToString();
                 }
 
                 if (disk.Source.HasValue() && !disk.Source.StartsWith(option.DiskStore)
-                )
-                {
+                ) {
                     DatastorePath dspath = new DatastorePath(disk.Source);
                     dspath.Merge(option.DiskStore);
                     disk.Source = dspath.ToString();
@@ -556,7 +549,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private void RefreshAffinity()
         {
-            lock (_affinityMap)
+            lock(_affinityMap)
             {
                 List<string> tags = new List<string>();
                 foreach (Vm vm in _vmCache.Values)
@@ -575,14 +568,14 @@ namespace TopoMojo.Hypervisor.vSphere
         private VimClient FindHostByAffinity(string tag)
         {
             VimClient host = null;
-            lock (_affinityMap)
+            lock(_affinityMap)
             {
                 if (_affinityMap.ContainsKey(tag))
-                    host = _affinityMap[tag];
+                    host =  _affinityMap[tag];
                 else
                 {
-                    Vm vm = _vmCache.Values.Where(o => o.Name.EndsWith(tag)).FirstOrDefault();
-                    if (vm != null)
+                    Vm vm = _vmCache.Values.Where(o=>o.Name.EndsWith(tag)).FirstOrDefault();
+                    if (vm !=  null)
                         host = _hostCache[vm.Host];
                     else
                         host = FindHostByFewestVms();
@@ -636,7 +629,7 @@ namespace TopoMojo.Hypervisor.vSphere
             string match = new Regex(@"\[[\d-,]*\]").Match(host).Value;
             if (match.HasValue())
             {
-                foreach (int i in match.ExpandRange())
+                foreach(int i in match.ExpandRange())
                     hosts.Add(host.Replace(match, i.ToString()));
             }
             else
@@ -646,10 +639,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
             Parallel.ForEach(
                 hosts,
-                async (url) =>
-                {
-                    try
-                    {
+                async (url) => {
+                    try {
                         await AddHost(url);
                     }
                     catch (Exception ex)
