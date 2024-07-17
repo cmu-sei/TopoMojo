@@ -101,9 +101,9 @@ namespace TopoMojo.Hypervisor.Proxmox
                 template.Iso = option.IsoStore + "null.iso";
             }
 
-            var isopath = new DatastorePath(template.Iso);
-            isopath.Merge(option.IsoStore);
-            template.Iso = isopath.ToString();
+            // var isopath = new DatastorePath(template.Iso);
+            // isopath.Merge(option.IsoStore);
+            // template.Iso = isopath.ToString();
 
             foreach (VmDisk disk in template.Disks)
             {
@@ -396,9 +396,14 @@ namespace TopoMojo.Hypervisor.Proxmox
             throw new NotImplementedException();
         }
 
-        public Task<VmOptions> GetVmIsoOptions(string key)
+        public async Task<VmOptions> GetVmIsoOptions(string key)
         {
-            throw new NotImplementedException();
+            var isos = await this._pveClient.GetFiles();
+
+            return new VmOptions
+            {
+                Iso = isos.Select(x => x.Volid).ToArray()
+            };
         }
 
         public Task ReloadHost(string host)

@@ -149,8 +149,14 @@ namespace TopoMojo.Hypervisor.Proxmox
                 var memory = this.GetMemory(template);
                 var sockets = this.GetSockets(template);
                 var coresPerSocket = this.GetCoresPerSocket(template);
+                var iso = await this.GetIso(template);
 
-                task = await vmRef.Config.UpdateVmAsync(netN: nics, memory: memory, sockets: sockets, cores: coresPerSocket);
+                task = await vmRef.Config.UpdateVmAsync(
+                    netN: nics,
+                    memory: memory,
+                    sockets: sockets,
+                    cores: coresPerSocket,
+                    cdrom: iso);
                 await this.WaitForTaskToFinish(task);
 
                 if (!task.IsSuccessStatusCode)
@@ -434,6 +440,18 @@ namespace TopoMojo.Hypervisor.Proxmox
             };
         }
 
+        public async Task<PveIso[]> GetFiles()
+        {
+            var node = await this.GetRandomNode();
+
+            var task = await _pveClient.Nodes[node].Storage["nfs"].Content.Index(content: "iso");
+            await this.WaitForTaskToFinish(task);
+
+            var isos = task.ToModel<PveIso[]>();
+
+            return isos;
+        }
+
         private string ToPveName(string vmName)
         {
             return vmName.Replace("#", "--");
@@ -479,6 +497,13 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             return target;
+        }
+
+        private async Task<string> GetRandomNode()
+        {
+            var nodes = await _pveClient.GetNodesAsync();
+            var randomNum = _random.Next(0, nodes.Count() - 1);
+            return nodes.ElementAt(randomNum).Node;
         }
 
         private async Task WaitForTaskToFinish(Result task)
@@ -591,6 +616,24 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             return builder.ToString();
+        }
+
+        private async Task<string> GetIso(VmTemplate template)
+        {
+            var isos = await this.GetFiles();
+
+            var iso = isos
+                .Where(x => x.Volid == template.Iso)
+                .FirstOrDefault();
+
+            if (iso != null)
+            {
+                return iso.Volid;
+            }
+            else
+            {
+                return null;
+            }
         }
 
         private string GetMemory(VmTemplate template)
