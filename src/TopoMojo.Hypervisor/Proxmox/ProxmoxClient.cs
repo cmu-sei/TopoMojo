@@ -428,6 +428,8 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                             if (!task.IsSuccessStatusCode)
                                 throw new Exception($"Delete old template failed: {task.ReasonPhrase}");
+
+                            await this.ReloadVmCache();
                         }
                     }
                 }
@@ -719,7 +721,6 @@ namespace TopoMojo.Hypervisor.Proxmox
         private async Task<Vm[]> ReloadVmCache()
         {
             List<string> existing = _vmCache.Values
-                .Where(v => v.Host == _config.Host)
                 .Select(o => o.Id)
                 .ToList();
 
