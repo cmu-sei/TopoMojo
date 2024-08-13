@@ -134,9 +134,9 @@ namespace TopoMojo.Hypervisor.Proxmox
                 template.Iso = option.IsoStore + "null.iso";
             }
 
-            // var isopath = new DatastorePath(template.Iso);
-            // isopath.Merge(option.IsoStore);
-            // template.Iso = isopath.ToString();
+            var isoPath = template.Iso.Replace('/', '#');
+            isoPath = $"{option.IsoStore.Replace("/", String.Empty)}:iso/{isoPath}";
+            template.Iso = isoPath;
 
             foreach (VmDisk disk in template.Disks)
             {
@@ -435,7 +435,10 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             return new VmOptions
             {
-                Iso = isos.Select(x => x.Volid).ToArray()
+                Iso = isos
+                    .Where(x => x.Name.StartsWith(key) || x.Name.StartsWith(Guid.Empty.ToString()))
+                    .Select(x => x.DisplayName)
+                    .ToArray()
             };
         }
 

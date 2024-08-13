@@ -15,5 +15,13 @@ namespace TopoMojo.Hypervisor.Proxmox.Models
                 return this.Volid.Split('/')[1];
             }
         }
+
+        public string DisplayName
+        {
+            get
+            {
+                return this.Name.Replace('#', '/');
+            }
+        }
     }
 }
