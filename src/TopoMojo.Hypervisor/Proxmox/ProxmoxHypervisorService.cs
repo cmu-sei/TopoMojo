@@ -16,6 +16,8 @@ namespace TopoMojo.Hypervisor.Proxmox
     {
         public ProxmoxHypervisorService(
             HypervisorServiceConfiguration options,
+            IProxmoxNameService nameService,
+            IProxmoxVnetService vnetService,
             ILoggerFactory mill,
             Random random
         )
@@ -35,6 +37,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                 _vmCache,
                 _vlanman,
                 _mill.CreateLogger<ProxmoxClient>(),
+                nameService,
+                vnetService,
                 random);
         }
 
@@ -74,6 +78,35 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             _logger.LogDebug("deploy: " + template.Name + " " + Options.Host);
             return await _pveClient.Deploy(template);
+        }
+
+        public async Task<IEnumerable<Vm>> Deploy(IEnumerable<VmTemplate> templates, bool privileged = false)
+        {
+            var virtualNetworks = templates
+                .SelectMany(t => t.Eth)
+                .Select(eth => eth.Net)
+                .ToArray();
+            var vms = new List<Vm>();
+            var undeployedTemplates = new List<VmTemplate>();
+
+            foreach (var template in templates)
+            {
+                var vm = await Load(template.Name + "#" + template.IsolationTag);
+                if (vm is null)
+                {
+                    _logger.LogDebug("deploy: host " + _options.Host);
+                    NormalizeTemplate(template, Options, privileged);
+                    _logger.LogDebug("deploy: normalized " + template.Name);
+
+                    undeployedTemplates.Add(template);
+                }
+
+                _logger.LogDebug($"deploy (host: {Options.Host}, templates: {undeployedTemplates.Count}): {string.Join(",", undeployedTemplates.Select(t => t.Name).ToArray())}");
+                _logger.LogDebug("deploy: " + template.Name + " " + Options.Host);
+                vms.Add(await _pveClient.Deploy(template));
+            }
+
+            return vms;
         }
 
         public async Task<VmOptions> GetVmNetOptions(string id)

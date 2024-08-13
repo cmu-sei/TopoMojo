@@ -19,8 +19,9 @@ namespace TopoMojo.Hypervisor
         public string VmStore { get; set; } = "[topomojo] _run/";
         public string DiskStore { get; set; } = "[topomojo]";
         public string IsoStore { get; set; } = "[topomojo] iso/";
-        public string TicketUrlHandler { get; set; }  = "querystring"; //"local-app", "external-domain", "host-map", "none"
-        public Dictionary<string,string> TicketUrlHostMap { get; set; } = new Dictionary<string, string>();
+        public string NodeIsoStore { get; set; } = "nfs";
+        public string TicketUrlHandler { get; set; } = "querystring"; //"local-app", "external-domain", "host-map", "none"
+        public Dictionary<string, string> TicketUrlHostMap { get; set; } = new Dictionary<string, string>();
         public VlanConfiguration Vlan { get; set; } = new VlanConfiguration();
         public int KeepAliveMinutes { get; set; } = 10;
         public string ExcludeNetworkMask { get; set; } = "topomojo";
