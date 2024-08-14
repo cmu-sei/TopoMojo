@@ -379,21 +379,19 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                 if (pveDisk != null)
                 {
-                    var parent = storageItems.Where(x => x.FileName == pveDisk.Parent.Split('@')[0]).FirstOrDefault();
+                    var parent = storageItems.Where(x => x.FileName == pveDisk.GetParentFilename()).FirstOrDefault();
 
                     if (parent != null && parent.Parent == null)
                     {
                         // check if anything else is using the template
-                        var count = storageItems.Where(x => x.Parent != null && x.Parent.Split('@')[0] == parent.FileName).Count();
+                        var count = storageItems.Where(x => x.Parent != null && x.GetParentFilename() == parent.FileName).Count();
 
                         if (count > 1)
                         {
                             throw new InvalidOperationException("Base Template is in use");
                         }
 
-                        // find template (filename example: base-100-disk-0 where 100 is the templateId)
-                        var templateId = parent.FileName.Split('-')[1];
-                        var template = pveVms.Where(x => x.VmId.ToString() == templateId).FirstOrDefault();
+                        var template = pveVms.Where(x => x.VmId == parent.VmId).FirstOrDefault();
 
                         if (template != null && template.IsTemplate)
                         {
