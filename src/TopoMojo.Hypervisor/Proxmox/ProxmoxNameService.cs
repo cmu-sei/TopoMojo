@@ -8,14 +8,13 @@ namespace TopoMojo.Hypervisor.Proxmox
 
     public class ProxmoxNameService : IProxmoxNameService
     {
+        public bool IsPveName(string name)
+            => name.Contains("--");
+
         public string ToPveName(string name)
-        {
-            return name.Replace("#", "--");
-        }
+            => name.Replace("#", "--");
 
         public string FromPveName(string pveName)
-        {
-            return pveName.Replace("--", "#");
-        }
+            => pveName.Replace("--", "#");
     }
 }

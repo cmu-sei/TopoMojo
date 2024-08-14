@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using TopoMojo.Hypervisor.Proxmox.Models;
 using TopoMojo.Hypervisor.Extensions;
 using System.Threading;
+using System.Text;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -23,10 +24,9 @@ namespace TopoMojo.Hypervisor.Proxmox
         public ProxmoxClient(
             HypervisorServiceConfiguration options,
             ConcurrentDictionary<string, Vm> vmCache,
-            VlanManager networkManager,
             ILogger<ProxmoxClient> logger,
             IProxmoxNameService nameService,
-            IProxmoxVnetService vnetService,
+            IProxmoxVlanManager vnetService,
             Random random
         )
         {
@@ -36,7 +36,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             //_tasks = new Dictionary<string, VimHostTask>();
             _vmCache = vmCache;
             //_pgAllocation = new Dictionary<string, PortGroupAllocation>();
-            _vlanman = networkManager;
             _hostPrefix = _config.Host.Split('.').FirstOrDefault();
             _random = random;
 
@@ -53,11 +52,10 @@ namespace TopoMojo.Hypervisor.Proxmox
             Task sessionMonitorTask = MonitorSession();
         }
 
-        private readonly VlanManager _vlanman;
         private readonly ILogger<ProxmoxClient> _logger;
         private ConcurrentDictionary<string, Vm> _vmCache;
         private IProxmoxNameService _nameService;
-        private IProxmoxVnetService _vnetService;
+        private IProxmoxVlanManager _vnetService;
         HypervisorServiceConfiguration _config = null;
         // int _pollInterval = 1000;
         int _syncInterval = 30000;
@@ -117,9 +115,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             Vm vm = null;
 
             _logger.LogDebug("deploy: virtual networks...");
-            var vnets = await _vnetService.Deploy(template.Eth.Select(n => n.Net), CancellationToken.None);
+            var vnets = await _vnetService.Provision(template.Eth.Select(n => n.Net), CancellationToken.None);
             _logger.LogDebug($"deploy: {vnets.Count()} networks deployed.");
-            // await this.Provision(template);
 
             _logger.LogDebug("deploy: transform template...");
             //var transformer = new VCenterTransformer { DVSuuid = _dvsuuid };
@@ -463,6 +460,70 @@ namespace TopoMojo.Hypervisor.Proxmox
             return isos;
         }
 
+        public async Task<IEnumerable<PveVnet>> CreateVnets(IEnumerable<CreatePveVnet> createVnets)
+        {
+            var existingNets = await this.GetVnets();
+            var deployedNets = new List<PveVnet>();
+
+            foreach (var createVnet in createVnets)
+            {
+                var newVnetTag = default(int?);
+
+                do
+                {
+                    newVnetTag = _random.Next(100, 100000);
+                }
+                while (existingNets.Any(n => n.Tag == newVnetTag));
+
+                var vnetId = this.GetRandomVnetId();
+                var pveName = _nameService.ToPveName(createVnet.Alias);
+
+                var createTask = _pveClient.Cluster.Sdn.Vnets.Create
+                (
+                    vnet: vnetId,
+                    tag: newVnetTag,
+                    zone: createVnet.Zone,
+                    alias: pveName
+                ).Result;
+
+                if (createTask.IsSuccessStatusCode)
+                {
+                    deployedNets.Add(new PveVnet
+                    {
+                        Alias = pveName,
+                        Tag = newVnetTag.GetValueOrDefault(),
+                        Type = string.Empty,
+                        Vnet = vnetId,
+                        Zone = createVnet.Zone
+                    });
+                }
+            }
+
+            if (deployedNets.Any())
+            {
+                await this.ReloadVnets();
+            }
+
+            return deployedNets;
+        }
+
+        public async Task<IEnumerable<PveVnet>> GetVnets()
+        {
+            var task = _pveClient.Cluster.Sdn.Vnets.Index().Result;
+            await WaitForTaskToFinish(task);
+
+            if (!task.IsSuccessStatusCode)
+                throw new Exception($"Failed to load virtual networks from Proxmox. Status code: {task.StatusCode}");
+
+            return task.ToModel<PveVnet[]>();
+        }
+
+        public async Task ReloadVnets()
+        {
+            var reloadTask = _pveClient.Cluster.Sdn.Reload().Result;
+            await _pveClient.WaitForTaskToFinishAsync(reloadTask);
+        }
+
         private async Task<string> GetNextId()
         {
             string nextId = null;
@@ -642,6 +703,19 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             return coresPerSocket;
+        }
+
+        private string GetRandomVnetId()
+        {
+            var builder = new StringBuilder();
+            var _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
+
+            for (int i = 0; i <= 7; i++)
+            {
+                builder.Append(_chars[_random.Next(_chars.Length)]);
+            }
+
+            return builder.ToString();
         }
 
         private int? GetSockets(VmTemplate template)

@@ -17,7 +17,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public ProxmoxHypervisorService(
             HypervisorServiceConfiguration options,
             IProxmoxNameService nameService,
-            IProxmoxVnetService vnetService,
+            IProxmoxVlanManager vlanManager,
             ILoggerFactory mill,
             Random random
         )
@@ -27,23 +27,21 @@ namespace TopoMojo.Hypervisor.Proxmox
             _logger = _mill.CreateLogger<ProxmoxHypervisorService>();
             // _hostCache = new ConcurrentDictionary<string, VimClient>();
             // _affinityMap = new Dictionary<string, VimClient>();
+            _vlanManager = vlanManager;
             _vmCache = new ConcurrentDictionary<string, Vm>();
-            _vlanman = new VlanManager(_options.Vlan);
 
             NormalizeOptions(_options);
 
             _pveClient = new ProxmoxClient(
                 options,
                 _vmCache,
-                _vlanman,
                 _mill.CreateLogger<ProxmoxClient>(),
                 nameService,
-                vnetService,
+                vlanManager,
                 random);
         }
 
         private readonly HypervisorServiceConfiguration _options;
-        private readonly VlanManager _vlanman;
 
         private readonly ILogger<ProxmoxHypervisorService> _logger;
         private readonly ILoggerFactory _mill;
@@ -52,6 +50,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         //private Dictionary<string, VimClient> _affinityMap;
         private ConcurrentDictionary<string, Vm> _vmCache;
         private readonly ProxmoxClient _pveClient;
+        private readonly IProxmoxVlanManager _vlanManager;
 
         public HypervisorServiceConfiguration Options { get { return _options; } }
 
@@ -111,10 +110,11 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
-            await Task.Delay(0);
+            var hostVnets = await _pveClient.GetVnets();
+
             return new VmOptions
             {
-                Net = _vlanman.FindNetworks(id)
+                Net = hostVnets.Select(n => n.Alias).ToArray()
             };
         }
 
@@ -126,7 +126,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
         }
 
-        private void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option, bool privileged = false)
+        private async void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option, bool privileged = false)
         {
             if (!template.Iso.HasValue())
             {
@@ -160,17 +160,17 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (template.IsolationTag.HasValue())
             {
                 string tag = "#" + template.IsolationTag;
-
                 Regex rgx = new Regex("#.*");
 
                 if (!template.Name.EndsWith(template.IsolationTag))
                     template.Name = rgx.Replace(template.Name, "") + tag;
 
+                var templateNetworkNames = template.Eth.Select(eth => eth.Net);
+                if (privileged && await _vlanManager.HasNetworks(templateNetworkNames))
+                    return;
+
                 foreach (VmNet eth in template.Eth)
                 {
-                    if (privileged && _vlanman.Contains(eth.Net))
-                        continue;
-
                     eth.Net = rgx.Replace(eth.Net, "") + tag;
                 }
             }

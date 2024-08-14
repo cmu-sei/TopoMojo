@@ -1,116 +1,114 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Corsinvest.ProxmoxVE.Api;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using TopoMojo.Hypervisor.Common;
 using TopoMojo.Hypervisor.Proxmox.Models;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
-    public interface IProxmoxVnetService
+    public interface IProxmoxVlanManager
     {
-        Task<IEnumerable<PveVnet>> Deploy(IEnumerable<string> vnetNames, CancellationToken cancellationToken);
+
+        Task<bool> HasNetwork(string networkName);
+        Task<bool> HasNetworks(IEnumerable<string> networkNames);
+        Task<IEnumerable<PveVnet>> Provision(IEnumerable<string> vnetNames, CancellationToken cancellationToken);
     }
 
-    public class ProxmoxVnetService : IProxmoxVnetService
+    public class ProxmoxVlanManager : IProxmoxVlanManager
     {
-        private readonly static Lazy<SemaphoreSlim> DEPLOY_SEMAPHORE = new Lazy<SemaphoreSlim>(() => new SemaphoreSlim(1));
-        private readonly static Lazy<DebounceAddCollection<string>> VNET_DEPLOY_NAMES = new Lazy<DebounceAddCollection<string>>(() => new DebounceAddCollection<string>(300));
+        private readonly static Lazy<SemaphoreSlim> _deploySemaphore = new Lazy<SemaphoreSlim>(() => new SemaphoreSlim(1));
+        // defaults to a debounce period of 300ms, but can be changed using the `Pod__Vnet__ResetDebounceDuration`. A maximum
+        // debounce can be set using `Pod__VNet__ResetDebounceMaxDuration`.
+        private readonly static Lazy<DebouncePool<string>> _vnetDeployNames = new Lazy<DebouncePool<string>>(() => new DebouncePool<string>(300));
+        private readonly static IMemoryCache _debounceBatchCreationCache = new MemoryCache(new MemoryCacheOptions { });
 
         private readonly HypervisorServiceConfiguration _hypervisorOptions;
         private readonly IProxmoxNameService _nameService;
-        private readonly PveClient _pveClient;
-        private readonly Random _random;
+        private readonly ProxmoxClient _proxmox;
 
-        public ProxmoxVnetService
+        public ProxmoxVlanManager
         (
             HypervisorServiceConfiguration hypervisorOptions,
+            ILogger<ProxmoxClient> logger,
             IProxmoxNameService nameService,
             Random random
         )
         {
             _hypervisorOptions = hypervisorOptions;
             _nameService = nameService;
-            _pveClient = new PveClient(hypervisorOptions.Host, 443) { ApiToken = hypervisorOptions.Password };
-            _random = random;
+
+            _proxmox = new ProxmoxClient(
+                hypervisorOptions,
+                new ConcurrentDictionary<string, Vm>(),
+                logger,
+                nameService,
+                this,
+                random);
+
+            // update the debounce pool to use settings from config
+            _vnetDeployNames.Value.DebouncePeriod = _hypervisorOptions.Vlan.ResetDebounceDuration;
+            _vnetDeployNames.Value.MaxTotalDebounce = _hypervisorOptions.Vlan.ResetDebounceMaxDuration;
         }
 
-        public async Task<IEnumerable<PveVnet>> Deploy(IEnumerable<string> vnetNames, CancellationToken cancellationToken)
+        public async Task<IEnumerable<PveVnet>> Provision(IEnumerable<string> vnetNames, CancellationToken cancellationToken)
         {
-            var debouncedVnetNames = await VNET_DEPLOY_NAMES.Value.AddRange(vnetNames, CancellationToken.None);
+            var debouncedVnetNames = await _vnetDeployNames.Value.AddRange(vnetNames, CancellationToken.None);
 
             try
             {
-                await DEPLOY_SEMAPHORE.Value.WaitAsync(cancellationToken);
+                await _deploySemaphore.Value.WaitAsync(cancellationToken);
 
-                var task = _pveClient.Cluster.Sdn.Vnets.Index().Result;
-                var hostNets = task.ToModel<PveVnet[]>();
-                var newNets = debouncedVnetNames.Where(vnetName => !hostNets.Any(n => n.Alias == _nameService.ToPveName(vnetName))).Distinct();
-                var deployedVNets = new List<PveVnet>();
-
-                foreach (var vnetName in newNets)
+                // check the cache to see if this debounce batch has already been created.
+                // if so, just bail out and return what we already have
+                if (_debounceBatchCreationCache.TryGetValue<IEnumerable<PveVnet>>(debouncedVnetNames.Id, out var cachedDeployedVNets))
                 {
-                    var newVnetTag = default(int?);
+                    var createdVnetNames = cachedDeployedVNets.Select(v => v.Alias).ToArray();
 
-                    do
-                    {
-                        newVnetTag = _random.Next(100, 100000);
-                    }
-                    while (hostNets.Any(n => n.Tag == newVnetTag));
-
-                    var vnetId = this.GetRandomVnetId();
-                    var pveName = _nameService.ToPveName(vnetName);
-
-                    var createTask = _pveClient.Cluster.Sdn.Vnets.Create
-                    (
-                        vnet: vnetId,
-                        tag: newVnetTag,
-                        zone: _hypervisorOptions.SDNZone,
-                        alias: pveName
-                    ).Result;
-
-                    if (createTask.IsSuccessStatusCode)
-                    {
-                        deployedVNets.Add(new PveVnet
-                        {
-                            Alias = pveName,
-                            Tag = newVnetTag.GetValueOrDefault(),
-                            Type = string.Empty,
-                            Vnet = vnetId,
-                            Zone = _hypervisorOptions.SDNZone
-                        });
-                    }
+                    if (debouncedVnetNames.Items.All(newName => createdVnetNames.Contains(newName)))
+                        return cachedDeployedVNets;
                 }
 
-                if (deployedVNets.Any())
+                // the proxmox client does all the heavy lifting of normalizing names, reloading the vnet host, etc.
+                var deployedVnets = await _proxmox.CreateVnets(vnetNames.Select(n => new CreatePveVnet { Alias = n, Zone = _hypervisorOptions.SDNZone }));
+
+                if (deployedVnets.Any())
                 {
-                    var reloadTask = _pveClient.Cluster.Sdn.Reload().Result;
-                    await _pveClient.WaitForTaskToFinishAsync(reloadTask);
+                    // cache the id of the debounce batch we just handled (so later callers won't try to recreate the vnets)
+                    _debounceBatchCreationCache
+                        .GetOrCreate
+                        (
+                            debouncedVnetNames.Id,
+                            entry =>
+                            {
+                                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(10);
+                                return deployedVnets;
+                            }
+                        );
                 }
 
-                return deployedVNets;
+                return deployedVnets;
             }
             finally
             {
-                VNET_DEPLOY_NAMES.Value.Clear();
-                DEPLOY_SEMAPHORE.Value.Release();
+                _deploySemaphore.Value.Release();
             }
         }
 
-        private string GetRandomVnetId()
+        public Task<bool> HasNetwork(string networkName)
+            => HasNetworks(new string[] { networkName });
+
+        public async Task<bool> HasNetworks(IEnumerable<string> networkNames)
         {
-            var builder = new StringBuilder();
-            var _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
+            var hostNets = await _proxmox.GetVnets();
 
-            for (int i = 0; i <= 7; i++)
-            {
-                builder.Append(_chars[_random.Next(_chars.Length)]);
-            }
-
-            return builder.ToString();
+            return networkNames
+                .Select(n => _nameService.ToPveName(n))
+                .All(n => hostNets.Any(vnet => vnet.Alias == n));
         }
     }
 }

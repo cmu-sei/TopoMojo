@@ -51,6 +51,8 @@ namespace TopoMojo.Hypervisor
     {
         public string Range { get; set; } = "";
         public Vlan[] Reservations { get; set; } = new Vlan[] { };
+        public int ResetDebounceDuration { get; set; } = 300;
+        public int? ResetDebounceMaxDuration { get; set; } = null;
     }
 
     public class Vlan
