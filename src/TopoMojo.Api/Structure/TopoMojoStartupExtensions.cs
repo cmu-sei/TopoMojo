@@ -141,7 +141,7 @@ namespace Microsoft.Extensions.DependencyInjection
                 {
                     services.AddSingleton<IHypervisorService, TopoMojo.Hypervisor.Proxmox.ProxmoxHypervisorService>();
                     services.AddSingleton<IProxmoxNameService, ProxmoxNameService>();
-                    services.AddSingleton<IProxmoxVnetService, ProxmoxVnetService>();
+                    services.AddSingleton<IProxmoxVlanManager, ProxmoxVlanManager>();
                     services.AddSingleton<Random>(_ => Random.Shared);
                 }
                 else

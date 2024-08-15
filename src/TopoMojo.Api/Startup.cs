@@ -94,7 +94,6 @@ namespace TopoMojo.Api
             // Configure Auth
             services.AddConfiguredAuthentication(Settings.Oidc);
             services.AddConfiguredAuthorization();
-
         }
 
         public void Configure(IApplicationBuilder app)
