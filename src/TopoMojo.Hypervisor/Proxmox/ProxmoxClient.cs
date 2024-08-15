@@ -114,7 +114,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             Result task;
             Vm vm = null;
 
-            _logger.LogDebug("deploy: virtual networks...");
+            _logger.LogDebug($"deploy: virtual networks (id {template.Id})...");
+
             var vnets = await _vlanManager.Provision(template.Eth.Select(n => n.Net), CancellationToken.None);
             _logger.LogDebug($"deploy: {vnets.Count()} networks deployed.");
 

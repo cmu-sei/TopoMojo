@@ -9,6 +9,7 @@ namespace TopoMojo.Hypervisor.Common
 {
     public sealed class DebouncePool<T>
     {
+        private string _id;
         private readonly object _collectionLock = new object();
         private DateTimeOffsetRange _currentDebounce = null;
         private readonly object _currentDebounceLock = new object();
@@ -54,6 +55,7 @@ namespace TopoMojo.Hypervisor.Common
                         Start = nowish,
                         End = nowish.AddMilliseconds(this.DebouncePeriod)
                     };
+                    _id = Guid.NewGuid().ToString();
                 }
                 else
                 {
@@ -67,7 +69,6 @@ namespace TopoMojo.Hypervisor.Common
                         if (maxDebounceEnds < _currentDebounce.End)
                         {
                             _currentDebounce.End = maxDebounceEnds;
-                            Console.WriteLine($"Clamped to {_currentDebounce.End}");
                         }
                     }
                 }
@@ -108,7 +109,7 @@ namespace TopoMojo.Hypervisor.Common
 
                 return new DebouncePoolBatch<T>
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = _id,
                     Items = itemsThreadSafe
                 };
             }

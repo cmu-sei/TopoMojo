@@ -27,24 +27,27 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly static IMemoryCache _debounceBatchCreationCache = new MemoryCache(new MemoryCacheOptions { });
 
         private readonly HypervisorServiceConfiguration _hypervisorOptions;
+        private readonly ILogger<ProxmoxVlanManager> _logger;
         private readonly IProxmoxNameService _nameService;
         private readonly ProxmoxClient _proxmox;
 
         public ProxmoxVlanManager
         (
             HypervisorServiceConfiguration hypervisorOptions,
-            ILogger<ProxmoxClient> logger,
+            ILogger<ProxmoxClient> clientLogger,
+            ILogger<ProxmoxVlanManager> logger,
             IProxmoxNameService nameService,
             Random random
         )
         {
             _hypervisorOptions = hypervisorOptions;
+            _logger = logger;
             _nameService = nameService;
 
             _proxmox = new ProxmoxClient(
                 hypervisorOptions,
                 new ConcurrentDictionary<string, Vm>(),
-                logger,
+                clientLogger,
                 nameService,
                 this,
                 random);
@@ -56,7 +59,9 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<IEnumerable<PveVnet>> Provision(IEnumerable<string> vnetNames, CancellationToken cancellationToken)
         {
-            var debouncedVnetNames = await _vnetDeployNames.Value.AddRange(vnetNames.Distinct(), CancellationToken.None);
+            _logger.LogDebug($"Deploying vnets: {string.Join(",", vnetNames)}");
+            var debouncedVnetNames = await _vnetDeployNames.Value.AddRange(vnetNames, CancellationToken.None);
+            debouncedVnetNames.Items = debouncedVnetNames.Items.Distinct();
 
             try
             {
@@ -64,6 +69,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                 // check the cache to see if this debounce batch has already been created.
                 // if so, just bail out and return what we already have
+                _logger.LogDebug($"Looking up id {debouncedVnetNames.Id}");
                 if (_debounceBatchCreationCache.TryGetValue<IEnumerable<PveVnet>>(debouncedVnetNames.Id, out var cachedDeployedVNets))
                 {
                     var createdVnetNames = cachedDeployedVNets.Select(v => v.Alias).ToArray();
@@ -71,6 +77,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     if (debouncedVnetNames.Items.All(newName => createdVnetNames.Contains(newName)))
                         return cachedDeployedVNets;
                 }
+                _logger.LogDebug($"Cache miss {debouncedVnetNames.Id}");
 
                 // the proxmox client does all the heavy lifting of normalizing names, reloading the vnet host, etc.
                 var deployedVnets = await _proxmox.CreateVnets(debouncedVnetNames.Items.Select(n => new CreatePveVnet { Alias = n, Zone = _hypervisorOptions.SDNZone }));
@@ -91,6 +98,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                                 return deployedVnets;
                             }
                         );
+
+                    _logger.LogDebug($"Cached id {debouncedVnetNames.Id}");
                 }
 
                 return deployedVnets;
