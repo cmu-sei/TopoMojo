@@ -48,14 +48,14 @@ namespace TopoMojo.Hypervisor.Proxmox
             };
 
             _nameService = nameService;
-            _vnetService = vnetService;
+            _vlanManager = vnetService;
             Task sessionMonitorTask = MonitorSession();
         }
 
         private readonly ILogger<ProxmoxClient> _logger;
         private ConcurrentDictionary<string, Vm> _vmCache;
         private IProxmoxNameService _nameService;
-        private IProxmoxVlanManager _vnetService;
+        private IProxmoxVlanManager _vlanManager;
         HypervisorServiceConfiguration _config = null;
         // int _pollInterval = 1000;
         int _syncInterval = 30000;
@@ -115,7 +115,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             Vm vm = null;
 
             _logger.LogDebug("deploy: virtual networks...");
-            var vnets = await _vnetService.Provision(template.Eth.Select(n => n.Net), CancellationToken.None);
+            var vnets = await _vlanManager.Provision(template.Eth.Select(n => n.Net), CancellationToken.None);
             _logger.LogDebug($"deploy: {vnets.Count()} networks deployed.");
 
             _logger.LogDebug("deploy: transform template...");
@@ -478,6 +478,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 var vnetId = this.GetRandomVnetId();
                 var pveName = _nameService.ToPveName(createVnet.Alias);
 
+                // check for existence of alias = vnetname--gamespaceid
                 var createTask = _pveClient.Cluster.Sdn.Vnets.Create
                 (
                     vnet: vnetId,

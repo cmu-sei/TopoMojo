@@ -13,7 +13,6 @@ namespace TopoMojo.Hypervisor.Proxmox
 {
     public interface IProxmoxVlanManager
     {
-
         Task<bool> HasNetwork(string networkName);
         Task<bool> HasNetworks(IEnumerable<string> networkNames);
         Task<IEnumerable<PveVnet>> Provision(IEnumerable<string> vnetNames, CancellationToken cancellationToken);
@@ -57,7 +56,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<IEnumerable<PveVnet>> Provision(IEnumerable<string> vnetNames, CancellationToken cancellationToken)
         {
-            var debouncedVnetNames = await _vnetDeployNames.Value.AddRange(vnetNames, CancellationToken.None);
+            var debouncedVnetNames = await _vnetDeployNames.Value.AddRange(vnetNames.Distinct(), CancellationToken.None);
 
             try
             {
@@ -74,7 +73,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 }
 
                 // the proxmox client does all the heavy lifting of normalizing names, reloading the vnet host, etc.
-                var deployedVnets = await _proxmox.CreateVnets(vnetNames.Select(n => new CreatePveVnet { Alias = n, Zone = _hypervisorOptions.SDNZone }));
+                var deployedVnets = await _proxmox.CreateVnets(debouncedVnetNames.Items.Select(n => new CreatePveVnet { Alias = n, Zone = _hypervisorOptions.SDNZone }));
 
                 if (deployedVnets.Any())
                 {
@@ -85,7 +84,10 @@ namespace TopoMojo.Hypervisor.Proxmox
                             debouncedVnetNames.Id,
                             entry =>
                             {
-                                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(10);
+                                // cache this - we need this to remain at least long as the maximum possible debounce (if it's defined). If it is, 
+                                // add a couple seconds for safety. if not, just double the min debounce.
+                                var cacheDuration = _hypervisorOptions.Vlan.ResetDebounceMaxDuration != null ? _hypervisorOptions.Vlan.ResetDebounceMaxDuration.Value + 2000 : _hypervisorOptions.Vlan.ResetDebounceDuration;
+                                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(cacheDuration);
                                 return deployedVnets;
                             }
                         );

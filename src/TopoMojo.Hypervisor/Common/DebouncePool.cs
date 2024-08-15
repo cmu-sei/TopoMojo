@@ -80,7 +80,7 @@ namespace TopoMojo.Hypervisor.Common
 
                 if (_currentDebounce != null)
                 {
-                    var delayLength = 0;
+                    int delayLength;
                     do
                     {
                         delayLength = (int)Math.Ceiling((_currentDebounce.End - DateTimeOffset.UtcNow).TotalMilliseconds);
@@ -90,18 +90,20 @@ namespace TopoMojo.Hypervisor.Common
                     while (delayLength > 0);
                 }
 
+                var itemsThreadSafe = Array.Empty<T>();
+
                 lock (_currentDebounceLock)
                 {
                     _currentDebounce = null;
-                }
 
-                // get a new array that points to the contents of _items for thread safety
-                var itemsThreadSafe = this._items.ToArray();
+                    // get a new array that points to the contents of _items for thread safety
+                    itemsThreadSafe = this._items.ToArray();
 
-                // clear the collection (.Clear() isn't supported in .netstandard2.0)
-                foreach (var item in _items)
-                {
-                    _items.TryTake(out _);
+                    // clear the collection (.Clear() isn't supported in .netstandard2.0)
+                    foreach (var item in _items)
+                    {
+                        _items.TryTake(out _);
+                    }
                 }
 
                 return new DebouncePoolBatch<T>
