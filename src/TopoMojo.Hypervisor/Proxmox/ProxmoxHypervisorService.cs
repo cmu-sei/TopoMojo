@@ -376,9 +376,19 @@ namespace TopoMojo.Hypervisor.Proxmox
             return q.ToArray();
         }
 
-        public Task<int> CreateDisks(VmTemplate template)
+        public async Task<int> CreateDisks(VmTemplate template)
         {
-            throw new NotImplementedException();
+            // Clone template
+            var vm = await _pveClient.CreateTemplate(template);
+
+            if (vm != null)
+            {
+                return 0;
+            }
+            else
+            {
+                return 100;
+            }
         }
 
         public Task<int[]> VerifyDisks(VmTemplate template)
