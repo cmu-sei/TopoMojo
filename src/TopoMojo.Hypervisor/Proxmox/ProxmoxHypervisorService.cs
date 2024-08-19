@@ -110,12 +110,9 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
-            var hostVnets = await _pveClient.GetVnets();
+            var hostVnets = await _vlanManager.GetVnets();
 
-            return new VmOptions
-            {
-                Net = hostVnets.Select(n => n.Alias).ToArray()
-            };
+            return new VmOptions { Net = hostVnets.Select(n => n.Alias).ToArray() };
         }
 
         public string Version
@@ -323,18 +320,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task DeleteAll(string target)
         {
             _logger.LogDebug("deleting all matching " + target);
-            var tasks = new List<Task>();
-            foreach (var vm in await Find(target))
-            {
-                tasks.Add(_pveClient.Delete(vm.Id));
-            }
-
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks.ToArray());
-            }
-
-            await _pveClient.CleanupNetworks(target);
+            await _pveClient.DeleteAll(target);
         }
 
         public async Task<Vm> ChangeState(VmOperation op)

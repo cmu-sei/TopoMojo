@@ -15,7 +15,6 @@ using System.Collections.Generic;
 using TopoMojo.Hypervisor.Proxmox.Models;
 using TopoMojo.Hypervisor.Extensions;
 using System.Threading;
-using System.Text;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -33,9 +32,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             _logger = logger;
             _config = options;
             _logger.LogDebug($"Constructing Client {_config.Host}");
-            //_tasks = new Dictionary<string, VimHostTask>();
             _vmCache = vmCache;
-            //_pgAllocation = new Dictionary<string, PortGroupAllocation>();
             _hostPrefix = _config.Host.Split('.').FirstOrDefault();
             _random = random;
 
@@ -54,9 +51,9 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private readonly ILogger<ProxmoxClient> _logger;
         private ConcurrentDictionary<string, Vm> _vmCache;
-        private IProxmoxNameService _nameService;
-        private IProxmoxVlanManager _vlanManager;
-        HypervisorServiceConfiguration _config = null;
+        private readonly IProxmoxNameService _nameService;
+        private readonly IProxmoxVlanManager _vlanManager;
+        private readonly HypervisorServiceConfiguration _config = null;
         // int _pollInterval = 1000;
         int _syncInterval = 30000;
         // int _taskMonitorInterval = 3000;
@@ -85,7 +82,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 await Task.WhenAll(tasks);
             }
 
-            await this.CleanupNetworks(term);
+            await _vlanManager.DeleteVnetsByTerm(term);
         }
 
         public async Task<Vm> Refresh(VmTemplate template)
@@ -116,7 +113,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             _logger.LogDebug($"deploy: virtual networks (id {template.Id})...");
 
-            var vnets = await _vlanManager.Provision(template.Eth.Select(n => n.Net), CancellationToken.None);
+            var vnets = await _vlanManager.Provision(template.Eth.Select(n => n.Net));
             _logger.LogDebug($"deploy: {vnets.Count()} networks deployed.");
 
             _logger.LogDebug("deploy: transform template...");
@@ -459,90 +456,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             return isos;
         }
 
-        public async Task<IEnumerable<PveVnet>> CreateVnets(IEnumerable<CreatePveVnet> createVnets)
-        {
-            var existingNets = await this.GetVnets();
-            var deployedNets = new List<PveVnet>();
-
-            foreach (var createVnet in createVnets)
-            {
-                var newVnetTag = default(int?);
-
-                do
-                {
-                    newVnetTag = _random.Next(100, 100000);
-                }
-                while (existingNets.Any(n => n.Tag == newVnetTag));
-
-                var vnetId = this.GetRandomVnetId();
-                var pveName = _nameService.ToPveName(createVnet.Alias);
-
-                // check for existence of alias = vnetname--gamespaceid
-                var createTask = _pveClient.Cluster.Sdn.Vnets.Create
-                (
-                    vnet: vnetId,
-                    tag: newVnetTag,
-                    zone: createVnet.Zone,
-                    alias: pveName
-                ).Result;
-
-                if (createTask.IsSuccessStatusCode)
-                {
-                    deployedNets.Add(new PveVnet
-                    {
-                        Alias = pveName,
-                        Tag = newVnetTag.GetValueOrDefault(),
-                        Type = string.Empty,
-                        Vnet = vnetId,
-                        Zone = createVnet.Zone
-                    });
-                }
-            }
-
-            if (deployedNets.Any())
-            {
-                await this.ReloadVnets();
-            }
-
-            return deployedNets;
-        }
-
-        public async Task<IEnumerable<PveVnet>> GetVnets()
-        {
-            var task = _pveClient.Cluster.Sdn.Vnets.Index().Result;
-            await WaitForTaskToFinish(task);
-
-            if (!task.IsSuccessStatusCode)
-                throw new Exception($"Failed to load virtual networks from Proxmox. Status code: {task.StatusCode}");
-
-            return task.ToModel<PveVnet[]>();
-        }
-
-        public async Task ReloadVnets()
-        {
-            var reloadTask = _pveClient.Cluster.Sdn.Reload().Result;
-            await _pveClient.WaitForTaskToFinishAsync(reloadTask);
-        }
-
-        private async Task<string> GetNextId()
-        {
-            string nextId = null;
-
-            for (int i = 0; i < 10; i++)
-            {
-                var randomId = _random.Next(1, 999999999);
-                var task = await _pveClient.Cluster.Nextid.Nextid(randomId);
-
-                if (task.IsSuccessStatusCode)
-                {
-                    nextId = task.Response.data;
-                    break;
-                }
-            }
-
-            return nextId;
-        }
-
         private async Task<string> GetTargetNode()
         {
             string target = null;
@@ -577,92 +490,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error waiting for task to finish");
-            }
-        }
-
-        // private async Task Provision(VmTemplate template)
-        // {
-        //     lock (_lock)
-        //     {
-        //         var task = _pveClient.Cluster.Sdn.Vnets.Index().Result;
-        //         var vnets = task.ToModel<PveVnet[]>();
-
-        //         bool addedNets = false;
-
-        //         foreach (var eth in template.Eth)
-        //         {
-        //             if (vnets.Where(x => x.Alias == this.ToPveName(eth.Net)).Any())
-        //             {
-        //                 continue;
-        //             }
-
-        //             int? vnet = null;
-
-        //             while (vnet == null)
-        //             {
-        //                 var vnetId = _random.Next(100, 100000);
-
-        //                 if (!vnets.Where(x => x.Tag == vnetId).Any())
-        //                 {
-        //                     vnet = vnetId;
-        //                 }
-        //             }
-
-        //             task = _pveClient.Cluster.Sdn.Vnets.Create(
-        //                 vnet: this.GetRandomVnetId(),
-        //                 tag: vnet,
-        //                 zone: _config.SDNZone,
-        //                 alias: this.ToPveName(eth.Net)).Result;
-        //             this.WaitForTaskToFinish(task).Wait();
-
-        //             if (task.IsSuccessStatusCode)
-        //             {
-        //                 addedNets = true;
-        //             }
-        //         }
-
-        //         if (addedNets)
-        //         {
-        //             task = _pveClient.Cluster.Sdn.Reload().Result;
-        //             this.WaitForTaskToFinish(task).Wait();
-        //         }
-        //     }
-        // }
-
-        public async Task CleanupNetworks(string term)
-        {
-            var task = await _pveClient.Cluster.Sdn.Vnets.Index();
-            var vnets = task.ToModel<PveVnet[]>();
-
-            var success = true;
-            var any = false;
-
-            foreach (var vnet in vnets.Where(x => x.Alias.Contains(term)))
-            {
-                any = true;
-                task = await _pveClient.Cluster.Sdn.Vnets[vnet.Vnet].Delete();
-                await this.WaitForTaskToFinish(task);
-
-                if (!task.IsSuccessStatusCode)
-                {
-                    success = false;
-                }
-            }
-
-            if (any)
-            {
-                task = await _pveClient.Cluster.Sdn.Reload();
-                await this.WaitForTaskToFinish(task);
-
-                if (!task.IsSuccessStatusCode)
-                {
-                    success = false;
-                }
-            }
-
-            if (!success)
-            {
-                throw new Exception($"Exception cleaning up networks for {term}");
             }
         }
 
@@ -705,19 +532,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             return coresPerSocket;
         }
 
-        private string GetRandomVnetId()
-        {
-            var builder = new StringBuilder();
-            var _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
-
-            for (int i = 0; i <= 7; i++)
-            {
-                builder.Append(_chars[_random.Next(_chars.Length)]);
-            }
-
-            return builder.ToString();
-        }
-
         private int? GetSockets(VmTemplate template)
         {
             string[] p = template.Cpu.Split('x');
@@ -729,6 +543,25 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             return sockets;
+        }
+
+        private async Task<string> GetNextId()
+        {
+            string nextId = null;
+
+            for (int i = 0; i < 10; i++)
+            {
+                var randomId = _random.Next(1, 999999999);
+                var task = await _pveClient.Cluster.Nextid.Nextid(randomId);
+
+                if (task.IsSuccessStatusCode)
+                {
+                    nextId = task.Response.data;
+                    break;
+                }
+            }
+
+            return nextId;
         }
 
         private async Task<Dictionary<int, string>> GetNics(VmTemplate template)
