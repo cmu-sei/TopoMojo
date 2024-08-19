@@ -25,6 +25,7 @@ namespace TopoMojo.Hypervisor
         public int Delay { get; set; }
         public bool AutoStart { get; set; } = true;
         public string Template { get; set; }
+        public string ParentTemplate { get; set; }
         public VmNet[] Eth { get; set; }
         public VmDisk[] Disks { get; set; }
         public VmKeyValue[] GuestSettings { get; set; }

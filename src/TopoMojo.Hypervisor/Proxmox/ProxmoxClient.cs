@@ -87,6 +87,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> Refresh(VmTemplate template)
         {
+            string target = template.Name + "#" + template.IsolationTag;
             var resources = await _pveClient.GetResourcesAsync(ClusterResourceType.Vm);
 
             var pveVm = resources.Where(x => x.Name == _nameService.ToPveName(template.Name)).FirstOrDefault();
@@ -102,8 +103,78 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
             else
             {
-                return null;
+                // todo: check for in progress cloning of parent template
+                if (resources.Where(x => x.Name == template.Template).Any())
+                {
+                    return new Vm
+                    {
+                        Name = target,
+                        Status = "initialized"
+                    };
+                }
+                else
+                {
+                    return new Vm
+                    {
+                        Name = target,
+                        Status = "created"
+                    };
+                }
             }
+        }
+
+        public async Task<Vm> CreateTemplate(VmTemplate template)
+        {
+            await this.ReloadVmCache();
+
+            var vmTemplate = _vmCache
+                .Where(x => x.Value.Name == template.Template)
+                .FirstOrDefault()
+                .Value;
+
+            if (vmTemplate != null)
+            {
+                throw new InvalidOperationException("Template already exists");
+            }
+
+            var parentTemplate = _vmCache
+                .Where(x => x.Value.Name == template.ParentTemplate)
+                .FirstOrDefault()
+                .Value;
+
+            if (parentTemplate == null)
+            {
+                throw new InvalidOperationException("Parent Template does not exist");
+            }
+
+            var nextId = await GetNextId();
+            var pveId = Int32.Parse(nextId);
+
+            // full clone parent template
+            var task = await _pveClient.Nodes[parentTemplate.Host].Qemu[parentTemplate.Id].Clone.CloneVm(
+                pveId,
+                full: true,
+                name: ToPveName(template.Template),
+                target: parentTemplate.Host);
+            await _pveClient.WaitForTaskToFinishAsync(task);
+
+            if (task.IsSuccessStatusCode)
+            {
+                // convert new vm to template
+                task = await _pveClient.Nodes[parentTemplate.Host].Qemu[nextId].Template.Template();
+                await this.WaitForTaskToFinish(task);
+            }
+            else
+            {
+                throw new Exception(task.ReasonPhrase);
+            }
+
+            await this.ReloadVmCache();
+
+            return _vmCache
+                .Where(x => x.Value.Name == template.Template)
+                .FirstOrDefault()
+                .Value;
         }
 
         public async Task<Vm> Deploy(VmTemplate template)
@@ -435,7 +506,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             return new Vm
             {
-                Status = "created",
+                Status = "initialized",
                 Id = null
             };
         }
