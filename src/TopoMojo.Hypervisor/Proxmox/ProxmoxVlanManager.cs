@@ -26,8 +26,6 @@ namespace TopoMojo.Hypervisor.Proxmox
         // defaults to a debounce period of 300ms, but can be changed using the `Pod__Vnet__ResetDebounceDuration`. A maximum
         // debounce can be set using `Pod__VNet__ResetDebounceMaxDuration`.
         private readonly static Lazy<DebouncePool<PveVnetOperation>> _vnetOpsPool = new Lazy<DebouncePool<PveVnetOperation>>(() => new DebouncePool<PveVnetOperation>(300));
-        private readonly static Lazy<DebouncePool<string>> _createVnetNamesPool = new Lazy<DebouncePool<string>>(() => new DebouncePool<string>(300));
-        private readonly static IMemoryCache _debounceBatchCreationCache = new MemoryCache(new MemoryCacheOptions { });
         private readonly static IMemoryCache _recentVnetOpsCache = new MemoryCache(new MemoryCacheOptions { });
 
         private readonly int _cacheDurationMs = 600;
@@ -52,8 +50,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             // update the debounce pool to use settings from config
             _vnetOpsPool.Value.DebouncePeriod = _hypervisorOptions.Vlan.ResetDebounceDuration;
             _vnetOpsPool.Value.MaxTotalDebounce = _hypervisorOptions.Vlan.ResetDebounceMaxDuration;
-            _createVnetNamesPool.Value.DebouncePeriod = _hypervisorOptions.Vlan.ResetDebounceDuration;
-            _createVnetNamesPool.Value.MaxTotalDebounce = _hypervisorOptions.Vlan.ResetDebounceMaxDuration;
 
             // cache this - we need this to remain at least long as the maximum possible debounce (if it's defined). If it is, 
             // add a couple seconds for safety. if not, just double the min debounce up to a maximum of two seconds
@@ -74,7 +70,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 // check the cache to see if this debounce batch has already been created.
                 // if so, just bail out and return what we already have
                 _logger.LogDebug($"Looking up id {debouncedOperations.Id}");
-                if (_debounceBatchCreationCache.TryGetValue<IEnumerable<PveVnetOperationResult>>(debouncedOperations.Id, out var cachedOperations))
+                if (_recentVnetOpsCache.TryGetValue<IEnumerable<PveVnetOperationResult>>(debouncedOperations.Id, out var cachedOperations))
                 {
                     return cachedOperations.Where(o => requestedOperations.Any(req => req.Equals(o)));
                 }

@@ -154,7 +154,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             var task = await _pveClient.Nodes[parentTemplate.Host].Qemu[parentTemplate.Id].Clone.CloneVm(
                 pveId,
                 full: true,
-                name: ToPveName(template.Template),
+                name: _nameService.ToPveName(template.Template),
                 target: parentTemplate.Host);
             await _pveClient.WaitForTaskToFinishAsync(task);
 
