@@ -25,10 +25,10 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly static Lazy<SemaphoreSlim> _deploySemaphore = new Lazy<SemaphoreSlim>(() => new SemaphoreSlim(1));
         // defaults to a debounce period of 300ms, but can be changed using the `Pod__Vnet__ResetDebounceDuration`. A maximum
         // debounce can be set using `Pod__VNet__ResetDebounceMaxDuration`.
-        private readonly static Lazy<DebouncePool<PveVnetOperation>> _vnetOpsPool = new Lazy<DebouncePool<PveVnetOperation>>(() => new DebouncePool<PveVnetOperation>(300));
+        private readonly static Lazy<DebouncePool<PveVnetOperation>> _vnetOpsPool = new Lazy<DebouncePool<PveVnetOperation>>(() => new DebouncePool<PveVnetOperation>());
         private readonly static IMemoryCache _recentVnetOpsCache = new MemoryCache(new MemoryCacheOptions { });
 
-        private readonly int _cacheDurationMs = 600;
+        private readonly int _cacheDurationMs;
         private readonly HypervisorServiceConfiguration _hypervisorOptions;
         private readonly ILogger<ProxmoxVlanManager> _logger;
         private readonly IProxmoxNameService _nameService;
@@ -52,8 +52,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             _vnetOpsPool.Value.MaxTotalDebounce = _hypervisorOptions.Vlan.ResetDebounceMaxDuration;
 
             // cache this - we need this to remain at least long as the maximum possible debounce (if it's defined). If it is, 
-            // add a couple seconds for safety. if not, just double the min debounce up to a maximum of two seconds
-            _cacheDurationMs = _hypervisorOptions.Vlan.ResetDebounceMaxDuration != null ? _hypervisorOptions.Vlan.ResetDebounceMaxDuration.Value + 2000 : Math.Min(_hypervisorOptions.Vlan.ResetDebounceDuration * 2, 2000);
+            // add a couple seconds for safety. if not, just double the min debounce. Min cache length is 2 sec
+            _cacheDurationMs = _hypervisorOptions.Vlan.ResetDebounceMaxDuration != null ? Math.Max(_hypervisorOptions.Vlan.ResetDebounceMaxDuration.Value + 2000 : _hypervisorOptions.Vlan.ResetDebounceDuration * 2, 2000);
         }
 
         private async Task<IEnumerable<PveVnetOperationResult>> DebounceVnetOperations(IEnumerable<PveVnetOperation> requestedOperations)

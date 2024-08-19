@@ -88,11 +88,6 @@ namespace TopoMojo.Hypervisor.Proxmox
                 }
             }
 
-            if (deployedNets.Any())
-            {
-                await this.ReloadVnets();
-            }
-
             return deployedNets;
         }
 

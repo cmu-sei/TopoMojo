@@ -19,7 +19,6 @@ namespace TopoMojo.Hypervisor
         public string VmStore { get; set; } = "[topomojo] _run/";
         public string DiskStore { get; set; } = "[topomojo]";
         public string IsoStore { get; set; } = "[topomojo] iso/";
-        public string NodeIsoStore { get; set; } = "nfs";
         public string TicketUrlHandler { get; set; } = "querystring"; //"local-app", "external-domain", "host-map", "none"
         public Dictionary<string, string> TicketUrlHostMap { get; set; } = new Dictionary<string, string>();
         public VlanConfiguration Vlan { get; set; } = new VlanConfiguration();
@@ -51,8 +50,8 @@ namespace TopoMojo.Hypervisor
     {
         public string Range { get; set; } = "";
         public Vlan[] Reservations { get; set; } = new Vlan[] { };
-        public int ResetDebounceDuration { get; set; } = 300;
-        public int? ResetDebounceMaxDuration { get; set; } = null;
+        public int ResetDebounceDuration { get; set; } = 2000;
+        public int? ResetDebounceMaxDuration { get; set; } = 5000;
     }
 
     public class Vlan

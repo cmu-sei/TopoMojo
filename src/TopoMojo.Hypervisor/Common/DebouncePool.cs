@@ -16,6 +16,11 @@ namespace TopoMojo.Hypervisor.Common
         private readonly SemaphoreSlim _semaphoreLock = new SemaphoreSlim(1);
         private readonly ConcurrentBag<T> _items = new ConcurrentBag<T>();
 
+        public DebouncePool()
+        {
+            DebouncePeriod = 0;
+        }
+
         public DebouncePool(int debounceDurationMs)
         {
             DebouncePeriod = debounceDurationMs;
