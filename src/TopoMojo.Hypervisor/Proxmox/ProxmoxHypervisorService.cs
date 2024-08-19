@@ -383,11 +383,11 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (vm != null)
             {
-                return 0;
+                return 100;
             }
             else
             {
-                return 100;
+                return 0;
             }
         }
 

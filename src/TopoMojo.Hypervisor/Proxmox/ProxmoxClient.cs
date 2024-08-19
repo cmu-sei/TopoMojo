@@ -64,6 +64,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly Random _random;
         private readonly bool _enableHA = false;
         private readonly Object _lock = new object();
+        private const string deleteTag = "delete"; // tags are always lower-case
 
         public async Task DeletAll(string term)
         {
@@ -198,7 +199,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             _logger.LogDebug("deploy: create vm...");
             var targetNode = await GetTargetNode();
             var vmTemplate = _vmCache
-                .Where(x => x.Value.Name == template.Template)
+                .Where(x => x.Value.Name == template.Template &&
+                            (x.Value.Tags == null || !x.Value.Tags.Contains(deleteTag)))
                 .FirstOrDefault()
                 .Value;
 
@@ -484,8 +486,13 @@ namespace TopoMojo.Hypervisor.Proxmox
                             if (!task.IsSuccessStatusCode)
                                 throw new Exception($"Convert to template failed: {task.ReasonPhrase}");
 
-                            // Rename old template
-                            task = await _pveClient.Nodes[template.Node].Qemu[template.VmId].Config.UpdateVmAsync(name: $"{template.Name}-DELETEME");
+                            // Tag old template
+                            // Janitor will delete anything with this tag if deletion fails now
+                            task = await _pveClient
+                                .Nodes[template.Node]
+                                .Qemu[template.VmId]
+                                .Config
+                                .UpdateVmAsync(tags: deleteTag);
                             await this.WaitForTaskToFinish(task);
 
                             if (!task.IsSuccessStatusCode)
@@ -780,7 +787,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                 Id = pveVm.VmId.ToString(),
                 State = pveVm.IsRunning ? VmPowerState.Running : VmPowerState.Off,
                 Status = "deployed",
-                Host = pveVm.Node
+                Host = pveVm.Node,
+                Tags = pveVm.Tags
             };
 
             if (!pveVm.IsTemplate && vm.Name.Contains("#").Equals(false) || vm.Name.ToTenant() != _config.Tenant)
