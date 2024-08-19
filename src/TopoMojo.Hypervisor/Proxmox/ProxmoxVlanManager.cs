@@ -217,7 +217,12 @@ namespace TopoMojo.Hypervisor.Proxmox
         public Task<bool> HasNetwork(string networkName)
             => HasNetworks(new string[] { networkName });
 
-        public Task<bool> HasNetworks(IEnumerable<string> networkNames)
-            => _vnetsApi.GetVnetsExist(networkNames.Select(n => _nameService.ToPveName(n)));
+        public async Task<bool> HasNetworks(IEnumerable<string> networkNames)
+        {
+            var nets = await _vnetsApi.GetVnets();
+            var pveNames = networkNames.Select(n => _nameService.ToPveName(n));
+
+            return pveNames.All(name => nets.Any(net => net.Alias == name));
+        }
     }
 }

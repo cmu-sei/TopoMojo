@@ -15,7 +15,6 @@ namespace TopoMojo.Hypervisor.Proxmox
         Task<IEnumerable<PveVnet>> DeleteVnets(IEnumerable<string> names);
         Task<IEnumerable<PveVnet>> DeleteVnetsByTerm(string term);
         Task<IEnumerable<PveVnet>> GetVnets();
-        Task<bool> GetVnetsExist(IEnumerable<string> networkAliases);
         Task ReloadVnets();
     }
 
@@ -153,13 +152,6 @@ namespace TopoMojo.Hypervisor.Proxmox
                 throw new Exception($"Failed to load virtual networks from Proxmox. Status code: {task.StatusCode}");
 
             return task.ToModel<PveVnet[]>();
-        }
-
-        public async Task<bool> GetVnetsExist(IEnumerable<string> networkAliases)
-        {
-            var hostNets = await this.GetVnets();
-
-            return networkAliases.All(n => hostNets.Any(vnet => vnet.Alias == n));
         }
 
         public async Task ReloadVnets()
