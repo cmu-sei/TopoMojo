@@ -16,6 +16,8 @@ namespace TopoMojo.Hypervisor.Proxmox
     {
         public ProxmoxHypervisorService(
             HypervisorServiceConfiguration options,
+            IProxmoxNameService nameService,
+            IProxmoxVlanManager vlanManager,
             ILoggerFactory mill,
             Random random
         )
@@ -25,21 +27,21 @@ namespace TopoMojo.Hypervisor.Proxmox
             _logger = _mill.CreateLogger<ProxmoxHypervisorService>();
             // _hostCache = new ConcurrentDictionary<string, VimClient>();
             // _affinityMap = new Dictionary<string, VimClient>();
+            _vlanManager = vlanManager;
             _vmCache = new ConcurrentDictionary<string, Vm>();
-            _vlanman = new VlanManager(_options.Vlan);
 
             NormalizeOptions(_options);
 
             _pveClient = new ProxmoxClient(
                 options,
                 _vmCache,
-                _vlanman,
                 _mill.CreateLogger<ProxmoxClient>(),
+                nameService,
+                vlanManager,
                 random);
         }
 
         private readonly HypervisorServiceConfiguration _options;
-        private readonly VlanManager _vlanman;
 
         private readonly ILogger<ProxmoxHypervisorService> _logger;
         private readonly ILoggerFactory _mill;
@@ -48,6 +50,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         //private Dictionary<string, VimClient> _affinityMap;
         private ConcurrentDictionary<string, Vm> _vmCache;
         private readonly ProxmoxClient _pveClient;
+        private readonly IProxmoxVlanManager _vlanManager;
 
         public HypervisorServiceConfiguration Options { get { return _options; } }
 
@@ -76,13 +79,40 @@ namespace TopoMojo.Hypervisor.Proxmox
             return await _pveClient.Deploy(template);
         }
 
+        public async Task<IEnumerable<Vm>> Deploy(IEnumerable<VmTemplate> templates, bool privileged = false)
+        {
+            var virtualNetworks = templates
+                .SelectMany(t => t.Eth)
+                .Select(eth => eth.Net)
+                .ToArray();
+            var vms = new List<Vm>();
+            var undeployedTemplates = new List<VmTemplate>();
+
+            foreach (var template in templates)
+            {
+                var vm = await Load(template.Name + "#" + template.IsolationTag);
+                if (vm is null)
+                {
+                    _logger.LogDebug("deploy: host " + _options.Host);
+                    NormalizeTemplate(template, Options, privileged);
+                    _logger.LogDebug("deploy: normalized " + template.Name);
+
+                    undeployedTemplates.Add(template);
+                }
+
+                _logger.LogDebug($"deploy (host: {Options.Host}, templates: {undeployedTemplates.Count}): {string.Join(",", undeployedTemplates.Select(t => t.Name).ToArray())}");
+                _logger.LogDebug("deploy: " + template.Name + " " + Options.Host);
+                vms.Add(await _pveClient.Deploy(template));
+            }
+
+            return vms;
+        }
+
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
-            await Task.Delay(0);
-            return new VmOptions
-            {
-                Net = _vlanman.FindNetworks(id)
-            };
+            var hostVnets = await _vlanManager.GetVnets();
+
+            return new VmOptions { Net = hostVnets.Select(n => n.Alias).ToArray() };
         }
 
         public string Version
@@ -93,7 +123,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
         }
 
-        private void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option, bool privileged = false)
+        private async void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option, bool privileged = false)
         {
             if (!template.Iso.HasValue())
             {
@@ -127,17 +157,17 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (template.IsolationTag.HasValue())
             {
                 string tag = "#" + template.IsolationTag;
-
                 Regex rgx = new Regex("#.*");
 
                 if (!template.Name.EndsWith(template.IsolationTag))
                     template.Name = rgx.Replace(template.Name, "") + tag;
 
+                var templateNetworkNames = template.Eth.Select(eth => eth.Net);
+                if (privileged && await _vlanManager.HasNetworks(templateNetworkNames))
+                    return;
+
                 foreach (VmNet eth in template.Eth)
                 {
-                    if (privileged && _vlanman.Contains(eth.Net))
-                        continue;
-
                     eth.Net = rgx.Replace(eth.Net, "") + tag;
                 }
             }
@@ -290,18 +320,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task DeleteAll(string target)
         {
             _logger.LogDebug("deleting all matching " + target);
-            var tasks = new List<Task>();
-            foreach (var vm in await Find(target))
-            {
-                tasks.Add(_pveClient.Delete(vm.Id));
-            }
-
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks.ToArray());
-            }
-
-            await _pveClient.CleanupNetworks(target);
+            await _pveClient.DeleteAll(target);
         }
 
         public async Task<Vm> ChangeState(VmOperation op)

@@ -136,6 +136,5 @@ namespace TopoMojo.Hypervisor.Proxmox
             nets.Sort();
             return nets.ToArray();
         }
-
     }
 }

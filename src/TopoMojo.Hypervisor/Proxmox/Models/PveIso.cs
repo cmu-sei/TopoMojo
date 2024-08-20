@@ -6,7 +6,7 @@ namespace TopoMojo.Hypervisor.Proxmox.Models
         public string Format { get; set; }
         public string Content { get; set; }
         public int Ctime { get; set; }
-        public int Size { get; set; }
+        public long Size { get; set; }
 
         public string Name
         {
