@@ -332,6 +332,16 @@ namespace TopoMojo.Hypervisor.Proxmox
             return vm;
         }
 
+        public async Task<Vm> DeleteTemplate(string templateName)
+        {
+            Vm vm = _vmCache.Where(x => x.Value.Name == templateName).FirstOrDefault().Value;
+
+            if (vm == null)
+                return null;
+
+            return await Delete(vm.Id);
+        }
+
         public async Task<Vm> Delete(string id)
         {
             Result task;
