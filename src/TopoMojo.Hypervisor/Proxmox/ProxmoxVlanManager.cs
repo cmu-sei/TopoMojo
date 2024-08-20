@@ -52,8 +52,10 @@ namespace TopoMojo.Hypervisor.Proxmox
             _vnetOpsPool.Value.MaxTotalDebounce = _hypervisorOptions.Vlan.ResetDebounceMaxDuration;
 
             // cache this - we need this to remain at least long as the maximum possible debounce (if it's defined). If it is, 
-            // add a couple seconds for safety. if not, just double the min debounce. Min cache length is 2 sec
-            _cacheDurationMs = _hypervisorOptions.Vlan.ResetDebounceMaxDuration != null ? Math.Max(_hypervisorOptions.Vlan.ResetDebounceMaxDuration.Value + 2000 : _hypervisorOptions.Vlan.ResetDebounceDuration * 2, 2000);
+            // add a couple seconds for safety. if not, just double the min debounce up to a maximum of two seconds
+            _cacheDurationMs = _hypervisorOptions.Vlan.ResetDebounceMaxDuration != null ?
+                _hypervisorOptions.Vlan.ResetDebounceMaxDuration.Value + 2000 :
+                Math.Max(_hypervisorOptions.Vlan.ResetDebounceDuration * 2, 2000);
         }
 
         private async Task<IEnumerable<PveVnetOperationResult>> DebounceVnetOperations(IEnumerable<PveVnetOperation> requestedOperations)
