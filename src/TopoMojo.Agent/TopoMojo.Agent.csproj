@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.4" />
-    <PackageReference Include="TopoMojo.Api.Client" Version="2.0.7" />
+    <PackageReference Include="TopoMojo.Api.Client" Version="2.3.0-beta1" />
   </ItemGroup>
 
 </Project>
