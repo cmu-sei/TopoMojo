@@ -52,13 +52,16 @@ namespace TopoMojo.Hypervisor.Proxmox
                     continue;
                 }
 
-                var newVnetTag = default(int?);
+                var newVnetTag = createVnet.Tag;
 
-                do
+                if (newVnetTag == null)
                 {
-                    newVnetTag = _random.Next(100, 100000);
+                    do
+                    {
+                        newVnetTag = _random.Next(100, 100000);
+                    }
+                    while (existingNets.Any(n => n.Tag == newVnetTag));
                 }
-                while (existingNets.Any(n => n.Tag == newVnetTag));
 
                 var vnetId = this.GetRandomVnetId();
 
