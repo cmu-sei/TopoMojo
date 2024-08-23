@@ -403,9 +403,9 @@ namespace TopoMojo.Hypervisor.Proxmox
             throw new NotImplementedException();
         }
 
-        public Task DeleteDisks(VmTemplate template)
+        public async Task DeleteDisks(VmTemplate template)
         {
-            return Task.CompletedTask;
+            await _pveClient.DeleteTemplate(template.Template);
         }
 
         public Task<Vm> Answer(string id, VmAnswer answer)
