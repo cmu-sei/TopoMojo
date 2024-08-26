@@ -10,7 +10,6 @@ namespace TopoMojo.Hypervisor.Common
     public sealed class DebouncePool<T>
     {
         private string _id;
-        private readonly object _collectionLock = new object();
         private DateTimeOffsetRange _currentDebounce = null;
         private readonly object _currentDebounceLock = new object();
         private readonly SemaphoreSlim _semaphoreLock = new SemaphoreSlim(1);
@@ -41,12 +40,9 @@ namespace TopoMojo.Hypervisor.Common
         public async Task<DebouncePoolBatch<T>> AddRange(IEnumerable<T> items, CancellationToken cancellationToken)
         {
             // add the item to the collection immediately (independent of debounce settings)
-            lock (_collectionLock)
+            foreach (var item in items.ToArray())
             {
-                foreach (var item in items.ToArray())
-                {
-                    _items.Add(item);
-                }
+                _items.Add(item);
             }
 
             var nowish = DateTimeOffset.UtcNow;
@@ -60,6 +56,7 @@ namespace TopoMojo.Hypervisor.Common
                         Start = nowish,
                         End = nowish.AddMilliseconds(this.DebouncePeriod)
                     };
+
                     _id = Guid.NewGuid().ToString();
                 }
                 else
@@ -67,6 +64,7 @@ namespace TopoMojo.Hypervisor.Common
                     // if there's a current debounce happening, refresh the period length (e.g. if the debounce period is 300ms and an item is added 250ms after the last one,
                     // the debounce timer should reset to 300ms after the second item is added)
                     _currentDebounce.End = nowish.AddMilliseconds(this.DebouncePeriod);
+
                     // BUT if there's a maximum total debounce time, we have to ensure that we don't overflow it, so clamp the value to the maximum remaining if it would
                     if (this.MaxTotalDebounce.HasValue)
                     {
@@ -89,7 +87,14 @@ namespace TopoMojo.Hypervisor.Common
                     int delayLength;
                     do
                     {
-                        delayLength = (int)Math.Ceiling((_currentDebounce.End - DateTimeOffset.UtcNow).TotalMilliseconds);
+
+                        // lock on the current debounce when we read its `.End`, because
+                        // another thread could be writing it (above)
+                        lock (_currentDebounceLock)
+                        {
+                            delayLength = (int)Math.Ceiling((_currentDebounce.End - DateTimeOffset.UtcNow).TotalMilliseconds);
+                        }
+
                         if (delayLength > 0)
                             await Task.Delay(delayLength, cancellationToken);
                     }

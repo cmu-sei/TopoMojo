@@ -48,7 +48,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         //private ConcurrentDictionary<string, VimClient> _hostCache;
         private DateTimeOffset _lastCacheUpdate = DateTimeOffset.MinValue;
         //private Dictionary<string, VimClient> _affinityMap;
-        private ConcurrentDictionary<string, Vm> _vmCache;
+        private readonly ConcurrentDictionary<string, Vm> _vmCache;
         private readonly ProxmoxClient _pveClient;
         private readonly IProxmoxVlanManager _vlanManager;
 
@@ -61,19 +61,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                 return vm;
 
             _logger.LogDebug("deploy: host " + _options.Host);
-
             NormalizeTemplate(template, Options, privileged);
             _logger.LogDebug("deploy: normalized " + template.Name);
-
-            // ensure disks exists
-            // if (template.Disks.Any() && (await VerifyNormalizedDisks(template, host)).Any(i => i < 100))
-            //     throw new Exception("Template disks have not been prepared.");
-
-            // if (!Options.IsNsxNetwork && !Options.Uplink.StartsWith("nsx."))
-            // {
-            //     _logger.LogDebug("deploy: reserve vlans ");
-            //     _vlanman.ReserveVlans(template, Options.IsVCenter);
-            // }
 
             _logger.LogDebug("deploy: " + template.Name + " " + Options.Host);
             return await _pveClient.Deploy(template);
@@ -123,7 +112,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
         }
 
-        private async void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option, bool privileged = false)
+        private void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option, bool privileged = false)
         {
             if (!template.Iso.HasValue())
             {
@@ -156,19 +145,18 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (template.IsolationTag.HasValue())
             {
-                string tag = "#" + template.IsolationTag;
-                Regex rgx = new Regex("#.*");
+                var tag = "#" + template.IsolationTag;
+                var rgx = new Regex("#.*");
 
                 if (!template.Name.EndsWith(template.IsolationTag))
                     template.Name = rgx.Replace(template.Name, "") + tag;
 
-                var templateNetworkNames = template.Eth.Select(eth => eth.Net);
-                if (privileged && await _vlanManager.HasNetworks(templateNetworkNames))
-                    return;
-
-                foreach (VmNet eth in template.Eth)
+                foreach (var requestedNetwork in template.Eth)
                 {
-                    eth.Net = rgx.Replace(eth.Net, "") + tag;
+                    if (privileged && _vlanManager.IsReserved(requestedNetwork.Net))
+                        continue;
+
+                    requestedNetwork.Net = rgx.Replace(requestedNetwork.Net, "") + tag;
                 }
             }
         }
@@ -233,7 +221,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 options.IsoStore += "/";
         }
 
-        public async Task<Vm> Load(string id)
+        public Task<Vm> Load(string id)
         {
             // await Task.Delay(0);
 
@@ -244,7 +232,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             // var vm = await _pveClient.GetVm(id);
 
-            return vm;
+            return Task.FromResult(vm);
         }
 
         private void CheckProgress(Vm vm)
@@ -385,14 +373,14 @@ namespace TopoMojo.Hypervisor.Proxmox
             return vm;
         }
 
-        public async Task<Vm[]> Find(string term)
+        public Task<Vm[]> Find(string term)
         {
             IEnumerable<Vm> q = _vmCache.Values;
 
             if (term.HasValue())
                 q = q.Where(o => o.Id.Contains(term) || o.Name.Contains(term));
 
-            return q.ToArray();
+            return Task.FromResult(q.ToArray());
         }
 
         public async Task<int> CreateDisks(VmTemplate template)
@@ -443,5 +431,4 @@ namespace TopoMojo.Hypervisor.Proxmox
             throw new NotImplementedException();
         }
     }
-
 }
