@@ -1,0 +1,32 @@
+{
+  "$id": "1",
+  "Id": "dcda990e153b46f0a32dc5d26b7add0e",
+  "Name": "Workspace Two for Two",
+  "WhenCreated": "2024-08-27T17:23:57.965921+00:00",
+  "Description": "Second place",
+  "Tags": null,
+  "Author": "me",
+  "Audience": "everyone",
+  "ShareCode": "",
+  "TemplateScope": null,
+  "IsPublished": false,
+  "TemplateLimit": 3,
+  "HostAffinity": false,
+  "UseUplinkSwitch": false,
+  "DurationMinutes": 0,
+  "LaunchCount": 0,
+  "LastActivity": "2024-08-27T17:23:57.965921+00:00",
+  "Challenge": "{\u0022Text\u0022:null,\u0022Score\u0022:0,\u0022LastScoreTime\u0022:\u00220001-01-01T00:00:00\u002B00:00\u0022,\u0022MaxPoints\u0022:0,\u0022MaxAttempts\u0022:0,\u0022CustomizeScript\u0022:null,\u0022GradingScript\u0022:null,\u0022Transforms\u0022:[],\u0022Variants\u0022:[],\u0022Submissions\u0022:[],\u0022Challenge\u0022:null}",
+  "Workers": {
+    "$id": "2",
+    "$values": []
+  },
+  "Gamespaces": {
+    "$id": "3",
+    "$values": []
+  },
+  "Templates": {
+    "$id": "4",
+    "$values": []
+  }
+}
