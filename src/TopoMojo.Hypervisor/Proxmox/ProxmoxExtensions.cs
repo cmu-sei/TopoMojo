@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
-using Corsinvest.ProxmoxVE.Api.Shared.Models.Cluster;
 using Corsinvest.ProxmoxVE.Api.Shared.Models.Node;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -35,6 +35,26 @@ namespace TopoMojo.Hypervisor.Proxmox
             {
                 throw new InvalidOperationException("Unsupported NodeStorageContent type");
             }
+        }
+
+        /// <summary>
+        /// Adds support for the Proxmox hypervisor to Topomojo.
+        /// </summary>
+        /// <param name="services">The app's service collection.</param>
+        /// <param name="random">
+        ///     An instance of Random which will be used across the hypervisor's implementation. Where available,
+        ///     The thread-safe Random.Shared instance is recommended. If no instance is supplied, a default
+        ///     will be created.
+        /// </param>
+        /// <returns></returns>
+        public static IServiceCollection AddProxmoxHypervisor(this IServiceCollection services, Random random = null)
+        {
+            return services
+                .AddSingleton<IHypervisorService, ProxmoxHypervisorService>()
+                .AddSingleton<IProxmoxNameService, ProxmoxNameService>()
+                .AddSingleton<IProxmoxVlanManager, ProxmoxVlanManager>()
+                .AddSingleton<IProxmoxVnetsClient, ProxmoxVnetsClient>()
+                .AddSingleton(_ => random ?? new Random());
         }
     }
 }

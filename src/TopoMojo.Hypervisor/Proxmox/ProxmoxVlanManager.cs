@@ -17,6 +17,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         Task<IEnumerable<PveVnet>> GetVnets();
         bool IsReserved(string networkName);
         Task<IEnumerable<PveVnet>> Provision(IEnumerable<string> vnetNames);
+        string ResolvePveNetName(string topoName);
     }
 
     public class ProxmoxVlanManager : IProxmoxVlanManager
@@ -135,6 +136,9 @@ namespace TopoMojo.Hypervisor.Proxmox
                 .Where(r => pveVnetNames.Contains(r.Vnet.Alias))
                 .Select(r => r.Vnet);
         }
+
+        public string ResolvePveNetName(string topoName)
+            => IsReserved(topoName) ? topoName : _nameService.ToPveName(topoName);
 
         private void Reserve(IEnumerable<Vlan> vlans)
         {
