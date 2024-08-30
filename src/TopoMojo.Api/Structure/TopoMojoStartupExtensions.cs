@@ -139,11 +139,8 @@ namespace Microsoft.Extensions.DependencyInjection
             {
                 if (config.IsProxmox)
                 {
-                    services.AddSingleton<IHypervisorService, TopoMojo.Hypervisor.Proxmox.ProxmoxHypervisorService>();
-                    services.AddSingleton<IProxmoxNameService, ProxmoxNameService>();
-                    services.AddSingleton<IProxmoxVlanManager, ProxmoxVlanManager>();
-                    services.AddSingleton<IProxmoxVnetsClient, ProxmoxVnetsClient>();
-                    services.AddSingleton<Random>(_ => Random.Shared);
+                    // give proxmox Random.Shared since it's not directly available in netstandard2.0
+                    services.AddProxmoxHypervisor(Random.Shared);
                 }
                 else
                 {

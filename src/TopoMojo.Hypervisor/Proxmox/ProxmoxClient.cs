@@ -3,15 +3,16 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Corsinvest.ProxmoxVE.Api;
 using Corsinvest.ProxmoxVE.Api.Extension;
-using System.Threading.Tasks;
 using Corsinvest.ProxmoxVE.Api.Shared.Models.Cluster;
 using Corsinvest.ProxmoxVE.Api.Shared.Models.Vm;
-using System.Net;
-using System.Collections.Generic;
 using TopoMojo.Hypervisor.Proxmox.Models;
 using TopoMojo.Hypervisor.Extensions;
 
@@ -542,6 +543,115 @@ namespace TopoMojo.Hypervisor.Proxmox
             return isos;
         }
 
+        public Task<PveVmConfig> GetVmConfig(Vm vm)
+            => GetVmConfig(vm.Host, vm.GetId());
+
+        public async Task<PveVmConfig> GetVmConfig(string node, long vmId)
+        {
+            var vmConfig = await _pveClient
+                .Nodes[node]
+                .Qemu[vmId]
+                .Config
+                .GetAsync(true);
+
+            var nics = new List<PveNic>();
+
+            // our proxmox package stuffs NIC info into the ExtensionData property of
+            // the config call, so we rely on the fact that (current) proxmox documentation
+            // says that NICs start with "net" and are followed by a number
+            var nicDataRegex = new Regex(@"net(\d)+");
+            var nicModelMacRegex = new Regex(@"(\S+)=([0-9A-F:]+)");
+
+            if (vmConfig.ExtensionData.Any(d => nicDataRegex.IsMatch(d.Key)))
+            {
+                foreach (var extensionItem in vmConfig.ExtensionData)
+                {
+                    var match = nicDataRegex.Match(extensionItem.Key);
+
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out var nicIndex))
+                    {
+                        var modelMacMatch = nicModelMacRegex.Match(extensionItem.Value.ToString());
+
+                        if (modelMacMatch.Success)
+                        {
+                            nics.Add(new PveNic
+                            {
+                                Index = nicIndex,
+                                MacAddress = modelMacMatch.Groups[2].Value,
+                                PveModel = modelMacMatch.Groups[1].Value
+                            });
+                        }
+                    }
+                }
+            }
+
+            return new PveVmConfig
+            {
+                Boot = vmConfig.Boot,
+                Cores = vmConfig.Cores,
+                Cpu = vmConfig.Cpu,
+                Nics = nics,
+                OsType = vmConfig.OsType,
+                MemoryInBytes = vmConfig.Memory,
+                Smbios1 = vmConfig.Smbios1,
+                Sockets = vmConfig.Sockets
+            };
+        }
+
+        public async Task<Vm> PushVmConfigUpdate(long vmId, PveVmUpdateConfig update)
+        {
+            var vm = await _pveClient.GetVmAsync(vmId);
+            var currentConfig = await this.GetVmConfig(vm.Node, vm.VmId);
+
+            // if there are any net assignment updates, we need to resolve their IDs from the names
+            // passed in. We make a new dictionary to hold them rather than mutate the argument.
+            var vnetAssignmentIds = new Dictionary<int, string>();
+
+            if (update.NetAssignments.Any())
+            {
+                var vnets = await _vlanManager.GetVnets();
+
+                foreach (var netUpdate in update.NetAssignments)
+                {
+                    var resolvedName = _vlanManager.ResolvePveNetName(netUpdate.Value);
+                    var vnet = vnets.FirstOrDefault(v => v.Alias == _vlanManager.ResolvePveNetName(netUpdate.Value))
+                        ?? throw new Exception($"Couldn't resolve an ID for virtual network {netUpdate.Value}");
+
+                    var nic = currentConfig.Nics.SingleOrDefault(n => n.Index == netUpdate.Key)
+                        ?? throw new Exception($"Couldn't resolve a NIC on the host machine with index {netUpdate.Key}.");
+
+                    var updateValue = $"{nic.PveModel}={nic.MacAddress},bridge={vnet.Vnet}";
+                    vnetAssignmentIds.Add(netUpdate.Key, updateValue);
+                }
+            }
+
+            var updateTask = await _pveClient
+                .Nodes[vm.Node]
+                .Qemu[vm.VmId]
+                .Config
+                .UpdateVmAsync
+                (
+                    netN: vnetAssignmentIds.Any() ? vnetAssignmentIds : null
+                );
+
+            await this.WaitForTaskToFinish(updateTask);
+
+            if (!updateTask.IsSuccessStatusCode)
+            {
+                throw new Exception($"VM Id {vmId}: failed to push update to the VM. The API returned a failed status code ({updateTask.StatusCode}): {updateTask.ReasonPhrase}");
+            }
+
+            return new Vm
+            {
+                Id = vmId.ToString(),
+                Name = _nameService.ToPveName(vm.Name),
+                State = vm.IsRunning ? VmPowerState.Running : VmPowerState.Off,
+                Status = "deployed",
+                Host = vm.Node,
+                Tags = vm.Tags
+            };
+        }
+
         private async Task<string> GetTargetNode()
         {
             string target = null;
@@ -621,7 +731,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         private int? GetSockets(VmTemplate template)
         {
             string[] p = template.Cpu.Split('x');
-            int sockets = 1;
+            var sockets = 1;
 
             if (!Int32.TryParse(p[0], out sockets))
             {

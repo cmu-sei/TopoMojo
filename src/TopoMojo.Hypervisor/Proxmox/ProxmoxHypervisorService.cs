@@ -346,9 +346,41 @@ namespace TopoMojo.Hypervisor.Proxmox
             return vm;
         }
 
-        public Task<Vm> ChangeConfiguration(string id, VmKeyValue change, bool privileged = false)
+        public async Task<Vm> ChangeConfiguration(string id, VmKeyValue change, bool privileged = false)
         {
-            throw new NotImplementedException();
+            if (!long.TryParse(id, out var vmId))
+            {
+                throw new ArgumentException($"Couldn't parse virtual machine ID to a long.", nameof(id));
+            }
+
+            var configUpdate = new PveVmUpdateConfig();
+
+            switch (change.Key)
+            {
+                case "net":
+                    // for NIC/network changes, the value contains the (topo) name of a virtual network.
+                    // topo may also append a colon and the the zero-based index of the NIC to target, so
+                    // we need to check if we're being asked to target a specific NIC. Defaults to the first
+                    // NIC if not.
+                    var nicIndex = 0;
+                    var delimitedValue = change.Value.Split(':');
+                    var netName = change.Value;
+
+                    if (delimitedValue.Length == 2)
+                    {
+                        if (int.TryParse(delimitedValue[1], out nicIndex))
+                        {
+                            netName = delimitedValue[0];
+                        }
+                    }
+
+                    configUpdate.NetAssignments[nicIndex] = netName.Trim();
+                    break;
+                default:
+                    throw new NotImplementedException($"Updating configuration property '{change.Key}' is not supported on Proxmox.");
+            }
+
+            return await _pveClient.PushVmConfigUpdate(vmId, configUpdate);
         }
 
         public Task SetAffinity(string isolationTag, Vm[] vms, bool start)
