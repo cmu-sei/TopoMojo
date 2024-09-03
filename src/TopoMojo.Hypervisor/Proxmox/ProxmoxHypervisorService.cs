@@ -234,7 +234,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             {
                 vm = new Vm()
                 {
-                    Id = null
+                    Id = null,
+                    HypervisorType = HypervisorType.Proxmox
                 };
             }
 

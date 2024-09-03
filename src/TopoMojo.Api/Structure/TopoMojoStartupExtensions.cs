@@ -137,7 +137,7 @@ namespace Microsoft.Extensions.DependencyInjection
             }
             else
             {
-                if (config.IsProxmox)
+                if (config.HypervisorType == HypervisorType.Proxmox)
                 {
                     // give proxmox Random.Shared since it's not directly available in netstandard2.0
                     services.AddProxmoxHypervisor(Random.Shared);

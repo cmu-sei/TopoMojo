@@ -186,6 +186,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 State = VmPowerState.Off,
                 Status = "deployed",
                 Host = parentTemplate.Host,
+                HypervisorType = HypervisorType.Proxmox
             };
 
             _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
@@ -290,7 +291,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                     Id = nextId,
                     State = VmPowerState.Off,
                     Status = "deployed",
-                    Host = targetNode
+                    Host = targetNode,
+                    HypervisorType = HypervisorType.Proxmox
                 };
 
                 if (vm.Name.Contains("#").Equals(false) || vm.Name.ToTenant() != _config.Tenant)
@@ -393,8 +395,6 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (task.IsSuccessStatusCode)
             {
-                //vm.Status = "created";
-                //vm.Id = null;
                 vm.Status = "initialized";
             }
 
@@ -689,7 +689,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 State = vm.IsRunning ? VmPowerState.Running : VmPowerState.Off,
                 Status = "deployed",
                 Host = vm.Node,
-                Tags = vm.Tags
+                Tags = vm.Tags.Split(' ')
             };
         }
 
@@ -847,12 +847,13 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             Vm vm = new Vm()
             {
-                Name = _nameService.FromPveName(pveVm.Name),
+                Name = pveVm.Name == null ? "" : _nameService.FromPveName(pveVm.Name),
                 Id = pveVm.VmId.ToString(),
                 State = pveVm.IsRunning ? VmPowerState.Running : VmPowerState.Off,
                 Status = "deployed",
                 Host = pveVm.Node,
-                Tags = pveVm.Tags
+                Tags = pveVm.Tags == null ? new string[] { } : pveVm.Tags.Split(' '),
+                HypervisorType = HypervisorType.Proxmox
             };
 
             if (_tasks.ContainsKey(vm.Id))
@@ -917,9 +918,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                     await ReloadVmCache();
                     if (step == 0)
                     {
-                        //await _netman.Clean();
+                        await DeleteUnusedTemplates();
                     }
-
                 }
                 catch (Exception ex)
                 {
@@ -933,6 +933,25 @@ namespace TopoMojo.Hypervisor.Proxmox
                 step = (step + 1) % 2;
             }
             // _logger.LogDebug("sessionMonitor ended.");
+        }
+
+        private async Task DeleteUnusedTemplates()
+        {
+            var tasks = new List<Task>();
+
+            foreach (var taggedVm in _vmCache)
+            {
+                if (taggedVm.Value.Tags.Contains(deleteTag))
+                {
+                    _logger.LogInformation($"Deleting vm with deleteTag: {taggedVm.Value?.Name} ({taggedVm.Key})");
+                    tasks.Add(this.Delete(taggedVm.Key));
+                }
+            }
+
+            if (tasks.Count > 0)
+            {
+                await Task.WhenAll(tasks);
+            }
         }
 
         private async Task MonitorTasks()

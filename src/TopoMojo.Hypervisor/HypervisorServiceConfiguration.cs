@@ -8,7 +8,7 @@ namespace TopoMojo.Hypervisor
     public class HypervisorServiceConfiguration
     {
         public bool IsVCenter { get; set; }
-        public bool IsProxmox { get; set; }
+        public HypervisorType HypervisorType { get; set; }
         public string Type { get; set; }
         public string Url { get; set; }
         public string Host { get; set; }
@@ -61,5 +61,4 @@ namespace TopoMojo.Hypervisor
         public string Name { get; set; }
         public bool OnUplink { get; set; }
     }
-
 }
