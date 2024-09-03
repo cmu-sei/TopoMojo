@@ -16,6 +16,7 @@ using Corsinvest.ProxmoxVE.Api.Shared.Models.Vm;
 using TopoMojo.Hypervisor.Proxmox.Models;
 using TopoMojo.Hypervisor.Extensions;
 using Corsinvest.ProxmoxVE.Api.Shared.Models.Node;
+using System.Text;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -63,7 +64,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         int _taskMonitorInterval = 3000;
         string _hostPrefix = "";
         // DateTimeOffset _lastAction;
-        private readonly PveClient _pveClient;
+        private PveClient _pveClient;
         private readonly Random _random;
         private readonly bool _enableHA = false;
         private readonly Object _lock = new object();
@@ -233,14 +234,24 @@ namespace TopoMojo.Hypervisor.Proxmox
                 var sockets = this.GetSockets(template);
                 var coresPerSocket = this.GetCoresPerSocket(template);
                 var iso = await this.GetIso(template);
+                var args = this.GetArgs(template);
+
+                _pveClient.ApiToken = null;
+                await _pveClient.LoginAsync("root", "");
 
                 task = await vmRef.Config.UpdateVmAsync(
                     netN: nics,
                     memory: memory,
                     sockets: sockets,
                     cores: coresPerSocket,
-                    cdrom: iso);
+                    cdrom: iso,
+                    args: args);
                 await this.WaitForTaskToFinish(task);
+
+                _pveClient = new PveClient(_config.Host, 443)
+                {
+                    ApiToken = _config.Password
+                };
 
                 if (!task.IsSuccessStatusCode)
                 {
@@ -712,6 +723,21 @@ namespace TopoMojo.Hypervisor.Proxmox
             {
                 _logger.LogError(ex, "Error waiting for task to finish");
             }
+        }
+
+        private string GetArgs(VmTemplate template)
+        {
+            if (!template.GuestSettings.Any())
+                return null;
+
+            var args = new StringBuilder();
+
+            foreach (var guestSetting in template.GuestSettings)
+            {
+                args.Append($"-fw_cfg name=opt/{guestSetting.Key},string={guestSetting.Value} ");
+            }
+
+            return args.ToString();
         }
 
         private async Task<string> GetIso(VmTemplate template)
