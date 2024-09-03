@@ -231,11 +231,11 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (task.IsSuccessStatusCode)
             {
                 // Proxmox requires using the root user account directly (not an access token)
-                // for settings the args field to add arbitrary arguments to the QEMU command line. This is currently the only
+                // for setting the args field to add arbitrary arguments to the QEMU command line. This is currently the only
                 // way to set the fw_cfg property that we need for Guest Settings.
                 // A Patch is available to add direct fw_cfg support but has not been merged into a release.
                 // https://bugzilla.proxmox.com/show_bug.cgi?id=4068
-                // If no root password is provided, skip setting args
+                // If no root password is provided, skip setting args.
                 var client = _pveClient;
                 var setGuestSettings = false;
 
