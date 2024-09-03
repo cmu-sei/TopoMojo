@@ -44,8 +44,10 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             _pveClient = new PveClient(options.Host, 443)
             {
-                ApiToken = options.Password
+                ApiToken = options.AccessToken
             };
+
+            _rootPveClient = new PveClient(options.Host, 443);
 
             _nameService = nameService;
             _vlanManager = vnetService;
@@ -65,6 +67,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         string _hostPrefix = "";
         // DateTimeOffset _lastAction;
         private PveClient _pveClient;
+        private PveClient _rootPveClient;
         private readonly Random _random;
         private readonly bool _enableHA = false;
         private readonly Object _lock = new object();
@@ -227,19 +230,45 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (task.IsSuccessStatusCode)
             {
-                var vmRef = _pveClient.Nodes[targetNode].Qemu[nextId];
+                // Proxmox requires using the root user account directly (not an access token)
+                // for settings the args field to add arbitrary arguments to the QEMU command line. This is currently the only
+                // way to set the fw_cfg property that we need for Guest Settings.
+                // A Patch is available to add direct fw_cfg support but has not been merged into a release.
+                // https://bugzilla.proxmox.com/show_bug.cgi?id=4068
+                // If no root password is provided, skip setting args
+                var client = _pveClient;
+                var setGuestSettings = false;
+
+                if (!string.IsNullOrEmpty(_config.Password))
+                {
+                    if (await _rootPveClient.LoginAsync("root", _config.Password))
+                    {
+                        client = _rootPveClient;
+                        setGuestSettings = true;
+                    }
+                    else
+                    {
+                        _logger.LogError("Error logging in with root password. Skipping Guest Settings.");
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug("No root password provided. Skipping Guest Settings");
+                }
 
                 var nics = await this.GetNics(template);
                 var memory = this.GetMemory(template);
                 var sockets = this.GetSockets(template);
                 var coresPerSocket = this.GetCoresPerSocket(template);
                 var iso = await this.GetIso(template);
-                var args = this.GetArgs(template);
+                string args = null;
 
-                _pveClient.ApiToken = null;
-                await _pveClient.LoginAsync("root", "");
+                if (setGuestSettings)
+                {
+                    args = this.GetArgs(template);
+                }
 
-                task = await vmRef.Config.UpdateVmAsync(
+                task = await client.Nodes[targetNode].Qemu[nextId].Config.UpdateVmAsync(
                     netN: nics,
                     memory: memory,
                     sockets: sockets,
@@ -247,11 +276,6 @@ namespace TopoMojo.Hypervisor.Proxmox
                     cdrom: iso,
                     args: args);
                 await this.WaitForTaskToFinish(task);
-
-                _pveClient = new PveClient(_config.Host, 443)
-                {
-                    ApiToken = _config.Password
-                };
 
                 if (!task.IsSuccessStatusCode)
                 {
@@ -284,25 +308,6 @@ namespace TopoMojo.Hypervisor.Proxmox
                     _logger.LogDebug("deploy: start vm...");
                     vm = await Start(vm.Id);
                 }
-
-                // bool ready = false;
-
-                // while (!ready)
-                // {
-                //     var vmList = await _pveClient.GetVmsAsync();
-                //     var pveVm = vmList.Where(x => x.VmId == Int32.Parse(nextId)).FirstOrDefault();
-
-                //     if (pveVm != null && pveVm.Name != null)
-                //     {
-                //         ready = true;
-                //     }
-
-                //     if (!ready)
-                //     {
-                //         Console.WriteLine("Vm not ready, sleeping");
-                //         await Task.Delay(3000);
-                //     }
-                // }
             }
             else
             {

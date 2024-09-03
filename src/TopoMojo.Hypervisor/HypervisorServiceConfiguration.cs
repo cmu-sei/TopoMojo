@@ -14,6 +14,7 @@ namespace TopoMojo.Hypervisor
         public string Host { get; set; }
         public string User { get; set; }
         public string Password { get; set; }
+        public string AccessToken { get; set; }
         public string PoolPath { get; set; }
         public string Uplink { get; set; } = "dvs-topomojo";
         public string VmStore { get; set; } = "[topomojo] _run/";

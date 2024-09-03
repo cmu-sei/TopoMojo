@@ -34,7 +34,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             _logger = logger;
             _pveClient = new PveClient(hypervisorOptions.Host, 443)
             {
-                ApiToken = hypervisorOptions.Password
+                ApiToken = hypervisorOptions.AccessToken
             };
             _random = random;
         }
