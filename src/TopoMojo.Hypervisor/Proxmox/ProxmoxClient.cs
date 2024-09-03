@@ -15,6 +15,7 @@ using Corsinvest.ProxmoxVE.Api.Shared.Models.Cluster;
 using Corsinvest.ProxmoxVE.Api.Shared.Models.Vm;
 using TopoMojo.Hypervisor.Proxmox.Models;
 using TopoMojo.Hypervisor.Extensions;
+using Corsinvest.ProxmoxVE.Api.Shared.Models.Node;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -32,6 +33,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             _logger = logger;
             _config = options;
             _logger.LogDebug($"Constructing Client {_config.Host}");
+            _tasks = new Dictionary<string, PveNodeTask>();
             _vmCache = vmCache;
             _hostPrefix = _config.Host.Split('.').FirstOrDefault();
             _random = random;
@@ -47,16 +49,18 @@ namespace TopoMojo.Hypervisor.Proxmox
             _nameService = nameService;
             _vlanManager = vnetService;
             Task sessionMonitorTask = MonitorSession();
+            Task taskMonitorTask = MonitorTasks();
         }
 
         private readonly ILogger<ProxmoxClient> _logger;
+        Dictionary<string, PveNodeTask> _tasks;
         private ConcurrentDictionary<string, Vm> _vmCache;
         private readonly IProxmoxNameService _nameService;
         private readonly IProxmoxVlanManager _vlanManager;
         private readonly HypervisorServiceConfiguration _config = null;
         // int _pollInterval = 1000;
         int _syncInterval = 30000;
-        // int _taskMonitorInterval = 3000;
+        int _taskMonitorInterval = 3000;
         string _hostPrefix = "";
         // DateTimeOffset _lastAction;
         private readonly PveClient _pveClient;
@@ -126,7 +130,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> CreateTemplate(VmTemplate template)
         {
-            await this.ReloadVmCache();
+            // await this.ReloadVmCache();
 
             var vmTemplate = _vmCache
                 .Where(x => x.Value.Name == template.Template)
@@ -150,12 +154,13 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             var nextId = await GetNextId();
             var pveId = Int32.Parse(nextId);
+            var name = _nameService.ToPveName(template.Template);
 
             // full clone parent template
             var task = await _pveClient.Nodes[parentTemplate.Host].Qemu[parentTemplate.Id].Clone.CloneVm(
                 pveId,
                 full: true,
-                name: _nameService.ToPveName(template.Template),
+                name: name,
                 target: parentTemplate.Host);
             await _pveClient.WaitForTaskToFinishAsync(task);
 
@@ -170,12 +175,18 @@ namespace TopoMojo.Hypervisor.Proxmox
                 throw new Exception(task.ReasonPhrase);
             }
 
-            await this.ReloadVmCache();
+            Vm vm = new Vm()
+            {
+                Name = name,
+                Id = nextId,
+                State = VmPowerState.Off,
+                Status = "deployed",
+                Host = parentTemplate.Host,
+            };
 
-            return _vmCache
-                .Where(x => x.Value.Name == template.Template)
-                .FirstOrDefault()
-                .Value;
+            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
+
+            return vm;
         }
 
         public async Task<Vm> Deploy(VmTemplate template)
@@ -447,6 +458,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> Save(string id)
         {
+            Vm vm = _vmCache[id];
             var pveVms = await _pveClient.GetVmsAsync();
             var pveVm = pveVms.Where(x => x.VmId.ToString() == id).FirstOrDefault();
 
@@ -480,51 +492,64 @@ namespace TopoMojo.Hypervisor.Proxmox
                             // Full Clone vm
                             var nextId = Int32.Parse(await this.GetNextId());
                             var task = await _pveClient.Nodes[pveVm.Node].Qemu[pveVm.VmId].Clone.CloneVm(newid: nextId, full: true, target: template.Node, name: template.Name);
-                            await this.WaitForTaskToFinish(task);
 
-                            if (!task.IsSuccessStatusCode)
-                                throw new Exception($"Clone failed: {task.ReasonPhrase}");
+                            var t = new PveNodeTask { Id = task.Response.data, Action = "saving", WhenCreated = DateTimeOffset.UtcNow };
+                            vm.Task = new VmTask { Name = "saving", WhenCreated = DateTime.UtcNow, Progress = t.Progress };
+                            _tasks.Add(vm.Id, t);
 
-                            // Delete old vm
-                            await this.Delete(id);
-
-                            // Convert to template
-                            task = await _pveClient.Nodes[template.Node].Qemu[nextId].Template.Template();
-                            await this.WaitForTaskToFinish(task);
-
-                            if (!task.IsSuccessStatusCode)
-                                throw new Exception($"Convert to template failed: {task.ReasonPhrase}");
-
-                            // Tag old template
-                            // Janitor will delete anything with this tag if deletion fails now
-                            task = await _pveClient
-                                .Nodes[template.Node]
-                                .Qemu[template.VmId]
-                                .Config
-                                .UpdateVmAsync(tags: deleteTag);
-                            await this.WaitForTaskToFinish(task);
-
-                            if (!task.IsSuccessStatusCode)
-                                throw new Exception($"Rename old template failed: {task.ReasonPhrase}");
-
-                            // delete old template
-                            task = await _pveClient.Nodes[template.Node].Qemu[template.VmId].DestroyVm();
-                            await this.WaitForTaskToFinish(task);
-
-                            if (!task.IsSuccessStatusCode)
-                                throw new Exception($"Delete old template failed: {task.ReasonPhrase}");
-
-                            await this.ReloadVmCache();
+                            _ = CompleteSave(task, id, nextId, template, vm.Id);
                         }
                     }
                 }
             }
 
-            return new Vm
+            return vm;
+        }
+
+        private async Task CompleteSave(Result task, string oldId, int nextId, IClusterResourceVm template, string vmId)
+        {
+            try
             {
-                Status = "initialized",
-                Id = null
-            };
+                await this.WaitForTaskToFinish(task);
+
+                if (!task.IsSuccessStatusCode)
+                    throw new Exception($"Clone failed: {task.ReasonPhrase}");
+
+                // Convert to template
+                task = await _pveClient.Nodes[template.Node].Qemu[nextId].Template.Template();
+                await this.WaitForTaskToFinish(task);
+
+                if (!task.IsSuccessStatusCode)
+                    throw new Exception($"Convert to template failed: {task.ReasonPhrase}");
+
+                // Delete old vm
+                await this.Delete(oldId);
+
+                // Tag old template
+                // Janitor will delete anything with this tag if deletion fails now
+                task = await _pveClient
+                    .Nodes[template.Node]
+                    .Qemu[template.VmId]
+                    .Config
+                    .UpdateVmAsync(tags: deleteTag);
+                await this.WaitForTaskToFinish(task);
+
+                if (!task.IsSuccessStatusCode)
+                    throw new Exception($"Rename old template failed: {task.ReasonPhrase}");
+
+                // delete old template
+                task = await _pveClient.Nodes[template.Node].Qemu[template.VmId].DestroyVm();
+                await this.WaitForTaskToFinish(task);
+
+                if (!task.IsSuccessStatusCode)
+                    throw new Exception($"Delete old template failed: {task.ReasonPhrase}");
+
+                await this.ReloadVmCache();
+            }
+            finally
+            {
+                _tasks.Remove(vmId);
+            }
         }
 
         public async Task<PveIso[]> GetFiles()
@@ -799,6 +824,12 @@ namespace TopoMojo.Hypervisor.Proxmox
                 Tags = pveVm.Tags
             };
 
+            if (_tasks.ContainsKey(vm.Id))
+            {
+                var t = _tasks[vm.Id];
+                vm.Task = new VmTask { Name = t.Action, WhenCreated = t.WhenCreated, Progress = t.Progress };
+            }
+
             if (!pveVm.IsTemplate && vm.Name.Contains("#").Equals(false) || vm.Name.ToTenant() != _config.Tenant)
                 return null;
 
@@ -871,6 +902,70 @@ namespace TopoMojo.Hypervisor.Proxmox
                 step = (step + 1) % 2;
             }
             // _logger.LogDebug("sessionMonitor ended.");
+        }
+
+        private async Task MonitorTasks()
+        {
+            _logger.LogDebug($"{_config.Host}: starting task monitor");
+            while (true)
+            {
+                try
+                {
+                    foreach (string key in _tasks.Keys.ToArray())
+                    {
+                        var t = _tasks[key];
+                        var info = await _pveClient.Nodes[PveClientBase.GetNodeFromTask(t.Id)]
+                            .Tasks[t.Id]
+                            .Status
+                            .ReadTaskStatus();
+
+                        var nodeTask = info.ToModel<NodeTask>();
+
+                        switch (nodeTask.Status)
+                        {
+                            case "running":
+                                var taskLog = await _pveClient
+                                    .Nodes[PveClientBase.GetNodeFromTask(t.Id)]
+                                    .Tasks[t.Id]
+                                    .Log
+                                    .ReadTaskLog(start: t.LastLine);
+
+                                var log = new PveNodeTaskLog(taskLog);
+                                t.SetProgress(log);
+                                break;
+
+                            case "stopped":
+                                t.SetProgress(info);
+                                //_tasks.Remove(key);
+                                break;
+
+                            default:
+                                t.SetProgress(info);
+                                //_tasks.Remove(key);
+                                break;
+                        }
+
+                        if (_vmCache.ContainsKey(key))
+                        {
+                            Vm vm = _vmCache[key];
+                            if (vm.Task == null)
+                                vm.Task = new VmTask();
+                            vm.Task.Progress = t.Progress;
+                            vm.Task.Name = t.Action;
+                            _vmCache.TryUpdate(key, vm, vm);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(0, ex, $"Error in task monitor of {_config.Host}");
+                }
+                finally
+                {
+                    await Task.Delay(_taskMonitorInterval);
+                }
+            }
+            // _logger.LogDebug("taskMonitor ended.");
         }
     }
 }

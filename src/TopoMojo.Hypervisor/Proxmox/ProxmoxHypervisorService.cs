@@ -56,7 +56,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> Deploy(VmTemplate template, bool privileged = false)
         {
-            var vm = await Load(template.Name + "#" + template.IsolationTag);
+            var vm = await LoadVm(template.Name + "#" + template.IsolationTag);
             if (vm != null)
                 return vm;
 
@@ -79,7 +79,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             foreach (var template in templates)
             {
-                var vm = await Load(template.Name + "#" + template.IsolationTag);
+                var vm = await LoadVm(template.Name + "#" + template.IsolationTag);
                 if (vm is null)
                 {
                     _logger.LogDebug("deploy: host " + _options.Host);
@@ -164,7 +164,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<Vm> Delete(string id)
         {
             _logger.LogDebug("deleting " + id);
-            Vm vm = await Load(id);
+            Vm vm = await LoadVm(id);
             return await _pveClient.Delete(vm.Id);
         }
 
@@ -174,7 +174,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             try
             {
-                var vm = await Load(id);
+                var vm = await LoadVm(id);
 
                 info = new VmConsole
                 {
@@ -221,16 +221,22 @@ namespace TopoMojo.Hypervisor.Proxmox
                 options.IsoStore += "/";
         }
 
-        public Task<Vm> Load(string id)
+        public async Task<Vm> Load(string id)
         {
-            // await Task.Delay(0);
+            return await LoadVm(id, false);
+        }
 
+        private Task<Vm> LoadVm(string id, bool returnNull = true)
+        {
             Vm vm = _vmCache.Values.Where(o => o.Id == id || o.Name == id).FirstOrDefault();
 
-            // if (vm != null)
-            //     CheckProgress(vm);
-
-            // var vm = await _pveClient.GetVm(id);
+            if (vm == null && !returnNull)
+            {
+                vm = new Vm()
+                {
+                    Id = null
+                };
+            }
 
             return Task.FromResult(vm);
         }
@@ -254,19 +260,19 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> Start(string id)
         {
-            var vm = await Load(id);
+            var vm = await LoadVm(id);
             return await _pveClient.Start(vm.Id);
         }
 
         public async Task<Vm> Stop(string id)
         {
-            var vm = await Load(id);
+            var vm = await LoadVm(id);
             return await _pveClient.Stop(vm.Id);
         }
 
         public async Task<Vm> Save(string id)
         {
-            var vm = await Load(id);
+            var vm = await LoadVm(id);
             return await _pveClient.Save(vm.Id);
         }
 
@@ -390,16 +396,27 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> Refresh(VmTemplate template)
         {
-            NormalizeTemplate(template, Options, false);
-            var vm = await _pveClient.Refresh(template);
+            string target = template.Name + "#" + template.IsolationTag;
+            var vm = await LoadVm(target);
 
             if (vm == null)
             {
-                vm = new Vm()
+                if (_vmCache.Where(x => x.Value.Name == template.Template).Any())
                 {
-                    Name = template.Name + "#" + template.IsolationTag,
-                    Status = "initialized"
-                };
+                    return new Vm
+                    {
+                        Name = target,
+                        Status = "initialized"
+                    };
+                }
+                else
+                {
+                    return new Vm
+                    {
+                        Name = target,
+                        Status = "created"
+                    };
+                }
             }
 
             return vm;
@@ -422,11 +439,11 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (vm != null)
             {
-                return 100;
+                return 0;
             }
             else
             {
-                return 0;
+                return 100;
             }
         }
 
