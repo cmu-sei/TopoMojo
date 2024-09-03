@@ -23,12 +23,14 @@ namespace TopoMojo.Hypervisor.Proxmox.Models
 
         public void SetProgress(PveNodeTaskLog log)
         {
-            Progress = log.Progress;
-
             // Hack to ensure topo ui keeps polling until task is removed
-            if (Progress > 99)
+            if (log.Progress > 99)
             {
                 Progress = 99;
+            }
+            else
+            {
+                Progress = log.Progress;
             }
 
             var lastEntry = log.Entries.LastOrDefault();

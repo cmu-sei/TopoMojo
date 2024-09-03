@@ -230,11 +230,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             Vm vm = _vmCache.Values.Where(o => o.Id == id || o.Name == id).FirstOrDefault();
 
-            if (vm != null)
-            {
-                //CheckProgress(vm);
-            }
-            else if (!returnNull)
+            if (vm == null && !returnNull)
             {
                 vm = new Vm()
                 {
@@ -369,7 +365,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<Vm> Refresh(VmTemplate template)
         {
             string target = template.Name + "#" + template.IsolationTag;
-            Vm vm = await LoadVm(target);
+            var vm = await LoadVm(target);
 
             if (vm == null)
             {
