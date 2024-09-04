@@ -143,7 +143,7 @@ namespace TopoMojo.Api.Services
 
         }
 
-        public async Task<Tuple<byte[], string>> Download(string[] ids, string src, string zipfolder)
+        public async Task<Tuple<byte[], string>> Download(string[] ids, string src)
         {
             using MemoryStream zipStream = new MemoryStream();
             using (ZipArchive zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
@@ -167,7 +167,8 @@ namespace TopoMojo.Api.Services
 
                 foreach (var topo in list)
                 {
-                    string folder = Path.Combine(dest, topo.Id);
+                    // set destination folder i.e. _export/4e49177c4c684f5088d12d702bbb0d46
+                    string folderInArchive = Path.Combine(dest, topo.Id);
 
                     //write data
                     topo.Workers.Clear();
@@ -180,7 +181,7 @@ namespace TopoMojo.Api.Services
                     }
                     WriteFileToArchive(
                         zipArchive,
-                        Path.Combine(folder, "topo.json"),
+                        Path.Combine(folderInArchive, "topo.json"),
                         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(topo, jsonSerializerSettings)));
 
                     //write disk-list
@@ -200,7 +201,7 @@ namespace TopoMojo.Api.Services
                     {
                         WriteFileToArchive(
                             zipArchive,
-                            Path.Combine(folder, "topo.disks"),
+                            Path.Combine(folderInArchive, "topo.disks"),
                             Encoding.UTF8.GetBytes(string.Join("\n", disks.Distinct()))
                         );
                     }
@@ -216,15 +217,17 @@ namespace TopoMojo.Api.Services
                             {
                                 fileStream.Read(byteArray, 0, byteArray.Length);
                             }
-                            folder = Path.Combine(dest, "_docs");
+                            // set destination folder i.e. _export/_docs
+                            folderInArchive = Path.Combine(dest, "_docs");
                             WriteFileToArchive(
                                 zipArchive,
-                                Path.Combine(folder, Path.GetFileName(filePath)),
+                                Path.Combine(folderInArchive, Path.GetFileName(filePath)),
                                 byteArray);
                             //write supporting files
                             filePath = Path.Combine(docSrc, topo.Id);
                             string[] docFiles = Directory.GetFiles(filePath, "*", SearchOption.TopDirectoryOnly);
-                            folder = Path.Combine(folder, topo.Id);
+                            // set destination folder i.e. _export/_docs/4e49177c4c684f5088d12d702bbb0d46
+                            folderInArchive = Path.Combine(folderInArchive, topo.Id);
                             foreach (var docFile in docFiles)
                             {
                                 byteArray = new byte[(int)new FileInfo(docFile).Length];
@@ -234,7 +237,7 @@ namespace TopoMojo.Api.Services
                                 }
                                 WriteFileToArchive(
                                     zipArchive,
-                                    Path.Combine(folder, Path.GetFileName(docFile)),
+                                    Path.Combine(folderInArchive, Path.GetFileName(docFile)),
                                     byteArray);
                             }
                         }
@@ -245,19 +248,6 @@ namespace TopoMojo.Api.Services
             zipStream.Position = 0;
             return System.Tuple.Create(zipStream.ToArray(), "topo-result-workspaces.zip");
         }
-
-        static void AddTextFile(ZipArchive archive, string entryName, string content)
-        {
-            // Create a new entry in the zip archive
-            ZipArchiveEntry entry = archive.CreateEntry(entryName);
-
-            // Write the content to the zip entry
-            using (StreamWriter writer = new StreamWriter(entry.Open(), Encoding.UTF8))
-            {
-                writer.Write(content);
-            }
-        }
-
 
         public async Task<IEnumerable<string>> Import(string repoPath, string docPath)
         {

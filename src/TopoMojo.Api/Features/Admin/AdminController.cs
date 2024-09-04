@@ -109,7 +109,7 @@ namespace TopoMojo.Api.Controllers
                 _uploadOptions.TopoRoot,
                 "_export"
             );
-            (var byteArray, var fileName) = await _transferSvc.Download(ids, srcPath, destPath);
+            (var byteArray, var fileName) = await _transferSvc.Download(ids, srcPath);
 
             return File(byteArray, "application/zip", fileName);
         }
@@ -120,9 +120,9 @@ namespace TopoMojo.Api.Controllers
         /// <returns></returns>
         [HttpPost("api/admin/upload")]
         [SwaggerOperation(OperationId = "UploadWorkspaces")]
-        public async Task<ActionResult<string[]>> UploadWorkspaces([FromForm] List<IFormFile> forms)
+        public async Task<ActionResult<string[]>> UploadWorkspaces([FromForm] List<IFormFile> files)
         {
-            return Ok(await _transferSvc.Upload(forms));
+            return Ok(await _transferSvc.Upload(files));
         }
 
         /// <summary>
