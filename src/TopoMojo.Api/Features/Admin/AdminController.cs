@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Memory;
@@ -99,7 +100,7 @@ namespace TopoMojo.Api.Controllers
         /// <param name="ids"></param>
         /// <returns></returns>
         [HttpPost("api/admin/download")]
-        [ProducesResponseType(typeof(string[]), 200)]
+        [ProducesResponseType(typeof(FileResult), 200)]
         [SwaggerOperation(OperationId = "DownloadWorkspaces")]
         public async Task<ActionResult> DownloadWorkspaces([FromBody] string[] ids)
         {
@@ -108,23 +109,20 @@ namespace TopoMojo.Api.Controllers
                 _uploadOptions.TopoRoot,
                 "_export"
             );
-            await _transferSvc.Download(ids, srcPath, destPath);
+            (var byteArray, var fileName) = await _transferSvc.Download(ids, srcPath, destPath);
 
-            return Ok();
+            return File(byteArray, "application/zip", fileName);
         }
 
         /// <summary>
         /// Initiate upload process.
         /// </summary>
         /// <returns></returns>
-        [HttpGet("api/admin/upload")]
+        [HttpPost("api/admin/upload")]
         [SwaggerOperation(OperationId = "UploadWorkspaces")]
-        public async Task<ActionResult<string[]>> UploadWorkspaces()
+        public async Task<ActionResult<string[]>> UploadWorkspaces([FromForm] List<IFormFile> forms)
         {
-            return Ok(await _transferSvc.Upload(
-                _uploadOptions.TopoRoot,
-                _uploadOptions.DocRoot
-            ));
+            return Ok(await _transferSvc.Upload(forms));
         }
 
         /// <summary>
