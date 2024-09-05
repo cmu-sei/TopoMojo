@@ -737,12 +737,24 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             var args = new StringBuilder();
 
-            foreach (var guestSetting in template.GuestSettings)
+            // Default settings
+            // TODO: Fix duplication with vsphere?
+            args.Append($"-fw_cfg name=opt/guestinfo.isolationTag,string={template.IsolationTag} ");
+            args.Append($"-fw_cfg name=opt/guestinfo.templateSource,string={template.Id} ");
+            args.Append($"-fw_cfg name=opt/guestinfo.hostname,string={template.Name.Untagged()} ");
+
+            foreach (var setting in template.GuestSettings)
             {
-                args.Append($"-fw_cfg name=opt/{guestSetting.Key},string={guestSetting.Value} ");
+                // TODO: rework this quick fix for injecting isolation specific settings
+                if (setting.Key.StartsWith("iftag.") && !setting.Value.Contains(template.IsolationTag))
+                {
+                    continue;
+                }
+
+                args.Append($"-fw_cfg name=opt/{setting.Key},string={setting.Value} ");
             }
 
-            return args.ToString();
+            return args.ToString().TrimEnd();
         }
 
         private async Task<string> GetIso(VmTemplate template)
