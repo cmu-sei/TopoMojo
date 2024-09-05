@@ -11,7 +11,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing.Constraints;
 using Microsoft.Extensions.Logging;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Extensions;
@@ -323,7 +322,7 @@ namespace TopoMojo.Api.Services
             return results;
         }
 
-        public async Task<IEnumerable<string>> Upload(List<IFormFile> forms)
+        public async Task<IEnumerable<string>> Upload(List<IFormFile> forms, string docPath)
         {
             var results = new List<string>();
             var files = forms.Where(f => f.FileName.EndsWith("topo.json"));
@@ -367,6 +366,42 @@ namespace TopoMojo.Api.Services
 
                     await _workspaceStore.Create(topo);
 
+                    // add the document
+                    var doc = forms.SingleOrDefault(f => f.FileName.EndsWith(topo.Id + ".md"));
+                    if (doc != null)
+                    {
+                        var path = Path.Combine(docPath, topo.Id + ".md");
+                        using (var stream = new FileStream(path, FileMode.Create))
+                        {
+                            await doc.CopyToAsync(stream);
+                        }
+                        // add the supporting files
+                        var searchTerm = $"docs/{topo.Id}/";
+                        var supportingFiles = forms.Where(f => f.FileName.Contains(searchTerm));
+                        if (supportingFiles != null && supportingFiles.Count() > 0)
+                        {
+                            var supportPath = Path.Combine(docPath, topo.Id);
+                            if (!System.IO.Directory.Exists(path) && !System.IO.File.Exists(path))
+                                System.IO.Directory.CreateDirectory(path);
+
+                            foreach (var supportingFile in supportingFiles)
+                            {
+                                int startIndex = supportingFile.Name.IndexOf(searchTerm);
+                                if (startIndex != -1) // substring found
+                                {
+                                    int endIndex = startIndex + searchTerm.Length;
+                                    string filename = supportingFile.Name.Substring(endIndex);
+                                    path = Path.Combine(supportPath, filename);
+                                    using (var stream = new FileStream(path, FileMode.Create))
+                                    {
+                                        await doc.CopyToAsync(stream);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // add success message to the results
                     results.Add($"Success: {topo.Name}");
 
                 }

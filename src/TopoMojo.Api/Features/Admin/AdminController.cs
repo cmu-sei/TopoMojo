@@ -119,10 +119,12 @@ namespace TopoMojo.Api.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost("api/admin/upload")]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(MultipartBodyLengthLimit = Int32.MaxValue, ValueLengthLimit = Int32.MaxValue, ValueCountLimit = Int32.MaxValue)]
         [SwaggerOperation(OperationId = "UploadWorkspaces")]
         public async Task<ActionResult<string[]>> UploadWorkspaces([FromForm] List<IFormFile> files)
         {
-            return Ok(await _transferSvc.Upload(files));
+            return Ok(await _transferSvc.Upload(files, _uploadOptions.DocRoot));
         }
 
         /// <summary>
