@@ -385,43 +385,17 @@ namespace TopoMojo.Hypervisor.Proxmox
             return vm;
         }
 
-        public async Task<Vm> GetVm(string nameOrId)
-        {
-            Vm vm = null;
-
-            try
-            {
-                var pveVm = await _pveClient.GetVmAsync(_nameService.ToPveName(nameOrId));
-
-                vm = new Vm
-                {
-                    Name = _nameService.FromPveName(pveVm.Name),
-                    Id = pveVm.VmId.ToString(),
-                    State = pveVm.IsRunning ? VmPowerState.Running : VmPowerState.Off,
-                    Status = "created"
-                };
-            }
-            catch (Exception)
-            {
-
-            }
-
-            return vm;
-        }
-
         public async Task<Tuple<string, string>> GetTicket(string id)
         {
             string url;
             string ticket;
-            var pveVm = await _pveClient.GetVmAsync(id);
-            var vmRef = _pveClient.Nodes[pveVm.Node].Qemu[id];
+            var vm = _vmCache[id];
 
-            var result = await vmRef.Vncproxy.Vncproxy(websocket: true);
+            var result = await _pveClient.Nodes[vm.Host].Qemu[id].Vncproxy.Vncproxy(websocket: true);
 
             if (result.IsSuccessStatusCode)
             {
-                string urlFragment = $"/api2/json/nodes/{pveVm.Node}/{pveVm.Type.ToString().ToLower()}/{id}/vncwebsocket?port={result.Response.data.port}&vncticket={WebUtility.UrlEncode(result.Response.data.ticket)}";
-
+                string urlFragment = $"/api2/json/nodes/{vm.Host}/qemu/{id}/vncwebsocket?port={result.Response.data.port}&vncticket={WebUtility.UrlEncode(result.Response.data.ticket)}";
                 url = $"wss://{_config.Host}{urlFragment}";
                 ticket = result.Response.data.ticket;
             }
@@ -600,8 +574,8 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> PushVmConfigUpdate(long vmId, PveVmUpdateConfig update)
         {
-            var vm = await _pveClient.GetVmAsync(vmId);
-            var currentConfig = await this.GetVmConfig(vm.Node, vm.VmId);
+            var vm = _vmCache[vmId.ToString()];
+            var currentConfig = await this.GetVmConfig(vm);
 
             // if there are any net assignment updates, we need to resolve their IDs from the names
             // passed in. We make a new dictionary to hold them rather than mutate the argument.
@@ -626,8 +600,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             var updateTask = await _pveClient
-                .Nodes[vm.Node]
-                .Qemu[vm.VmId]
+                .Nodes[vm.Host]
+                .Qemu[vm.Id]
                 .Config
                 .UpdateVmAsync
                 (
@@ -641,15 +615,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 throw new Exception($"VM Id {vmId}: failed to push update to the VM. The API returned a failed status code ({updateTask.StatusCode}): {updateTask.ReasonPhrase}");
             }
 
-            return new Vm
-            {
-                Id = vmId.ToString(),
-                Name = _nameService.ToPveName(vm.Name),
-                State = vm.IsRunning ? VmPowerState.Running : VmPowerState.Off,
-                Status = "deployed",
-                Host = vm.Node,
-                Tags = vm.Tags.Split(' ')
-            };
+            return vm;
         }
 
         private async Task<string> GetTargetNode()
