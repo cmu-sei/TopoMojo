@@ -106,7 +106,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 if (vnet != null)
                 {
                     var deleteTask = await _pveClient.Cluster.Sdn.Vnets[vnet.Vnet].Delete();
-                    await this.WaitForProxmoxTask(deleteTask);
+                    await _pveClient.WaitForTaskToFinish(deleteTask);
 
                     if (deleteTask.IsSuccessStatusCode)
                     {
@@ -130,7 +130,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             foreach (var vnet in vnets.Where(x => x.Alias.Contains(term)))
             {
                 var deleteTask = await _pveClient.Cluster.Sdn.Vnets[vnet.Vnet].Delete();
-                await this.WaitForProxmoxTask(deleteTask);
+                await _pveClient.WaitForTaskToFinish(deleteTask);
 
                 if (deleteTask.IsSuccessStatusCode)
                 {
@@ -144,7 +144,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<IEnumerable<PveVnet>> GetVnets()
         {
             var task = _pveClient.Cluster.Sdn.Vnets.Index().Result;
-            await WaitForProxmoxTask(task);
+            await _pveClient.WaitForTaskToFinish(task);
 
             if (!task.IsSuccessStatusCode)
                 throw new Exception($"Failed to load virtual networks from Proxmox. Status code: {task.StatusCode}");
@@ -155,7 +155,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task ReloadVnets()
         {
             var reloadTask = _pveClient.Cluster.Sdn.Reload().Result;
-            await _pveClient.WaitForTaskToFinishAsync(reloadTask);
+            await _pveClient.WaitForTaskToFinish(reloadTask);
         }
 
         private string GetRandomVnetId()
@@ -169,18 +169,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             return builder.ToString();
-        }
-
-        private async Task WaitForProxmoxTask(Result proxmoxTask)
-        {
-            try
-            {
-                await _pveClient.WaitForTaskToFinishAsync(proxmoxTask);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error waiting for task to finish");
-            }
         }
     }
 }

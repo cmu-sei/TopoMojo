@@ -1,7 +1,13 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Corsinvest.ProxmoxVE.Api;
 using Corsinvest.ProxmoxVE.Api.Shared.Models.Node;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -55,6 +61,58 @@ namespace TopoMojo.Hypervisor.Proxmox
                 .AddSingleton<IProxmoxVlanManager, ProxmoxVlanManager>()
                 .AddSingleton<IProxmoxVnetsClient, ProxmoxVnetsClient>()
                 .AddSingleton(_ => random ?? new Random());
+        }
+
+        /// <summary>
+        /// Wait for task to finish.
+        /// </summary>
+        /// Modification of the Corsinvest implementation that adds additional check
+        /// that the passed in result actually contains a task id to avoid throwing errors.
+        /// https://github.com/Corsinvest/cv4pve-api-dotnet/blob/master/src/Corsinvest.ProxmoxVE.Api/PveClientBase.cs
+        /// TODO: Make PR to their repo
+        /// <param name="client"></param>
+        /// <param name="result">The result representing the task to wait for</param>
+        /// <param name="wait"></param>
+        /// <param name="timeout"></param>
+        /// <returns></returns>
+        public static async Task<bool> WaitForTaskToFinish(this PveClient client, Result result, int wait = 2000, long timeout = 3600 * 1000)
+        => !(result != null &&
+            !result.ResponseInError &&
+            timeout > 0 &&
+            result.ToData() is string &&
+            ((string)result.ToData()).StartsWith("UPID:")) ||
+                await WaitForTaskToFinish(client, result.ToData(), wait, timeout);
+
+        /// <summary>
+        /// Wait for task to finish.
+        /// </summary>
+        /// Modification of Corsinvest implementation that swaps Thread.Sleep with Task.Delay
+        /// and fixes timeout.
+        /// TODO: Make PR to their repo
+        /// <param name="client"></param>
+        /// <param name="task">Task identifier</param>
+        /// <param name="wait">Millisecond wait next check</param>
+        /// <param name="timeout">Millisecond timeout</param>
+        /// <return></return>
+        public static async Task<bool> WaitForTaskToFinish(this PveClient client, string task, int wait = 2000, long timeout = 3600 * 1000)
+        {
+            var isRunning = true;
+            if (wait <= 0) { wait = 500; }
+            if (timeout < wait) { timeout = wait + 5000; }
+
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
+
+            while (isRunning && stopwatch.ElapsedMilliseconds < timeout)
+            {
+                await Task.Delay(wait);
+                isRunning = await client.TaskIsRunningAsync(task);
+            }
+
+            stopwatch.Stop();
+
+            //check timeout
+            return stopwatch.ElapsedMilliseconds < timeout;
         }
     }
 }

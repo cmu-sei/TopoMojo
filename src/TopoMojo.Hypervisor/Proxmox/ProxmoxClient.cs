@@ -166,13 +166,13 @@ namespace TopoMojo.Hypervisor.Proxmox
                 full: true,
                 name: name,
                 target: parentTemplate.Host);
-            await _pveClient.WaitForTaskToFinishAsync(task);
+            await _pveClient.WaitForTaskToFinish(task);
 
             if (task.IsSuccessStatusCode)
             {
                 // convert new vm to template
                 task = await _pveClient.Nodes[parentTemplate.Host].Qemu[nextId].Template.Template();
-                await this.WaitForTaskToFinish(task);
+                await _pveClient.WaitForTaskToFinish(task);
             }
             else
             {
@@ -227,7 +227,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 full: false,
                 name: _nameService.ToPveName(template.Name),
                 target: targetNode);
-            await _pveClient.WaitForTaskToFinishAsync(task);
+            await _pveClient.WaitForTaskToFinish(task);
 
             if (task.IsSuccessStatusCode)
             {
@@ -276,7 +276,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     cores: coresPerSocket,
                     cdrom: iso,
                     args: args);
-                await this.WaitForTaskToFinish(task);
+                await _pveClient.WaitForTaskToFinish(task);
 
                 if (!task.IsSuccessStatusCode)
                 {
@@ -298,7 +298,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 if (vm.Name.Contains("#").Equals(false) || vm.Name.ToTenant() != _config.Tenant)
                     return null;
 
-                _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
+                _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
 
                 if (_enableHA)
                 {
@@ -324,7 +324,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             Vm vm = _vmCache[id];
 
             var task = await _pveClient.Nodes[vm.Host].Qemu[vm.GetId()].Status.Start.VmStart();
-            await this.WaitForTaskToFinish(task);
+            await _pveClient.WaitForTaskToFinish(task);
 
             if (task.IsSuccessStatusCode)
             {
@@ -345,7 +345,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             Vm vm = _vmCache[id];
 
             var task = await _pveClient.Nodes[vm.Host].Qemu[vm.GetId()].Status.Stop.VmStop();
-            await this.WaitForTaskToFinish(task);
+            await _pveClient.WaitForTaskToFinish(task);
 
             if (task.IsSuccessStatusCode)
             {
@@ -381,17 +381,17 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (_enableHA)
             {
                 task = await _pveClient.Cluster.Ha.Resources[pveId].Delete();
-                await this.WaitForTaskToFinish(task);
+                await _pveClient.WaitForTaskToFinish(task);
             }
 
             if (status.IsRunning)
             {
                 task = await _pveClient.ChangeStatusVmAsync(pveId, VmStatus.Stop);
-                await this.WaitForTaskToFinish(task);
+                await _pveClient.WaitForTaskToFinish(task);
             }
 
             task = await _pveClient.Nodes[vm.Host].Qemu[id].DestroyVm();
-            await this.WaitForTaskToFinish(task);
+            await _pveClient.WaitForTaskToFinish(task);
 
             if (task.IsSuccessStatusCode)
             {
@@ -526,14 +526,14 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             try
             {
-                await this.WaitForTaskToFinish(task);
+                await _pveClient.WaitForTaskToFinish(task);
 
                 if (!task.IsSuccessStatusCode)
                     throw new Exception($"Clone failed: {task.ReasonPhrase}");
 
                 // Convert to template
                 task = await _pveClient.Nodes[template.Node].Qemu[nextId].Template.Template();
-                await this.WaitForTaskToFinish(task);
+                await _pveClient.WaitForTaskToFinish(task);
 
                 if (!task.IsSuccessStatusCode)
                     throw new Exception($"Convert to template failed: {task.ReasonPhrase}");
@@ -548,14 +548,14 @@ namespace TopoMojo.Hypervisor.Proxmox
                     .Qemu[template.VmId]
                     .Config
                     .UpdateVmAsync(tags: deleteTag);
-                await this.WaitForTaskToFinish(task);
+                await _pveClient.WaitForTaskToFinish(task);
 
                 if (!task.IsSuccessStatusCode)
                     throw new Exception($"Rename old template failed: {task.ReasonPhrase}");
 
                 // delete old template
                 task = await _pveClient.Nodes[template.Node].Qemu[template.VmId].DestroyVm();
-                await this.WaitForTaskToFinish(task);
+                await _pveClient.WaitForTaskToFinish(task);
 
                 if (!task.IsSuccessStatusCode)
                     throw new Exception($"Delete old template failed: {task.ReasonPhrase}");
@@ -577,7 +577,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 .Storage[_config.IsoStore]
                 .Content
                 .Index(content: "iso");
-            await this.WaitForTaskToFinish(task);
+            await _pveClient.WaitForTaskToFinish(task);
 
             var isos = task.ToModel<PveIso[]>();
 
@@ -675,7 +675,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     netN: vnetAssignmentIds.Any() ? vnetAssignmentIds : null
                 );
 
-            await this.WaitForTaskToFinish(updateTask);
+            await _pveClient.WaitForTaskToFinish(updateTask);
 
             if (!updateTask.IsSuccessStatusCode)
             {
@@ -716,18 +716,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             var nodes = await _pveClient.GetNodesAsync();
             var randomNum = _random.Next(0, nodes.Count() - 1);
             return nodes.ElementAt(randomNum).Node;
-        }
-
-        private async Task WaitForTaskToFinish(Result task)
-        {
-            try
-            {
-                await _pveClient.WaitForTaskToFinishAsync(task);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error waiting for task to finish");
-            }
         }
 
         private string GetArgs(VmTemplate template)
@@ -838,7 +826,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             Result task;
 
             task = _pveClient.Cluster.Sdn.Vnets.Index().Result;
-            await this.WaitForTaskToFinish(task);
+            await _pveClient.WaitForTaskToFinish(task);
             var vnets = task.ToModel<PveVnet[]>();
 
             for (int i = 0; i < template.Eth.Length; i++)
