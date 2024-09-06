@@ -560,7 +560,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             // the config call, so we rely on the fact that (current) proxmox documentation
             // says that NICs start with "net" and are followed by a number
             var nicDataRegex = new Regex(@"net(\d)+");
-            var nicModelMacRegex = new Regex(@"(\S+)=([0-9A-F:]+)");
+            var nicModelMacRegex = new Regex(@"(?<model>[^=]+)=(?<mac>[0-9A-Fa-f:]{17})");
 
             if (vmConfig.ExtensionData.Any(d => nicDataRegex.IsMatch(d.Key)))
             {
@@ -577,8 +577,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                             nics.Add(new PveNic
                             {
                                 Index = nicIndex,
-                                MacAddress = modelMacMatch.Groups[2].Value,
-                                PveModel = modelMacMatch.Groups[1].Value
+                                MacAddress = modelMacMatch.Groups["mac"].Value,
+                                PveModel = modelMacMatch.Groups["model"].Value
                             });
                         }
                     }
