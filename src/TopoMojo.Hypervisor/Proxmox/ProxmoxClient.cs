@@ -398,7 +398,10 @@ namespace TopoMojo.Hypervisor.Proxmox
                 vm.Status = "initialized";
             }
 
-            _vmCache.TryRemove(vm.Id, out vm);
+            // Don't set vm to the result here, because if we get unlucky and the sync task removed
+            // this vm from the cache first, we'll get a null value, which will cause errors in the
+            // calling method
+            _vmCache.TryRemove(vm.Id, out _);
 
             return vm;
         }
@@ -862,10 +865,13 @@ namespace TopoMojo.Hypervisor.Proxmox
                 vm.Task = new VmTask { Name = t.Action, WhenCreated = t.WhenCreated, Progress = t.Progress };
             }
 
-            if (!pveVm.IsTemplate && vm.Name.Contains("#").Equals(false) || vm.Name.ToTenant() != _config.Tenant)
+            // Proxmox Vm names are null for a few seconds when first deployed.
+            // We still want to add to cache when in this state.
+            if (!pveVm.IsTemplate && !string.IsNullOrEmpty(vm.Name) && vm.Name.Contains("#").Equals(false) ||
+                vm.Name.ToTenant() != _config.Tenant)
                 return null;
 
-            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
+            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
 
             return vm;
         }
