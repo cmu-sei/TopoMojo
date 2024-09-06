@@ -73,27 +73,6 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly Object _lock = new object();
         private const string deleteTag = "delete"; // tags are always lower-case
 
-        public async Task DeleteAll(string term)
-        {
-            var tasks = new List<Task>();
-            var pveVms = await _pveClient.GetVmsAsync();
-
-            foreach (var pveVm in pveVms)
-            {
-                if (pveVm.Name.Contains(term))
-                {
-                    tasks.Add(this.Delete(pveVm.VmId.ToString()));
-                }
-            }
-
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks);
-            }
-
-            await _vlanManager.DeleteVnetsByTerm(term);
-        }
-
         public async Task<Vm> Refresh(VmTemplate template)
         {
             string target = template.Name + "#" + template.IsolationTag;
@@ -454,39 +433,16 @@ namespace TopoMojo.Hypervisor.Proxmox
             return new Tuple<string, string>(url, ticket);
         }
 
-        public async Task<Vm[]> Find(string term)
-        {
-            var vms = new List<Vm>();
-            var pveVms = await _pveClient.GetVmsAsync();
-
-            foreach (var pveVm in pveVms)
-            {
-                if (pveVm.Name != null && pveVm.Name.Contains(term))
-                {
-                    vms.Add(new Vm
-                    {
-                        Name = _nameService.FromPveName(pveVm.Name),
-                        Id = pveVm.VmId.ToString(),
-                        State = pveVm.IsRunning ? VmPowerState.Running : VmPowerState.Off,
-                    });
-                }
-            }
-
-            return vms.ToArray();
-        }
-
         public async Task<Vm> Save(string id)
         {
             Vm vm = _vmCache[id];
-            var pveVms = await _pveClient.GetVmsAsync();
-            var pveVm = pveVms.Where(x => x.VmId.ToString() == id).FirstOrDefault();
 
-            if (pveVm != null)
+            if (vm != null)
             {
-                var config = await _pveClient.Nodes[pveVm.Node].Qemu[pveVm.VmId].Config.GetAsync();
+                var config = await _pveClient.Nodes[vm.Host].Qemu[vm.Id].Config.GetAsync();
 
                 var disk = config.Disks.ElementAt(0);
-                var storageItems = await _pveClient.Nodes[pveVm.Node].Storage[disk.Storage].Content.GetAsync();
+                var storageItems = await _pveClient.Nodes[vm.Host].Storage[disk.Storage].Content.GetAsync();
 
                 var pveDisk = storageItems.Where(x => disk.FileName == x.FileName).FirstOrDefault();
 
@@ -504,13 +460,13 @@ namespace TopoMojo.Hypervisor.Proxmox
                             throw new InvalidOperationException("Base Template is in use");
                         }
 
-                        var template = pveVms.Where(x => x.VmId == parent.VmId).FirstOrDefault();
+                        var template = _vmCache[parent.VmId.ToString()];
 
-                        if (template != null && template.IsTemplate)
+                        if (template != null)
                         {
                             // Full Clone vm
                             var nextId = Int32.Parse(await this.GetNextId());
-                            var task = await _pveClient.Nodes[pveVm.Node].Qemu[pveVm.VmId].Clone.CloneVm(newid: nextId, full: true, target: template.Node, name: template.Name);
+                            var task = await _pveClient.Nodes[vm.Host].Qemu[vm.Id].Clone.CloneVm(newid: nextId, full: true, target: template.Host, name: template.Name);
 
                             var t = new PveNodeTask { Id = task.Response.data, Action = "saving", WhenCreated = DateTimeOffset.UtcNow };
                             vm.Task = new VmTask { Name = "saving", WhenCreated = DateTime.UtcNow, Progress = t.Progress };
@@ -525,7 +481,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             return vm;
         }
 
-        private async Task CompleteSave(Result task, string oldId, int nextId, IClusterResourceVm template, string vmId)
+        private async Task CompleteSave(Result task, string oldId, int nextId, Vm template, string vmId)
         {
             try
             {
@@ -535,7 +491,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     throw new Exception($"Clone failed: {task.ReasonPhrase}");
 
                 // Convert to template
-                task = await _pveClient.Nodes[template.Node].Qemu[nextId].Template.Template();
+                task = await _pveClient.Nodes[template.Host].Qemu[nextId].Template.Template();
                 await _pveClient.WaitForTaskToFinish(task);
 
                 if (!task.IsSuccessStatusCode)
@@ -547,8 +503,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                 // Tag old template
                 // Janitor will delete anything with this tag if deletion fails now
                 task = await _pveClient
-                    .Nodes[template.Node]
-                    .Qemu[template.VmId]
+                    .Nodes[template.Host]
+                    .Qemu[template.Id]
                     .Config
                     .UpdateVmAsync(tags: deleteTag);
                 await _pveClient.WaitForTaskToFinish(task);
@@ -557,7 +513,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     throw new Exception($"Rename old template failed: {task.ReasonPhrase}");
 
                 // delete old template
-                task = await _pveClient.Nodes[template.Node].Qemu[template.VmId].DestroyVm();
+                task = await _pveClient.Nodes[template.Host].Qemu[template.Id].DestroyVm();
                 await _pveClient.WaitForTaskToFinish(task);
 
                 if (!task.IsSuccessStatusCode)
