@@ -326,6 +326,11 @@ namespace TopoMojo.Api.Services
         {
             var results = new List<string>();
             var files = forms.Where(f => f.FileName.EndsWith("topo.json"));
+            var newWorkspaces = new List<Data.Workspace>();
+            var newTemplates = new List<Data.Template>();
+            var existingTemplateIds = _templateStore.List().Select(m => m.Id).ToList();
+            var existingWorkspaceIds = _workspaceStore.List().Select(m => m.Id).ToList();
+            //create the workspaces
             foreach (IFormFile file in files)
             {
                 try
@@ -337,60 +342,68 @@ namespace TopoMojo.Api.Services
                         topoJson = reader.ReadToEnd();
                     }
                     var topo = JsonSerializer.Deserialize<Data.Workspace>(topoJson, jsonSerializerSettings);
+                    var topoId = topo.Id.Trim();
                     _logger.LogInformation("Importing topo from {0}", file.FileName);
 
                     //enforce uniqueness :(
-                    var found = await _workspaceStore.Retrieve(topo.Id);
+                    var found = await _workspaceStore.Retrieve(topoId);
 
                     if (found != null)
                         continue;
 
-                    // map parentid to new parentId
+                    // get list of new templates
                     foreach (var template in topo.Templates)
                     {
-                        if (template.Parent != null)
+                        // recursively add templates and parents
+                        var addedTemplates = AddTemplate(template);
+                        foreach (var tmp in addedTemplates)
                         {
-                            var pt = await _templateStore.Retrieve(template.Parent.Id);
-
-                            if (pt == null)
+                            if (!existingTemplateIds.Contains(tmp.Id))
                             {
-                                template.ParentId = null;
-                                template.WorkspaceId = null;
-                                pt = await _templateStore.Create(template.Parent);
+                                tmp.Parent = null;
+                                tmp.Workspace = null;
+                                newTemplates.Add(tmp);
+                                existingTemplateIds.Add(tmp.Id);
                             }
-
-                            template.ParentId = pt.Id;
-                            template.Parent = null;
                         }
                     }
-
-                    await _workspaceStore.Create(topo);
+                    topo.Templates.Clear();
+                    // get list of new workspaces
+                    if (!existingWorkspaceIds.Contains(topoId))
+                    {
+                        if (topoId == "003aff045a0b4c58a9619e057343e80b")
+                        {
+                            var x = 12;
+                        }
+                        newWorkspaces.Add(topo);
+                        existingWorkspaceIds.Add(topoId);
+                    }
 
                     // add the document
-                    var doc = forms.SingleOrDefault(f => f.FileName.EndsWith(topo.Id + ".md"));
+                    var doc = forms.SingleOrDefault(f => f.FileName.EndsWith(topoId + ".md"));
                     if (doc != null)
                     {
-                        var path = Path.Combine(docPath, topo.Id + ".md");
+                        var path = Path.Combine(docPath, topoId + ".md");
                         using (var stream = new FileStream(path, FileMode.Create))
                         {
                             await doc.CopyToAsync(stream);
                         }
                         // add the supporting files
-                        var searchTerm = $"docs/{topo.Id}/";
+                        var searchTerm = $"docs/{topoId}/";
                         var supportingFiles = forms.Where(f => f.FileName.Contains(searchTerm));
                         if (supportingFiles != null && supportingFiles.Count() > 0)
                         {
-                            var supportPath = Path.Combine(docPath, topo.Id);
-                            if (!System.IO.Directory.Exists(path) && !System.IO.File.Exists(path))
-                                System.IO.Directory.CreateDirectory(path);
+                            var supportPath = Path.Combine(docPath, topoId);
+                            if (!System.IO.Directory.Exists(supportPath))
+                                System.IO.Directory.CreateDirectory(supportPath);
 
                             foreach (var supportingFile in supportingFiles)
                             {
-                                int startIndex = supportingFile.Name.IndexOf(searchTerm);
+                                int startIndex = supportingFile.FileName.IndexOf(searchTerm);
                                 if (startIndex != -1) // substring found
                                 {
                                     int endIndex = startIndex + searchTerm.Length;
-                                    string filename = supportingFile.Name.Substring(endIndex);
+                                    string filename = supportingFile.FileName.Substring(endIndex);
                                     path = Path.Combine(supportPath, filename);
                                     using (var stream = new FileStream(path, FileMode.Create))
                                     {
@@ -413,7 +426,34 @@ namespace TopoMojo.Api.Services
                 }
             }
 
+            //add the new workspaces
+            if (newWorkspaces.Count() > 0)
+            {
+                await _workspaceStore.Create(newWorkspaces);
+            }
+
+            //add the new templates
+            if (newTemplates.Count() > 0)
+            {
+                await _templateStore.Create(newTemplates);
+            }
+
             return results;
+        }
+
+        private List<Data.Template> AddTemplate(Data.Template template)
+        {
+            var addedTemplates = new List<Data.Template>();
+            if (template.Parent == null)
+            {
+                addedTemplates.Add(template);
+            }
+            else
+            {
+                addedTemplates.AddRange(AddTemplate(template.Parent));
+            }
+
+            return addedTemplates;
         }
 
         private void CopyFile(string src, string dest, bool deleteSource = false)
