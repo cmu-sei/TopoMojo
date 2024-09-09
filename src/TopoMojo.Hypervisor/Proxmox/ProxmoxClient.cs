@@ -749,7 +749,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             Result task;
 
-            task = _pveClient.Cluster.Sdn.Vnets.Index().Result;
+            task = await _pveClient.Cluster.Sdn.Vnets.Index();
             await _pveClient.WaitForTaskToFinish(task);
             var vnets = task.ToModel<PveVnet[]>();
 

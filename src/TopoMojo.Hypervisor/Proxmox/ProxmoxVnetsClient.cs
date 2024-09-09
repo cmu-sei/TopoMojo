@@ -66,13 +66,13 @@ namespace TopoMojo.Hypervisor.Proxmox
                 var vnetId = this.GetRandomVnetId();
 
                 // check for existence of alias = vnetname--gamespaceid
-                var createTask = _pveClient.Cluster.Sdn.Vnets.Create
+                var createTask = await _pveClient.Cluster.Sdn.Vnets.Create
                 (
                     vnet: vnetId,
                     tag: newVnetTag,
                     zone: createVnet.Zone,
                     alias: createVnet.Alias
-                ).Result;
+                );
 
                 if (createTask.IsSuccessStatusCode)
                 {
@@ -143,7 +143,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<IEnumerable<PveVnet>> GetVnets()
         {
-            var task = _pveClient.Cluster.Sdn.Vnets.Index().Result;
+            var task = await _pveClient.Cluster.Sdn.Vnets.Index();
             await _pveClient.WaitForTaskToFinish(task);
 
             if (!task.IsSuccessStatusCode)
@@ -154,14 +154,14 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task ReloadVnets()
         {
-            var reloadTask = _pveClient.Cluster.Sdn.Reload().Result;
+            var reloadTask = await _pveClient.Cluster.Sdn.Reload();
             await _pveClient.WaitForTaskToFinish(reloadTask);
         }
 
         private string GetRandomVnetId()
         {
             var builder = new StringBuilder();
-            var _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
+            var _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
 
             for (int i = 0; i <= 7; i++)
             {
