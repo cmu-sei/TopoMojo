@@ -144,6 +144,11 @@ namespace TopoMojo.Api.Services
 
         public async Task<Tuple<byte[], string>> Download(string[] ids, string src)
         {
+            // check if ALL worspaces were requested
+            if (ids.Count() == 1 && ids[0].ToLower() == "all")
+            {
+                ids = _workspaceStore.List().Select(w => w.Id).ToArray();
+            }
             using MemoryStream zipStream = new MemoryStream();
             using (ZipArchive zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
             {
@@ -324,6 +329,11 @@ namespace TopoMojo.Api.Services
 
         public async Task<IEnumerable<string>> Upload(List<IFormFile> forms, string docPath)
         {
+            // if a single zip file, extract all of the files contained in it
+            if (forms.Count == 1 && forms[0].FileName.ToLower().EndsWith(".zip"))
+            {
+                forms = ExtractFilesFromZip(forms[0]);
+            }
             var results = new List<string>();
             var files = forms.Where(f => f.FileName.EndsWith("topo.json"));
             var newWorkspaces = new List<Data.Workspace>();
@@ -494,6 +504,30 @@ namespace TopoMojo.Api.Services
             {
                 entryStream.Write(contentBytes, 0, contentBytes.Length);
             }
+        }
+
+        private List<IFormFile> ExtractFilesFromZip(IFormFile zipFile)
+        {
+            var formFiles = new List<IFormFile>();
+
+            using (var zipArchiveStream = zipFile.OpenReadStream())
+            using (var zipArchive = new ZipArchive(zipArchiveStream, ZipArchiveMode.Read))
+            {
+                // Iterate through the entries in the ZIP archive
+                foreach (var entry in zipArchive.Entries)
+                {
+                    // Check if the entry is a file (not a directory)
+                    if (entry.Length > 0 && !entry.FullName.EndsWith("/"))
+                    {
+                        // Extract the file as an IFormFile
+                        var fileBytes = new byte[entry.Length];
+                        entry.Open().Read(fileBytes, 0, (int)entry.Length);
+                        var formFile = new FormFile(new MemoryStream(fileBytes), 0, entry.Length, entry.Name, entry.FullName);
+                        formFiles.Add(formFile);
+                    }
+                }
+            }
+            return formFiles;
         }
 
     }
