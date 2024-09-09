@@ -96,6 +96,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<IEnumerable<PveVnet>> DeleteVnets(IEnumerable<string> aliases)
         {
+            _logger.LogDebug($"Deleting vnets: {string.Join(",", aliases)}");
             var vnets = await this.GetVnets();
             var deletedPveNets = new List<PveVnet>();
 
@@ -161,7 +162,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         private string GetRandomVnetId()
         {
             var builder = new StringBuilder();
-            var _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
+            var _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
 
             for (int i = 0; i <= 7; i++)
             {

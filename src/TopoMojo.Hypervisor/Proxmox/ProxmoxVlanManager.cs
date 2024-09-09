@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -6,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using TopoMojo.Hypervisor.Common;
+using TopoMojo.Hypervisor.Extensions;
 using TopoMojo.Hypervisor.Proxmox.Models;
 
 namespace TopoMojo.Hypervisor.Proxmox
@@ -18,6 +20,8 @@ namespace TopoMojo.Hypervisor.Proxmox
         bool IsReserved(string networkName);
         Task<IEnumerable<PveVnet>> Provision(IEnumerable<string> vnetNames);
         string ResolvePveNetName(string topoName);
+        Task Clean(ConcurrentDictionary<string, Vm> vmCache, string tag = null);
+        Task Initialize();
     }
 
     public class ProxmoxVlanManager : IProxmoxVlanManager
@@ -32,6 +36,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly static Lazy<DebouncePool<PveVnetOperation>> _vnetOpsPool = new Lazy<DebouncePool<PveVnetOperation>>(() => new DebouncePool<PveVnetOperation>());
         private readonly static IMemoryCache _recentVnetOpsCache = new MemoryCache(new MemoryCacheOptions { });
         private readonly static IDictionary<string, int> _reservedVnetIds = new Dictionary<string, int>();
+        private readonly static IMemoryCache _recentVnetCache = new MemoryCache(new MemoryCacheOptions { });
 
         private readonly int _cacheDurationMs;
         private readonly HypervisorServiceConfiguration _hypervisorOptions;
@@ -68,7 +73,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<IEnumerable<PveVnet>> DeleteVnets(IEnumerable<string> vnetNames)
         {
-            _logger.LogDebug($"Deleting vnets: {string.Join(",", vnetNames)}");
+            _logger.LogDebug($"Requested to delete vnets: {string.Join(",", vnetNames)}");
             vnetNames = vnetNames
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .Distinct();
@@ -140,6 +145,60 @@ namespace TopoMojo.Hypervisor.Proxmox
         public string ResolvePveNetName(string topoName)
             => IsReserved(topoName) ? topoName : _nameService.ToPveName(topoName);
 
+        public async Task Initialize()
+        {
+            _logger.LogDebug($"initializing nets");
+
+            var vnets = await _vnetsApi.GetVnets();
+
+            foreach (var vnet in vnets)
+            {
+                _logger.LogDebug($"Adding to recent vnet cache: {vnet.Alias}");
+                AddToRecentCache(vnet);
+            }
+        }
+
+        public async Task Clean(ConcurrentDictionary<string, Vm> vmCache, string tag = null)
+        {
+            _logger.LogDebug($"cleaning nets [{tag}]");
+
+            var vnets = await _vnetsApi.GetVnets();
+            var vnetsToDelete = new List<string>();
+
+            if (!string.IsNullOrEmpty(tag))
+            {
+                vnets = vnets.Where(x => _nameService.FromPveName(x.Alias).Tag() == tag);
+            }
+
+            // exclude non-tagged
+            vnets = vnets.Where(x => _nameService.FromPveName(x.Alias).Contains('#'));
+
+            // find portgroups with no associated vm's
+            foreach (var vnet in vnets)
+            {
+                string id = _nameService.FromPveName(vnet.Alias).Tag();
+
+                // if vm's still exist, skip
+                if (!vmCache.Values.Any(v => _nameService.FromPveName(v.Name).Tag() == id))
+                {
+                    vnetsToDelete.Add(vnet.Alias);
+                }
+            }
+
+            await DeleteVnets(vnetsToDelete);
+        }
+
+        private void AddToRecentCache(PveVnet vnet)
+        {
+            _recentVnetCache.Set(
+                vnet.Alias,
+                vnet.Vnet,
+                new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
+                });
+        }
+
         private void Reserve(IEnumerable<Vlan> vlans)
         {
             var vlanNames = vlans.Select(v => v.Name).Distinct().ToArray();
@@ -188,6 +247,12 @@ namespace TopoMojo.Hypervisor.Proxmox
                         Tag = _reservedVnetIds.TryGetValue(n.NetworkName, out var reservedId) ? reservedId : default(int?)
                     }));
 
+                    // Add created vnets to recent cache
+                    foreach (var vnet in deployedVnets)
+                    {
+                        AddToRecentCache(vnet);
+                    }
+
                     results.AddRange(deployedVnets.Select(v => new PveVnetOperationResult
                     {
                         NetName = _nameService.FromPveName(v.Alias),
@@ -198,7 +263,14 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                 if (vnetsToDelete.Any())
                 {
-                    var vnetNamesToDelete = vnetsToDelete.Select(n => _nameService.ToPveName(n.NetworkName));
+                    // Only delete vnets that haven't been created recently to avoid accidentally deleting
+                    // a vnet that is in use. Also, don't delete a vnet if we created it in this batch
+                    var vnetNamesToDelete = vnetsToDelete
+                        .Select(n => _nameService.ToPveName(n.NetworkName))
+                        .Where(x =>
+                            !vnetsToCreate.Any(y => y.NetworkName == x) &&
+                            !_recentVnetCache.TryGetValue(x, out _));
+
                     var deletedVnets = await _vnetsApi.DeleteVnets(vnetNamesToDelete);
 
                     foreach (var deletedVnet in deletedVnets)
@@ -216,10 +288,11 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                 _logger.LogDebug($"Batch {debouncedOperations.Id} results: {string.Join(",", results)}");
 
-                if (results.Any())
+                if (results.Any(x => x.Type == PveVnetOperationType.Create))
                 {
                     // because we're allowing creates/deletes in the same debounce pool and trying to minimize reload calls,
                     // we manually reload proxmox's vnets at the end of the batch
+                    // skip reload if only delete operations - we'll catch them on the next reload
                     await _vnetsApi.ReloadVnets();
 
                     // cache the id of the debounce batch we just handled (so later callers won't try to recreate/redelete the vnets)

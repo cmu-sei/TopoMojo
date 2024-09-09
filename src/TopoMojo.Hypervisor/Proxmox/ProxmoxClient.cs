@@ -844,6 +844,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         private async Task MonitorSession()
         {
             _logger.LogDebug($"{_config.Host}: starting cache loop");
+            await _vlanManager.Initialize();
             int step = 0;
 
             while (true)
@@ -853,6 +854,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     await ReloadVmCache();
                     if (step == 0)
                     {
+                        await _vlanManager.Clean(_vmCache);
                         await DeleteUnusedTemplates();
                     }
                 }

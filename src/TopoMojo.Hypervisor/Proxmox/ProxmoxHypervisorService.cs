@@ -326,8 +326,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             {
                 await Task.WhenAll(tasks);
             }
-
-            await _vlanManager.DeleteVnetsByTerm(target);
         }
 
         public async Task<Vm> ChangeState(VmOperation op)
