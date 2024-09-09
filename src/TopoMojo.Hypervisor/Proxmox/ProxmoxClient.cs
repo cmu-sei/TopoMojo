@@ -761,7 +761,15 @@ namespace TopoMojo.Hypervisor.Proxmox
                 var vnet = vnets.Where(x => x.Alias == _nameService.ToPveName(eth.Net)).FirstOrDefault();
                 if (vnet != null)
                 {
-                    nics.Add(i, $"bridge={vnet.Vnet}");
+                    var netString = new StringBuilder();
+                    netString.Append(eth.Type);
+
+                    if (!string.IsNullOrEmpty(eth.Mac))
+                    {
+                        netString.Append($"={eth.Mac.ToUpper()}");
+                    }
+
+                    nics.Add(i, $"{netString},bridge={vnet.Vnet}");
                 }
             }
 
