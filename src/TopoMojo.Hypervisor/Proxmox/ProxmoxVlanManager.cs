@@ -80,7 +80,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             // create the nets
-            var results = await DebounceVnetOperations(vnetNames.Select(name => new PveVnetOperation(name, PveVnetOperationType.Create)));
+            var results = await DebounceVnetOperations(vnetNames.Select(name => new PveVnetOperation(name, PveVnetOperationType.Delete)));
 
             // the results contain all network operations performed this debounce, but we only want to send back the ones related to
             // the requested names
@@ -157,7 +157,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             var debouncedOperations = await _vnetOpsPool.Value.AddRange(requestedOperations, CancellationToken.None);
 
-            // PveVnetOperation implements object comparison, so we can use .Distinct to ensure we don't ever 
+            // PveVnetOperation implements object comparison, so we can use .Distinct to ensure we don't ever
             // try a duplicate op (at least not in the same debounce)
             debouncedOperations.Items = debouncedOperations.Items.Distinct();
 
