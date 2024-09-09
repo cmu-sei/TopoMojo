@@ -178,18 +178,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             Result task;
             Vm vm = null;
 
-            _logger.LogDebug($"deploy: virtual networks (id {template.Id})...");
-            var vnets = await _vlanManager.Provision(template.Eth.Select(n => n.Net));
-            _logger.LogDebug($"deploy: {vnets.Count()} networks deployed.");
-
-            _logger.LogDebug("deploy: transform template...");
-            //var transformer = new VCenterTransformer { DVSuuid = _dvsuuid };
-            // VirtualMachineConfigSpec vmcs = Transform.TemplateToVmSpec(
-            //     template,
-            //     _config.VmStore.Replace("{host}", _hostPrefix),
-            //     _dvsuuid
-            // );
-
             _logger.LogDebug("deploy: create vm...");
             var targetNode = await GetTargetNode();
             var vmTemplate = _vmCache
@@ -201,11 +189,23 @@ namespace TopoMojo.Hypervisor.Proxmox
             var nextId = await GetNextId();
             var pveId = Int32.Parse(nextId);
 
-            task = await _pveClient.Nodes[vmTemplate.Host].Qemu[vmTemplate.Id].Clone.CloneVm(
+            var cloneTask = _pveClient.Nodes[vmTemplate.Host].Qemu[vmTemplate.Id].Clone.CloneVm(
                 pveId,
                 full: false,
                 name: _nameService.ToPveName(template.Name),
                 target: targetNode);
+
+            _logger.LogDebug($"deploy: virtual networks (id {template.Id})...");
+            var vnetsTask = _vlanManager.Provision(template.Eth.Select(n => n.Net));
+            var isoTask = this.GetIso(template);
+
+            // We can clone vm and provision networks concurrently since we don't set the network until
+            // the configure step after the clone is finished. Isos are also not dependent on the other tasks.
+            await Task.WhenAll(cloneTask, vnetsTask, isoTask);
+
+            task = cloneTask.Result;
+            _logger.LogDebug($"deploy: {vnetsTask.Result.Count()} networks deployed.");
+
             await _pveClient.WaitForTaskToFinish(task);
 
             if (task.IsSuccessStatusCode)
@@ -240,7 +240,6 @@ namespace TopoMojo.Hypervisor.Proxmox
                 var memory = this.GetMemory(template);
                 var sockets = this.GetSockets(template);
                 var coresPerSocket = this.GetCoresPerSocket(template);
-                var iso = await this.GetIso(template);
                 string args = null;
 
                 if (setGuestSettings)
@@ -253,7 +252,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     memory: memory,
                     sockets: sockets,
                     cores: coresPerSocket,
-                    cdrom: iso,
+                    cdrom: isoTask.Result,
                     args: args);
                 await _pveClient.WaitForTaskToFinish(task);
 
