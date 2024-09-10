@@ -58,7 +58,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                 {
                     do
                     {
-                        newVnetTag = _random.Next(100, 100000);
+                        // VXLAN range should be 1 - 16777215, but some devices may reserve 1-4096
+                        newVnetTag = _random.Next(4097, 16777215);
                     }
                     while (existingNets.Any(n => n.Tag == newVnetTag));
                 }
