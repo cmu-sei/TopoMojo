@@ -375,6 +375,10 @@ namespace TopoMojo.Hypervisor.Proxmox
             {
                 vm.Status = "initialized";
             }
+            else
+            {
+                throw new Exception(task.ReasonPhrase);
+            }
 
             // Don't set vm to the result here, because if we get unlucky and the sync task removed
             // this vm from the cache first, we'll get a null value, which will cause errors in the
