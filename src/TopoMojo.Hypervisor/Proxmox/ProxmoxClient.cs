@@ -201,15 +201,49 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             // We can clone vm and provision networks concurrently since we don't set the network until
             // the configure step after the clone is finished. Isos are also not dependent on the other tasks.
-            await Task.WhenAll(cloneTask, vnetsTask, isoTask);
+            try
+            {
+                await Task.WhenAll(cloneTask, vnetsTask, isoTask);
+            }
+            catch (Exception ex)
+            {
+                if (cloneTask.IsFaulted)
+                {
+                    throw ex;
+                }
+            }
 
             task = cloneTask.Result;
-            _logger.LogDebug($"deploy: {vnetsTask.Result.Count()} networks deployed.");
+
+            if (!vnetsTask.IsFaulted)
+            {
+                _logger.LogDebug($"deploy: {vnetsTask.Result.Count()} networks deployed.");
+            }
 
             await _pveClient.WaitForTaskToFinish(task);
 
             if (task.IsSuccessStatusCode)
             {
+                if (isoTask.IsFaulted || vnetsTask.IsFaulted)
+                {
+                    var exceptions = new List<Exception>();
+
+                    if (isoTask.IsFaulted)
+                    {
+                        exceptions.Add(isoTask.Exception);
+                    }
+
+                    if (vnetsTask.IsFaulted)
+                    {
+                        exceptions.Add(vnetsTask.Exception);
+                    }
+
+                    var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
+                    await _pveClient.WaitForTaskToFinish(destroyTask);
+
+                    throw new AggregateException($"Exception deploying {template.Name}", exceptions);
+                }
+
                 // Proxmox requires using the root user account directly (not an access token)
                 // for setting the args field to add arbitrary arguments to the QEMU command line. This is currently the only
                 // way to set the fw_cfg property that we need for Guest Settings.
@@ -258,7 +292,11 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                 if (!task.IsSuccessStatusCode)
                 {
-                    _logger.LogError(task.ReasonPhrase);
+                    _logger.LogError($"Error reconfiguring vm {template.Name} ({nextId}) - {task.ReasonPhrase}");
+                    var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
+                    await _pveClient.WaitForTaskToFinish(destroyTask);
+
+                    throw new Exception(task.ReasonPhrase);
                 }
 
                 _logger.LogDebug("deploy: load vm...");
@@ -472,7 +510,11 @@ namespace TopoMojo.Hypervisor.Proxmox
                 await _pveClient.WaitForTaskToFinish(task);
 
                 if (!task.IsSuccessStatusCode)
+                {
+                    var destroyTask = await _pveClient.Nodes[template.Host].Qemu[nextId].DestroyVm();
+                    await _pveClient.WaitForTaskToFinish(destroyTask);
                     throw new Exception($"Convert to template failed: {task.ReasonPhrase}");
+                }
 
                 // Delete old vm
                 await this.Delete(oldId);
@@ -755,7 +797,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             task = await _pveClient.Cluster.Sdn.Vnets.Index();
             await _pveClient.WaitForTaskToFinish(task);
-            var vnets = task.ToModel<PveVnet[]>();
+            var vnets = task.ToModel<PveVnet[]>().Where(x => x.Zone == _config.SDNZone);
 
             for (int i = 0; i < template.Eth.Length; i++)
             {
