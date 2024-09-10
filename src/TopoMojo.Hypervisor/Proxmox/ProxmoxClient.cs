@@ -663,6 +663,11 @@ namespace TopoMojo.Hypervisor.Proxmox
             return vm;
         }
 
+        /// <summary>
+        /// Selects a Node to deploy to. Randomly picks among all online nodes with less than 50% memory usage, or the 
+        /// Node with the least memory usage if none are less than 50%.
+        /// </summary>
+        /// <returns></returns>
         private async Task<string> GetTargetNode()
         {
             string target = null;
@@ -670,10 +675,22 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (nodes.Count() > 0)
             {
-                var targetNode = nodes
-                    .OrderBy(x => x.MemoryUsagePercentage)
-                    .Where(x => x.IsOnline)
-                    .FirstOrDefault();
+                IClusterResourceNode targetNode;
+                var targetNodes = nodes.Where(x =>
+                    x.IsOnline &&
+                    x.MemoryUsagePercentage <= 50);
+
+                if (targetNodes.Any())
+                {
+                    targetNode = targetNodes.ElementAt(_random.Next(0, targetNodes.Count() - 1));
+                }
+                else
+                {
+                    targetNode = nodes
+                        .OrderBy(x => x.MemoryUsagePercentage)
+                        .Where(x => x.IsOnline)
+                        .FirstOrDefault();
+                }
 
                 target = targetNode.Node;
             }
