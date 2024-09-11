@@ -23,6 +23,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly ILogger<ProxmoxVnetsClient> _logger;
         private readonly PveClient _pveClient;
         private readonly Random _random;
+        private readonly string _sdnZone;
 
         public ProxmoxVnetsClient
         (
@@ -37,6 +38,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 ApiToken = hypervisorOptions.AccessToken
             };
             _random = random;
+            _sdnZone = hypervisorOptions.SDNZone;
         }
 
         public async Task<IEnumerable<PveVnet>> CreateVnets(IEnumerable<CreatePveVnet> createVnets)
@@ -151,7 +153,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (!task.IsSuccessStatusCode)
                 throw new Exception($"Failed to load virtual networks from Proxmox. Status code: {task.StatusCode}");
 
-            return task.ToModel<PveVnet[]>();
+            return task.ToModel<PveVnet[]>().Where(x => x.Zone == _sdnZone);
         }
 
         public async Task ReloadVnets()

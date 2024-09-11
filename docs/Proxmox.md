@@ -32,7 +32,7 @@ TopoMojo uses Proxmox's Software Defined Networking (SDN) feature to manage the 
 
 ### Configure NGINX
 
-You will need to configure a reverse proxy on the node that TopoMojo will communicate with in order to access the API and allow viewing of consoles. Instructions for doing this with NGINX are provided below.
+You will need to configure a reverse proxy on the node that TopoMojo will communicate with in order to access the API and allow viewing of consoles. This will allow the Proxmox API to be accessed over port 443 as well as provide the required authentication headers for accessing consoles through an external application. Instructions for doing this with NGINX are provided below.
 
 - Install NGINX on your main Proxmox node and configure it to run on startup.
     - `sudo apt install nginx`
@@ -110,6 +110,10 @@ This section describes the appsettings that will need to be set to configure Top
 - Pod_Password
     - Set this to the password of the **root** user account only to enable Guest Settings support (discussed in detail below).
     - If no password or an invalid root password is provided, Guest Settings will be disabled.
+- Pod__Vlan__ResetDebounceDuration
+  - The integer number of milliseconds TopoMojo will wait after a virtual network operation is initiated before reloading Proxmox's SDN. As reloading is a synchronous process that can take up 10 seconds, we offer this setting to reduce aggregate wait times by debouncing changes into batches.
+- Pod__Vlan__ResetDebounceMaxDuration
+  - The integer number of milliseconds that describes the maximum amount of time TopoMojo will debounce before it reloads Proxmox's SDN following a network operation.
 
 #### ISOs
 

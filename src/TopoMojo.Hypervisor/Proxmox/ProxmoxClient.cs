@@ -810,11 +810,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (template.Eth.IsEmpty())
                 return nics;
 
-            Result task;
-
-            task = await _pveClient.Cluster.Sdn.Vnets.Index();
-            await _pveClient.WaitForTaskToFinish(task);
-            var vnets = task.ToModel<PveVnet[]>().Where(x => x.Zone == _config.SDNZone);
+            var vnets = await _vlanManager.GetVnets();
 
             for (int i = 0; i < template.Eth.Length; i++)
             {
