@@ -27,7 +27,7 @@ TopoMojo uses Proxmox's Software Defined Networking (SDN) feature to manage the 
 - Add a new VXLAN Zone.
     - VXLAN is the only type currently supported by TopoMojo.
     - The ID is the name you want to use for this Zone. You will need it when configuring TopoMojo's appsettings.
-    - Under Peer Address List, enter a comma separate list of the IP Addresses of all of the nodes in your cluster.
+    - Under Peer Address List, enter a comma separated list of the IP Addresses of all of the nodes in your cluster.
         - If you add a new node to your cluster, you will need to add it to the SDN Zone as well.
 
 ### Configure NGINX
@@ -136,7 +136,7 @@ In Proxmox, a similar functionality is achieved using the QEMU Firmware Configur
 
 Note: This currently only works on Linux Guests. There is an open source [Windows driver](https://github.com/virtio-win/kvm-guest-drivers-windows/tree/master/fwcfg64) that has some basic fw_cfg support, but does not support reading user-defined /opt values at this time.
 
-As described in the Settings section, this currently requires the user of the root user and password. There is a [patch](https://bugzilla.proxmox.com/show_bug.cgi?id=4068) available for Proxmox that would make this no longer necessary, but it has not been merged into a release. Currently, if a root password is not provided, Guest Settings will be skipped when virtual machines are deployed.
+As described in the Settings section, this currently requires the use of the root user and password. There is a [patch](https://bugzilla.proxmox.com/show_bug.cgi?id=4068) available for Proxmox that would make this no longer necessary, but it has not been merged into a release. Currently, if a root password is not provided, Guest Settings will be skipped when virtual machines are deployed.
 
 ## Using Proxmox Templates
 
