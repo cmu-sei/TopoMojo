@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Memory;
@@ -66,7 +67,7 @@ namespace TopoMojo.Api.Controllers
         /// <returns></returns>
         [HttpPost("api/admin/export")]
         [ProducesResponseType(typeof(string[]), 200)]
-        [ApiExplorerSettings(IgnoreApi = true)]
+        [SwaggerOperation(OperationId = "ExportWorkspaces")]
         public async Task<ActionResult> ExportWorkspaces([FromBody] string[] ids)
         {
             string srcPath = _uploadOptions.TopoRoot;
@@ -84,13 +85,46 @@ namespace TopoMojo.Api.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("api/admin/import")]
-        [ApiExplorerSettings(IgnoreApi = true)]
+        [SwaggerOperation(OperationId = "ImportWorkspaces")]
         public async Task<ActionResult<string[]>> ImportWorkspaces()
         {
             return Ok(await _transferSvc.Import(
                 _uploadOptions.TopoRoot,
                 _uploadOptions.DocRoot
             ));
+        }
+
+        /// <summary>
+        /// Generate an download package.
+        /// </summary>
+        /// <param name="ids"></param>
+        /// <returns></returns>
+        [HttpPost("api/admin/download")]
+        [ProducesResponseType(typeof(FileResult), 200)]
+        [SwaggerOperation(OperationId = "DownloadWorkspaces")]
+        public async Task<ActionResult> DownloadWorkspaces([FromBody] string[] ids)
+        {
+            string srcPath = _uploadOptions.TopoRoot;
+            string destPath = Path.Combine(
+                _uploadOptions.TopoRoot,
+                "_export"
+            );
+            (var byteArray, var fileName) = await _transferSvc.Download(ids, srcPath);
+
+            return File(byteArray, "application/zip", fileName);
+        }
+
+        /// <summary>
+        /// Initiate upload process.
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost("api/admin/upload")]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(MultipartBodyLengthLimit = Int32.MaxValue, ValueLengthLimit = Int32.MaxValue, ValueCountLimit = Int32.MaxValue)]
+        [SwaggerOperation(OperationId = "UploadWorkspaces")]
+        public async Task<ActionResult<string[]>> UploadWorkspaces([FromForm] List<IFormFile> files)
+        {
+            return Ok(await _transferSvc.Upload(files, _uploadOptions.DocRoot));
         }
 
         /// <summary>
