@@ -16,9 +16,11 @@ namespace TopoMojo.Hypervisor
         public string Stats { get; set; }
         public string Status { get; set; }
         public string GroupName { get; set; }
+        public string[] Tags { get; set; }
         public VmPowerState State { get; set; }
         public VmQuestion Question { get; set; }
         public VmTask Task { get; set; }
+        public HypervisorType HypervisorType { get; set; } = HypervisorType.Vsphere;
     }
 
     public enum VmPowerState { Off, Running, Suspended}
@@ -79,6 +81,13 @@ namespace TopoMojo.Hypervisor
         public string IsolationId { get; set; }
         public string Name { get; set; }
         public string Url { get; set; }
+        public string Ticket { get; set; }
         public bool IsRunning { get; set; }
+    }
+
+    public enum HypervisorType
+    {
+        Vsphere,
+        Proxmox
     }
 }

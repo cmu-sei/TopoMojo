@@ -17,13 +17,15 @@ namespace TopoMojo.Hypervisor
         public string Floppy { get; set; }
         public string Version { get; set; }
         public string IsolationTag { get; set; }
-        public bool HostAffinity {get; set; }
-        public bool UseUplinkSwitch {get; set; }
+        public bool HostAffinity { get; set; }
+        public bool UseUplinkSwitch { get; set; }
         public int Ram { get; set; }
         public int VideoRam { get; set; }
         public int Adapters { get; set; }
         public int Delay { get; set; }
         public bool AutoStart { get; set; } = true;
+        public string Template { get; set; }
+        public string ParentTemplate { get; set; }
         public VmNet[] Eth { get; set; }
         public VmDisk[] Disks { get; set; }
         public VmKeyValue[] GuestSettings { get; set; }

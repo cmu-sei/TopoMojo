@@ -5,20 +5,23 @@ using System.Collections.Generic;
 
 namespace TopoMojo.Hypervisor
 {
-    public class HypervisorServiceConfiguration {
+    public class HypervisorServiceConfiguration
+    {
         public bool IsVCenter { get; set; }
+        public HypervisorType HypervisorType { get; set; }
         public string Type { get; set; }
-        public string Url { get; set;}
-        public string Host { get; set;}
+        public string Url { get; set; }
+        public string Host { get; set; }
         public string User { get; set; }
         public string Password { get; set; }
+        public string AccessToken { get; set; }
         public string PoolPath { get; set; }
         public string Uplink { get; set; } = "dvs-topomojo";
         public string VmStore { get; set; } = "[topomojo] _run/";
         public string DiskStore { get; set; } = "[topomojo]";
         public string IsoStore { get; set; } = "[topomojo] iso/";
-        public string TicketUrlHandler { get; set; }  = "querystring"; //"local-app", "external-domain", "host-map", "none"
-        public Dictionary<string,string> TicketUrlHostMap { get; set; } = new Dictionary<string, string>();
+        public string TicketUrlHandler { get; set; } = "querystring"; //"local-app", "external-domain", "host-map", "none"
+        public Dictionary<string, string> TicketUrlHostMap { get; set; } = new Dictionary<string, string>();
         public VlanConfiguration Vlan { get; set; } = new VlanConfiguration();
         public int KeepAliveMinutes { get; set; } = 10;
         public string ExcludeNetworkMask { get; set; } = "topomojo";
@@ -26,6 +29,7 @@ namespace TopoMojo.Hypervisor
         public bool IsNsxNetwork { get; set; }
         public bool DebugVerbose { get; set; }
         public bool IgnoreCertificateErrors { get; set; }
+        public string SDNZone { get; set; } = "topomojo";
         public SddcConfiguration Sddc { get; set; } = new SddcConfiguration();
     }
 
@@ -46,7 +50,9 @@ namespace TopoMojo.Hypervisor
     public class VlanConfiguration
     {
         public string Range { get; set; } = "";
-        public Vlan[] Reservations { get; set; } = new Vlan[] {};
+        public Vlan[] Reservations { get; set; } = new Vlan[] { };
+        public int ResetDebounceDuration { get; set; } = 2000;
+        public int? ResetDebounceMaxDuration { get; set; } = 5000;
     }
 
     public class Vlan
