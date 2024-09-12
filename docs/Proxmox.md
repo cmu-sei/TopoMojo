@@ -97,10 +97,10 @@ This section describes the appsettings that will need to be set to configure Top
 - Pod__HypervisorType
     - Set this to `Proxmox` to enable Proxmox mode.
     - Each TopoMojo instance currently operates either entirely in Vsphere or Proxmox mode.
-- Pod__Host
-    - Set this to the hostname of your main Proxmox node.
+- Pod__Url
+    - Set this to the url of your main Proxmox node. (i.e. https://my.prox.local)
 - Pod__AccessToken
-    - Set this to the access token generated above. It should be the same one set in your NGINX config. 
+    - Set this to the access token generated above. It should be the same one set in your NGINX config.
     - E.g. `root@pam!Topo=4c4fbe1e-b31e-55a9-9fg0-2de4a411cd23`
 - Pod__SDNZone
     - Set this to the name of the SDN Zone you created in Proxmox
