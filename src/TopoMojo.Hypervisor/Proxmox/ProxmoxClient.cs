@@ -33,21 +33,29 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             _logger = logger;
             _config = options;
-            _logger.LogDebug($"Constructing Client {_config.Host}");
+            _logger.LogDebug($"Constructing Client {_config.Url}");
             _tasks = new Dictionary<string, PveNodeTask>();
             _vmCache = vmCache;
-            _hostPrefix = _config.Host.Split('.').FirstOrDefault();
             _random = random;
 
             if (_config.Tenant == null)
                 _config.Tenant = "";
 
-            _pveClient = new PveClient(options.Host, 443)
+            int port = 443;
+            string host = _config.Url;
+            if (Uri.TryCreate(_config.Url, UriKind.RelativeOrAbsolute, out Uri result) && result.IsAbsoluteUri) {
+                host = result.Host;
+                port = result.Port;
+            }
+            _config.Host = host;
+            _hostPrefix = host.Split('.').FirstOrDefault();
+
+            _pveClient = new PveClient(host, port)
             {
                 ApiToken = options.AccessToken
             };
 
-            _rootPveClient = new PveClient(options.Host, 443);
+            _rootPveClient = new PveClient(host, port);
 
             _nameService = nameService;
             _vlanManager = vnetService;
@@ -664,7 +672,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         }
 
         /// <summary>
-        /// Selects a Node to deploy to. Randomly picks among all online nodes with less than 50% memory usage, or the 
+        /// Selects a Node to deploy to. Randomly picks among all online nodes with less than 50% memory usage, or the
         /// Node with the least memory usage if none are less than 50%.
         /// </summary>
         /// <returns></returns>
