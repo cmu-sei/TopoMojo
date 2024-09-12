@@ -33,7 +33,17 @@ namespace TopoMojo.Hypervisor.Proxmox
         )
         {
             _logger = logger;
-            _pveClient = new PveClient(hypervisorOptions.Host, 443)
+
+            int port = 443;
+            string host = hypervisorOptions.Url;
+            if (Uri.TryCreate(hypervisorOptions.Url, UriKind.RelativeOrAbsolute, out Uri result) && result.IsAbsoluteUri)
+            {
+                host = result.Host;
+                port = result.Port;
+            }
+            hypervisorOptions.Host = host;
+
+            _pveClient = new PveClient(host, port)
             {
                 ApiToken = hypervisorOptions.AccessToken
             };
