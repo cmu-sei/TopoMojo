@@ -51,7 +51,7 @@ namespace Microsoft.Extensions.DependencyInjection
                             && Int32.TryParse(net.Last(), out int prefix)
                         )
                         {
-                            config.KnownNetworks.Add(new IPNetwork(ipaddr, prefix));
+                            config.KnownNetworks.Add(new AspNetCore.HttpOverrides.IPNetwork(ipaddr, prefix));
                         }
                     }
                 }

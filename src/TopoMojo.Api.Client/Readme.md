@@ -11,12 +11,12 @@ cd src/TopoMojo.Api
 dotnet build
 
 # generate openapi.json in the api project folder
-dotnet swagger tofile --output ../TopoMojo.Api.Client/openapi.json ./bin/Debug/net6.0/TopoMojo.Api.dll v1
+dotnet swagger tofile --output ../TopoMojo.Api.Client/openapi.json ./bin/Debug/net8.0/TopoMojo.Api.dll v1
 
 cd ../TopoMojo.Api.Client
 
 # run generator
-nswag run /runtime:Net60
+nswag run /runtime:Net80
 
 # bundle nuget package
 dotnet pack -o ~/dev/nuget-local

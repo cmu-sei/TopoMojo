@@ -35,10 +35,9 @@ namespace TopoMojo.Api
             IOptionsMonitor<ApiKeyAuthenticationOptions> options,
             ILoggerFactory logger,
             UrlEncoder encoder,
-            ISystemClock clock,
             IApiKeyAuthenticationService svc
         )
-            : base(options, logger, encoder, clock)
+            : base(options, logger, encoder)
         {
             _svc = svc;
         }
