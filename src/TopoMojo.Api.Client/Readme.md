@@ -7,6 +7,9 @@ npm install -g nswag
 
 cd src/TopoMojo.Api
 
+# ensure latest is built
+dotnet build
+
 # generate openapi.json in the api project folder
 dotnet swagger tofile --output ../TopoMojo.Api.Client/openapi.json ./bin/Debug/net6.0/TopoMojo.Api.dll v1
 

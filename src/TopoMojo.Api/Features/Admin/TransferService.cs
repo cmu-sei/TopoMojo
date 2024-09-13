@@ -381,10 +381,10 @@ namespace TopoMojo.Api.Services
                     // get list of new workspaces
                     if (!existingWorkspaceIds.Contains(topoId))
                     {
-                        if (topoId == "003aff045a0b4c58a9619e057343e80b")
-                        {
-                            var x = 12;
-                        }
+                        // if (topoId == "003aff045a0b4c58a9619e057343e80b")
+                        // {
+                        //     var x = 12;
+                        // }
                         newWorkspaces.Add(topo);
                         existingWorkspaceIds.Add(topoId);
                     }

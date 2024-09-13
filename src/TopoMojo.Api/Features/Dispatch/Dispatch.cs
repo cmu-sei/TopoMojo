@@ -1,5 +1,8 @@
 using System;
 using System.Linq;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace TopoMojo.Api.Models
 {
@@ -39,7 +42,7 @@ namespace TopoMojo.Api.Models
         public string since { get; set; }
 
         public const string FilterPending = "pending";
-        public bool WantsPending => Filter.Contains(FilterPending);
+        [SwaggerIgnore][JsonIgnore] public bool WantsPending => Filter.Contains(FilterPending);
 
     }
 }
