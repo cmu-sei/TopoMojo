@@ -57,9 +57,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.List(model, ct)
@@ -71,9 +71,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize(AppConstants.AdminOnlyPolicy)]
         public async Task<ActionResult<string[]>> ListAllScopes(CancellationToken ct)
         {
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.ListScopes()
@@ -97,10 +97,10 @@ namespace TopoMojo.Api.Controllers
 
             await Validate(new Entity{ Id = id });
 
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin,
                 () => id == Actor.Id
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Load(id)
@@ -119,10 +119,10 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity{ Id = id });
 
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin,
                 () => id == Actor.Id
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.LoadWorkspaces(id)
@@ -141,10 +141,10 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity{ Id = id });
 
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin,
                 () => id == Actor.Id
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.LoadGamespaces(id)
@@ -161,9 +161,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize(AppConstants.AdminOnlyPolicy)]
         public async Task<ActionResult<User>> AddOrUpdateUser([FromBody]ChangedUser model)
         {
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.AddOrUpdate(model)
@@ -182,10 +182,10 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity{ Id = id });
 
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin,
                 () => id == Actor.Id
-            );
+            )) return Forbid();
 
             await _svc.Delete(id);
 
@@ -204,9 +204,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.LoadUserKeys(id)
@@ -225,9 +225,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.CreateApiKey(id, Actor.Name)
@@ -245,9 +245,9 @@ namespace TopoMojo.Api.Controllers
         public async Task<ActionResult> DeleteUserKey(string keyId)
         {
 
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin
-            );
+            )) return Forbid();
 
             await _svc.DeleteApiKey(keyId);
 

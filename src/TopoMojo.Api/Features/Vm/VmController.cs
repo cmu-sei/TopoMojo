@@ -56,9 +56,9 @@ namespace TopoMojo.Api.Controllers
 
         public async Task<ActionResult<Vm[]>> ListVms([FromQuery]string filter)
         {
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsObserver
-            );
+            )) return Forbid();
 
             var vms = await _pod.Find(filter);
 
@@ -96,10 +96,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<Vm>> LoadVm(string id)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVm(id, Actor).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _pod.Load(id)
@@ -121,10 +120,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(op);
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVmOperation(op).Result
-            );
+            )) return Forbid();
 
             Vm vm = await _pod.ChangeState(op);
 
@@ -143,10 +141,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<Vm>> DeleteVm(string id)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanDeleteVm(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             Vm vm = await _pod.Delete(id);
 
@@ -166,10 +163,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize(AppConstants.AnyUserPolicy)]
         public async Task<ActionResult<Vm>> ReconfigureVm(string id, [FromBody] VmKeyValue change)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVm(id, Actor).Result
-            );
+            )) return Forbid();
 
             // need elevated privileges to change vm to special nets
             if (
@@ -202,10 +198,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<Vm>> AnswerVmQuestion(string id, [FromBody] VmAnswer answer)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVm(id, Actor).Result
-            );
+            )) return Forbid();
 
             Vm vm = await _pod.Answer(id, answer);
 
@@ -224,10 +219,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize(AppConstants.AnyUserPolicy)]
         public async Task<ActionResult<VmOptions>> GetVmIsoOptions(string id)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVm(id, Actor).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _pod.GetVmIsoOptions(
@@ -246,10 +240,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize(AppConstants.AnyUserPolicy)]
         public async Task<ActionResult<VmOptions>> GetVmNetOptions(string id)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVm(id, Actor).Result
-            );
+            )) return Forbid();
 
             var opt = await _pod.GetVmNetOptions(
                 await GetVmIsolationTag(id)
@@ -276,10 +269,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize(AppConstants.AnyUserPolicy)]
         public async Task<ActionResult<VmConsole>> GetVmTicket(string id)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVm(id, Actor).Result
-            );
+            )) return Forbid();
 
             var info = await _pod.Display(id);
 
@@ -348,10 +340,9 @@ namespace TopoMojo.Api.Controllers
 
             string name = $"{template.Name}#{template.IsolationTag}";
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVm(name, Actor).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _pod.Refresh(template)
@@ -374,10 +365,9 @@ namespace TopoMojo.Api.Controllers
 
             string name = $"{template.Name}#{template.IsolationTag}";
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVm(name, Actor).Result
-            );
+            )) return Forbid();
 
             Vm vm = await _pod.Deploy(template, Actor.IsBuilder);
 
@@ -423,10 +413,9 @@ namespace TopoMojo.Api.Controllers
 
             string name = $"{template.Name}#{template.IsolationTag}";
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => CanManageVm(name, Actor).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _pod.CreateDisks(template)

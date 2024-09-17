@@ -67,7 +67,7 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAll();
+            if (!AuthorizeAll()) return Forbid();
 
             return Ok(
                 await _svc.List(model, Actor.Id, Actor.IsAdmin, Actor.IsObserver, Actor.Scope, ct)
@@ -87,10 +87,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new WorkspaceEntity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.HasValidUserScope(id, Actor.Scope, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Preview(id)
@@ -110,11 +109,10 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new SpaceEntity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => id == Actor.Id,  // from valid grader_apikey
                 () => _svc.CanInteract(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Load(id, Actor.Id)
@@ -129,10 +127,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => Actor.IsObserver && _svc.HasValidUserScopeGamespace(id, Actor.Scope).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.LoadChallenge(id, Actor.IsAdmin)
@@ -152,10 +149,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.HasValidUserScope(model.ResourceId, Actor.Scope, Actor.Id).Result
-            );
+            )) return Forbid();
 
             if (string.IsNullOrEmpty(model.GraderUrl))
             {
@@ -211,10 +207,9 @@ namespace TopoMojo.Api.Controllers
             await Validate(new Entity { Id = model.Id });
 
             // TODO: replace CanManage with ActorCanEditGamespaces
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(model.Id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             await _svc.Update(model);
 
@@ -233,10 +228,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.Start(id, Actor.IsBuilder);
 
@@ -257,10 +251,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.Stop(id);
 
@@ -281,10 +274,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.Complete(id);
 
@@ -305,11 +297,10 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = model.Id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => model.Id == Actor.Id,  // from valid grader_apikey
                 () => _svc.CanInteract(model.Id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.Grade(model);
 
@@ -330,10 +321,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Regrade(id)
@@ -352,10 +342,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 (await _svc.AuditSubmission(id)).ToArray()
@@ -376,10 +365,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanInteract(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             await _svc.Delete(id, Actor.IsAdmin);
 
@@ -395,10 +383,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.GenerateInvitation(id)
@@ -456,10 +443,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             await _svc.Delist(id, sid);
 
@@ -478,10 +464,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanInteract(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Players(id)

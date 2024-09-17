@@ -54,7 +54,7 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(search);
 
-            AuthorizeAll();
+            if (!AuthorizeAll()) return Forbid();
 
             var result = await _svc.List(search, Actor.IsAdmin, ct);
 
@@ -68,10 +68,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.ListSiblings(id, pub);
 
@@ -90,10 +89,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Load(id)
@@ -112,10 +110,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(model.Id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.Update(model);
 
@@ -136,10 +133,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.Delete(id);
 
@@ -160,10 +156,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.HasValidAudience(model.TemplateId, model.WorkspaceId, Actor.Scope).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.Link(model, Actor.IsCreator);
 
@@ -184,10 +179,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(model.TemplateId, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.Unlink(model);
 
@@ -208,10 +202,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(model.TemplateId, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var result = await _svc.ReLink(model);
 
@@ -232,7 +225,7 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity{ Id = id });
 
-            AuthorizeAll();
+            if (!AuthorizeAll()) return Forbid();
 
             return Ok(
                 await _svc.LoadDetail(id)
@@ -251,7 +244,7 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAll();
+            if (!AuthorizeAll()) return Forbid();
 
             return Ok(
                 await _svc.Create(model)
@@ -270,7 +263,7 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAll();
+            if (!AuthorizeAll()) return Forbid();
 
             return Ok(
                 await _svc.Clone(model)
@@ -289,7 +282,7 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAll();
+            if (!AuthorizeAll()) return Forbid();
 
             var result = await _svc.Configure(model);
 

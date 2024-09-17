@@ -63,7 +63,7 @@ namespace TopoMojo.Api.Controllers
                 Scope = Actor.Scope
             });
 
-            AuthorizeAll();
+            if (!AuthorizeAll()) return Forbid();
 
             search.scope = Actor.Scope;
 
@@ -84,10 +84,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity{ Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Load(id)
@@ -106,11 +105,10 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => Actor.IsCreator,
                 () => _svc.CheckWorkspaceLimit(Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Create(model, Actor.Id, Actor.Name, Actor.IsCreator)
@@ -129,11 +127,10 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => Actor.IsCreator,
                 () => _svc.CheckWorkspaceLimit(Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Clone(id)
@@ -152,10 +149,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(model.Id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             Workspace workspace = await _svc.Update(model);
 
@@ -179,9 +175,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(model);
 
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin
-            );
+            )) return Forbid();
 
             Workspace workspace = await _svc.Update(model);
 
@@ -203,10 +199,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult> DeleteWorkspace(string id)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var workspace = await _svc.Delete(id);
 
@@ -231,10 +226,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _pod.GetVmIsoOptions(id)
@@ -253,10 +247,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _pod.GetVmNetOptions(id)
@@ -275,10 +268,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.GetStats(id)
@@ -297,10 +289,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.GetScopedTemplates(id, Actor.Scope)
@@ -323,10 +314,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             var games = await _svc.KillGames(id);
 
@@ -358,10 +348,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.Invite(id)
@@ -380,10 +369,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity { Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             return Ok(
                 await _svc.GetChallenge(id)
@@ -405,10 +393,9 @@ namespace TopoMojo.Api.Controllers
 
             await Validate(model);
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             await _svc.UpdateChallenge(id, model);
 
@@ -449,10 +436,9 @@ namespace TopoMojo.Api.Controllers
         {
             await Validate(new Entity{ Id = id });
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanManage(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             await _svc.Delist(id, sid, Actor.IsAdmin);
 

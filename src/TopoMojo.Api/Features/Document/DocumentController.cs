@@ -49,10 +49,9 @@ namespace TopoMojo.Api.Controllers
         public async Task<ActionResult<string>> LoadDocument(string id, CancellationToken ct)
         {
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             string path = BuildPath();
 
@@ -88,10 +87,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult> SaveDocument(string id, [FromBody]string text)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             string path = BuildPath();
 
@@ -113,10 +111,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public ActionResult<ImageFile[]> ListDocumentImages(string id)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             string path = Path.Combine(_uploadOptions.DocRoot, id);
 
@@ -141,10 +138,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public IActionResult DeleteDocumentImage(string id, string filename)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             string path = BuildPath(id, filename);
 
@@ -166,10 +162,9 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<ImageFile>> UploadDocument(string id, IFormFile file)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            )) return Forbid();
 
             string path = BuildPath(id);
 
