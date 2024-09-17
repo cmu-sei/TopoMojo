@@ -47,6 +47,9 @@ namespace TopoMojo.Api.Models
             Role == UserRole.Observer ||
             Role == UserRole.Administrator
         ;
+        public bool HasScope(string scope) {
+            return Scope.Split(' ', ',', ';').Contains(scope);
+        }
     }
 
     public class ChangedUser

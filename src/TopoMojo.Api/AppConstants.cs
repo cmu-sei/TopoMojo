@@ -27,13 +27,23 @@ namespace TopoMojo.Api
         public const string RegistrationCachePrefix = "lp:";
         public const string CookieScheme = "topomojo.mks";
         public const string MarkdownCutLine = "<!-- cut -->";
-        public static char[] InlineListSeparators = new char[] { ' ', ',', ';' };
+        public static char[] InlineListSeparators = [' ', ',', ';'];
         public const string ErrorListCacheKey = "errbf";
     }
 
     internal static class AuditId
     {
 
+    }
+
+    public static class Message
+    {
+        public const string ResourceNotFound = "ResourceNotFound";
+        public const string MaximumTakeExceeded = "MaximumTakeExceeded";
+        public const string WorkspaceNotIsolated = "WorkspaceNotIsolated";
+        public const string InvalidClientAudience = "InvalidClientAudience";
+        public const string ResourceAlreadyExists = "ResourceAlreadyExists";
+        public const string InvalidPropertyValue = "InvalidPropertyValue";
     }
 
 }

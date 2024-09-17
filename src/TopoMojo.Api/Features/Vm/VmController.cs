@@ -1,14 +1,9 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Extensions;
@@ -18,470 +13,455 @@ using TopoMojo.Api.Validators;
 using TopoMojo.Api.Models;
 using TopoMojo.Hypervisor;
 
-namespace TopoMojo.Api.Controllers
+namespace TopoMojo.Api.Controllers;
+
+[Authorize]
+[ApiController]
+[TypeFilter<VmValidator>]
+public class VmController(
+    ILogger<AdminController> logger,
+    IHubContext<AppHub, IHubEvent> hub,
+    TemplateService templateService,
+    UserService userService,
+    IHypervisorService podService,
+    CoreOptions options
+    ) : _Controller(logger, hub)
 {
+
+    /// <summary>
+    /// List vms.
+    /// </summary>
+    /// <param name="filter"></param>
+    /// <returns></returns>
+    [HttpGet("api/vms")]
+    [SwaggerOperation(OperationId = "ListVms")]
     [Authorize]
-    [ApiController]
-    public class VmController : _Controller
+
+    public async Task<ActionResult<Vm[]>> ListVms([FromQuery]string filter)
     {
-        public VmController(
-            ILogger<AdminController> logger,
-            IHubContext<AppHub, IHubEvent> hub,
-            VmValidator validator,
-            TemplateService templateService,
-            UserService userService,
-            IHypervisorService podService,
-            CoreOptions options
-        ) : base(logger, hub, validator)
+        if (!AuthorizeAny(
+            () => Actor.IsObserver
+        )) return Forbid();
+
+        var vms = await podService.Find(filter);
+
+        if (Actor.IsObserver && !Actor.IsAdmin)
         {
-            _templateService = templateService;
-            _userService = userService;
-            _pod = podService;
-            _options = options;
+            // filter by scope/audience: ensure all VMs come from workspaces w/ audiences
+            // within this user's scope or they are manager
+            vms = vms.Where(vm =>
+                CanManageVm(vm.Name, Actor).Result
+            ).ToArray();
         }
 
-        private readonly IHypervisorService _pod;
-        private readonly TemplateService _templateService;
-        private readonly UserService _userService;
-        private readonly CoreOptions _options;
+        var keys = vms.Select(v => v.Name.Tag()).Distinct().ToArray();
 
-        /// <summary>
-        /// List vms.
-        /// </summary>
-        /// <param name="filter"></param>
-        /// <returns></returns>
-        [HttpGet("api/vms")]
-        [SwaggerOperation(OperationId = "ListVms")]
-        [Authorize]
+        var map = await templateService.ResolveKeys(keys);
 
-        public async Task<ActionResult<Vm[]>> ListVms([FromQuery]string filter)
+        foreach (Vm vm in vms)
+            vm.GroupName = map[vm.Name.Tag()];
+
+        return Ok(
+            vms
+            .OrderBy(v => v.GroupName)
+            .ThenBy(v => v.Name)
+            .ToArray()
+        );
+    }
+
+    /// <summary>
+    /// Load a vm.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    [HttpGet("api/vm/{id}")]
+    [SwaggerOperation(OperationId = "LoadVm")]
+    [Authorize]
+    public async Task<ActionResult<Vm>> LoadVm(string id)
+    {
+        if (!AuthorizeAny(
+            () => CanManageVm(id, Actor).Result
+        )) return Forbid();
+
+        return Ok(
+            await podService.Load(id)
+        );
+    }
+
+    /// <summary>
+    /// Change vm state.
+    /// </summary>
+    /// <remarks>
+    /// Operations: Start, Stop, Save, Revert
+    /// </remarks>
+    /// <param name="op"></param>
+    /// <returns></returns>
+    [HttpPut("api/vm")]
+    [SwaggerOperation(OperationId = "ChangeVm")]
+    [Authorize(AppConstants.AnyUserPolicy)]
+    public async Task<ActionResult<Vm>> ChangeVm([FromBody]VmOperation op)
+    {
+        if (!AuthorizeAny(
+            () => CanManageVmOperation(op).Result
+        )) return Forbid();
+
+        Vm vm = await podService.ChangeState(op);
+
+        SendBroadcast(vm, op.Type.ToString().ToLower());
+
+        return Ok(vm);
+    }
+
+    /// <summary>
+    /// Delete a vm.
+    /// </summary>
+    /// <param name="id">Vm Id</param>
+    /// <returns></returns>
+    [HttpDelete("api/vm/{id}")]
+    [SwaggerOperation(OperationId = "DeleteVm")]
+    [Authorize]
+    public async Task<ActionResult<Vm>> DeleteVm(string id)
+    {
+        if (!AuthorizeAny(
+            () => CanDeleteVm(id, Actor.Id).Result
+        )) return Forbid();
+
+        Vm vm = await podService.Delete(id);
+
+        SendBroadcast(vm, "delete");
+
+        return Ok(vm);
+    }
+
+    /// <summary>
+    /// Change vm iso or network
+    /// </summary>
+    /// <param name="id">Vm Id</param>
+    /// <param name="change">key-value pairs</param>
+    /// <returns></returns>
+    [HttpPut("api/vm/{id}/change")]
+    [SwaggerOperation(OperationId = "ReconfigureVm")]
+    [Authorize(AppConstants.AnyUserPolicy)]
+    public async Task<ActionResult<Vm>> ReconfigureVm(string id, [FromBody] VmKeyValue change)
+    {
+        if (!AuthorizeAny(
+            () => CanManageVm(id, Actor).Result
+        )) return Forbid();
+
+        // need elevated privileges to change vm to special nets
+        if (
+            Actor.IsBuilder.Equals(false) &&
+            change.Key == "net" &&
+            change.Value.Contains('#').Equals(false) &&
+            options.AllowUnprivilegedVmReconfigure.Equals(false)
+        )
         {
-            if (!AuthorizeAny(
-                () => Actor.IsObserver
-            )) return Forbid();
-
-            var vms = await _pod.Find(filter);
-
-            if (Actor.IsObserver && !Actor.IsAdmin)
-            {
-                // filter by scope/audience: ensure all VMs come from workspaces w/ audiences
-                // within this user's scope or they are manager
-                vms = vms.Where(vm =>
-                    CanManageVm(vm.Name, Actor).Result
-                ).ToArray();
-            }
-
-            var keys = vms.Select(v => v.Name.Tag()).Distinct().ToArray();
-
-            var map = await _templateService.ResolveKeys(keys);
-
-            foreach (Vm vm in vms)
-                vm.GroupName = map[vm.Name.Tag()];
-
-            return Ok(
-                vms
-                .OrderBy(v => v.GroupName)
-                .ThenBy(v => v.Name)
-                .ToArray()
-            );
+            throw new ActionForbidden();
         }
 
-        /// <summary>
-        /// Load a vm.
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        [HttpGet("api/vm/{id}")]
-        [SwaggerOperation(OperationId = "LoadVm")]
-        [Authorize]
-        public async Task<ActionResult<Vm>> LoadVm(string id)
-        {
-            if (!AuthorizeAny(
-                () => CanManageVm(id, Actor).Result
-            )) return Forbid();
+        bool sudo = Actor.IsBuilder && options.AllowPrivilegedNetworkIsolationExemption;
 
-            return Ok(
-                await _pod.Load(id)
-            );
-        }
+        Vm vm = await podService.ChangeConfiguration(id, change, sudo);
 
-        /// <summary>
-        /// Change vm state.
-        /// </summary>
-        /// <remarks>
-        /// Operations: Start, Stop, Save, Revert
-        /// </remarks>
-        /// <param name="op"></param>
-        /// <returns></returns>
-        [HttpPut("api/vm")]
-        [SwaggerOperation(OperationId = "ChangeVm")]
-        [Authorize(AppConstants.AnyUserPolicy)]
-        public async Task<ActionResult<Vm>> ChangeVm([FromBody]VmOperation op)
-        {
-            await Validate(op);
+        SendBroadcast(vm, "change");
 
-            if (!AuthorizeAny(
-                () => CanManageVmOperation(op).Result
-            )) return Forbid();
+        return Ok(vm);
+    }
 
-            Vm vm = await _pod.ChangeState(op);
+    /// <summary>
+    /// Answer a vm question.
+    /// </summary>
+    /// <param name="id">Vm Id</param>
+    /// <param name="answer"></param>
+    /// <returns></returns>
+    [HttpPut("api/vm/{id}/answer")]
+    [SwaggerOperation(OperationId = "AnswerVmQuestion")]
+    [Authorize]
+    public async Task<ActionResult<Vm>> AnswerVmQuestion(string id, [FromBody] VmAnswer answer)
+    {
+        if (!AuthorizeAny(
+            () => CanManageVm(id, Actor).Result
+        )) return Forbid();
 
-            SendBroadcast(vm, op.Type.ToString().ToLower());
+        Vm vm = await podService.Answer(id, answer);
 
-            return Ok(vm);
-        }
+        SendBroadcast(vm, "answer");
 
-        /// <summary>
-        /// Delete a vm.
-        /// </summary>
-        /// <param name="id">Vm Id</param>
-        /// <returns></returns>
-        [HttpDelete("api/vm/{id}")]
-        [SwaggerOperation(OperationId = "DeleteVm")]
-        [Authorize]
-        public async Task<ActionResult<Vm>> DeleteVm(string id)
-        {
-            if (!AuthorizeAny(
-                () => CanDeleteVm(id, Actor.Id).Result
-            )) return Forbid();
+        return Ok(vm);
+    }
 
-            Vm vm = await _pod.Delete(id);
+    /// <summary>
+    /// Find ISO files available to a vm.
+    /// </summary>
+    /// <param name="id">Vm Id</param>
+    /// <returns></returns>
+    [HttpGet("api/vm/{id}/isos")]
+    [SwaggerOperation(OperationId = "GetVmIsoOptions")]
+    [Authorize(AppConstants.AnyUserPolicy)]
+    public async Task<ActionResult<VmOptions>> GetVmIsoOptions(string id)
+    {
+        if (!AuthorizeAny(
+            () => CanManageVm(id, Actor).Result
+        )) return Forbid();
 
-            SendBroadcast(vm, "delete");
-
-            return Ok(vm);
-        }
-
-        /// <summary>
-        /// Change vm iso or network
-        /// </summary>
-        /// <param name="id">Vm Id</param>
-        /// <param name="change">key-value pairs</param>
-        /// <returns></returns>
-        [HttpPut("api/vm/{id}/change")]
-        [SwaggerOperation(OperationId = "ReconfigureVm")]
-        [Authorize(AppConstants.AnyUserPolicy)]
-        public async Task<ActionResult<Vm>> ReconfigureVm(string id, [FromBody] VmKeyValue change)
-        {
-            if (!AuthorizeAny(
-                () => CanManageVm(id, Actor).Result
-            )) return Forbid();
-
-            // need elevated privileges to change vm to special nets
-            if (
-                Actor.IsBuilder.Equals(false) &&
-                change.Key == "net" &&
-                change.Value.Contains('#').Equals(false) &&
-                _options.AllowUnprivilegedVmReconfigure.Equals(false)
+        return Ok(
+            await podService.GetVmIsoOptions(
+                await GetVmIsolationTag(id)
             )
-            {
-                throw new ActionForbidden();
-            }
+        );
+    }
 
-            bool sudo = Actor.IsBuilder && _options.AllowPrivilegedNetworkIsolationExemption;
+    /// <summary>
+    /// Find virtual networks available to a vm.
+    /// </summary>
+    /// <param name="id">Vm Id</param>
+    /// <returns></returns>
+    [HttpGet("api/vm/{id}/nets")]
+    [SwaggerOperation(OperationId = "GetVmNetOptions")]
+    [Authorize(AppConstants.AnyUserPolicy)]
+    public async Task<ActionResult<VmOptions>> GetVmNetOptions(string id)
+    {
+        if (!AuthorizeAny(
+            () => CanManageVm(id, Actor).Result
+        )) return Forbid();
 
-            Vm vm = await _pod.ChangeConfiguration(id, change, sudo);
+        var opt = await podService.GetVmNetOptions(
+            await GetVmIsolationTag(id)
+        );
 
-            SendBroadcast(vm, "change");
-
-            return Ok(vm);
+        // if not builder, strip any privileged nets
+        if (
+            Actor.IsBuilder.Equals(false) &&
+            options.AllowUnprivilegedVmReconfigure.Equals(false)
+        ) {
+            opt.Net = opt.Net.Where(x => x.Contains('#')).ToArray();
         }
 
-        /// <summary>
-        /// Answer a vm question.
-        /// </summary>
-        /// <param name="id">Vm Id</param>
-        /// <param name="answer"></param>
-        /// <returns></returns>
-        [HttpPut("api/vm/{id}/answer")]
-        [SwaggerOperation(OperationId = "AnswerVmQuestion")]
-        [Authorize]
-        public async Task<ActionResult<Vm>> AnswerVmQuestion(string id, [FromBody] VmAnswer answer)
-        {
-            if (!AuthorizeAny(
-                () => CanManageVm(id, Actor).Result
-            )) return Forbid();
+        return Ok(opt);
+    }
 
-            Vm vm = await _pod.Answer(id, answer);
+    /// <summary>
+    /// Request a vm console access ticket.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    [HttpGet("api/vm-console/{id}")]
+    [SwaggerOperation(OperationId = "GetVmTicket")]
+    [Authorize(AppConstants.AnyUserPolicy)]
+    public async Task<ActionResult<VmConsole>> GetVmTicket(string id)
+    {
+        if (!AuthorizeAny(
+            () => CanManageVm(id, Actor).Result
+        )) return Forbid();
 
-            SendBroadcast(vm, "answer");
+        var info = await podService.Display(id);
 
-            return Ok(vm);
-        }
-
-        /// <summary>
-        /// Find ISO files available to a vm.
-        /// </summary>
-        /// <param name="id">Vm Id</param>
-        /// <returns></returns>
-        [HttpGet("api/vm/{id}/isos")]
-        [SwaggerOperation(OperationId = "GetVmIsoOptions")]
-        [Authorize(AppConstants.AnyUserPolicy)]
-        public async Task<ActionResult<VmOptions>> GetVmIsoOptions(string id)
-        {
-            if (!AuthorizeAny(
-                () => CanManageVm(id, Actor).Result
-            )) return Forbid();
-
-            return Ok(
-                await _pod.GetVmIsoOptions(
-                    await GetVmIsolationTag(id)
-                )
-            );
-        }
-
-        /// <summary>
-        /// Find virtual networks available to a vm.
-        /// </summary>
-        /// <param name="id">Vm Id</param>
-        /// <returns></returns>
-        [HttpGet("api/vm/{id}/nets")]
-        [SwaggerOperation(OperationId = "GetVmNetOptions")]
-        [Authorize(AppConstants.AnyUserPolicy)]
-        public async Task<ActionResult<VmOptions>> GetVmNetOptions(string id)
-        {
-            if (!AuthorizeAny(
-                () => CanManageVm(id, Actor).Result
-            )) return Forbid();
-
-            var opt = await _pod.GetVmNetOptions(
-                await GetVmIsolationTag(id)
-            );
-
-            // if not builder, strip any privileged nets
-            if (
-                Actor.IsBuilder.Equals(false) &&
-                _options.AllowUnprivilegedVmReconfigure.Equals(false)
-            ) {
-                opt.Net = opt.Net.Where(x => x.Contains('#')).ToArray();
-            }
-
-            return Ok(opt);
-        }
-
-        /// <summary>
-        /// Request a vm console access ticket.
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        [HttpGet("api/vm-console/{id}")]
-        [SwaggerOperation(OperationId = "GetVmTicket")]
-        [Authorize(AppConstants.AnyUserPolicy)]
-        public async Task<ActionResult<VmConsole>> GetVmTicket(string id)
-        {
-            if (!AuthorizeAny(
-                () => CanManageVm(id, Actor).Result
-            )) return Forbid();
-
-            var info = await _pod.Display(id);
-
-            if (info.Url.IsEmpty())
-                return Ok(info);
-
-            Logger.LogDebug($"mks url: {info.Url}");
-
-            var src = new Uri(info.Url);
-            string target = "";
-            string qs = "";
-            string internalHost = src.Host.Split('.').First();
-            string domain = Request.Host.Value.Contains('.')
-                        ? Request.Host.Value[(Request.Host.Value.IndexOf('.') + 1)..]
-                        : Request.Host.Value;
-
-            switch (_pod.Options.TicketUrlHandler.ToLower())
-            {
-                case "local-app":
-                    target = $"{Request.Host.Value}{Request.PathBase}{internalHost}";
-                break;
-
-                case "external-domain":
-                    target = $"{internalHost}.{domain}";
-                break;
-
-                case "host-map":
-                    var map = _pod.Options.TicketUrlHostMap;
-                    if (map.ContainsKey(src.Host))
-                        target = map[src.Host];
-                break;
-
-                // TODO: make this default after publishing change
-                case "none":
-                case "":
-                break;
-
-                case "querystring":
-                default:
-                    qs = $"?vmhost={src.Host}";
-                    target = _options.ConsoleHost;
-                break;
-            }
-
-            if (target.NotEmpty())
-                info.Url = info.Url.Replace(src.Host, target);
-
-            info.Url += qs;
-
-            Logger.LogDebug($"mks url: {info.Url}");
-
+        if (info.Url.IsEmpty())
             return Ok(info);
+
+        Logger.LogDebug($"mks url: {info.Url}");
+
+        var src = new Uri(info.Url);
+        string target = "";
+        string qs = "";
+        string internalHost = src.Host.Split('.').First();
+        string domain = Request.Host.Value.Contains('.')
+                    ? Request.Host.Value[(Request.Host.Value.IndexOf('.') + 1)..]
+                    : Request.Host.Value;
+
+        switch (podService.Options.TicketUrlHandler.ToLower())
+        {
+            case "local-app":
+                target = $"{Request.Host.Value}{Request.PathBase}{internalHost}";
+            break;
+
+            case "external-domain":
+                target = $"{internalHost}.{domain}";
+            break;
+
+            case "host-map":
+                var map = podService.Options.TicketUrlHostMap;
+                if (map.ContainsKey(src.Host))
+                    target = map[src.Host];
+            break;
+
+            // TODO: make this default after publishing change
+            case "none":
+            case "":
+            break;
+
+            case "querystring":
+            default:
+                qs = $"?vmhost={src.Host}";
+                target = options.ConsoleHost;
+            break;
         }
 
-        /// <summary>
-        /// Resolve a vm from a template.
-        /// </summary>
-        /// <param name="id">Template Id</param>
-        /// <returns></returns>
-        [HttpGet("api/vm-template/{id}")]
-        [SwaggerOperation(OperationId = "ResolveVmFromTemplate")]
-        [Authorize]
-        public async Task<ActionResult<Vm>> ResolveVmFromTemplate(string id)
+        if (target.NotEmpty())
+            info.Url = info.Url.Replace(src.Host, target);
+
+        info.Url += qs;
+
+        Logger.LogDebug($"mks url: {info.Url}");
+
+        return Ok(info);
+    }
+
+    /// <summary>
+    /// Resolve a vm from a template.
+    /// </summary>
+    /// <param name="id">Template Id</param>
+    /// <returns></returns>
+    [HttpGet("api/vm-template/{id}")]
+    [SwaggerOperation(OperationId = "ResolveVmFromTemplate")]
+    [Authorize]
+    public async Task<ActionResult<Vm>> ResolveVmFromTemplate(string id)
+    {
+        var template  = await templateService.GetDeployableTemplate(id, null);
+
+        string name = $"{template.Name}#{template.IsolationTag}";
+
+        if (!AuthorizeAny(
+            () => CanManageVm(name, Actor).Result
+        )) return Forbid();
+
+        return Ok(
+            await podService.Refresh(template)
+        );
+    }
+
+    /// <summary>
+    /// Deploy a vm from a template.
+    /// </summary>
+    /// <param name="id">Template Id</param>
+    /// <returns></returns>
+    [HttpPost("api/vm-template/{id}")]
+    [SwaggerOperation(OperationId = "DeployVm")]
+    [Authorize]
+    public async Task<ActionResult<Vm>> DeployVm(string id)
+    {
+        VmTemplate template  = await templateService
+            .GetDeployableTemplate(id, null)
+        ;
+
+        string name = $"{template.Name}#{template.IsolationTag}";
+
+        if (!AuthorizeAny(
+            () => CanManageVm(name, Actor).Result
+        )) return Forbid();
+
+        Vm vm = await podService.Deploy(template, Actor.IsBuilder);
+
+        if (template.HostAffinity)
         {
-            var template  = await _templateService.GetDeployableTemplate(id, null);
-
-            string name = $"{template.Name}#{template.IsolationTag}";
-
-            if (!AuthorizeAny(
-                () => CanManageVm(name, Actor).Result
-            )) return Forbid();
-
-            return Ok(
-                await _pod.Refresh(template)
+            await podService.SetAffinity(
+                template.IsolationTag,
+                new Vm[] { vm },
+                true
             );
+
+            vm.State = VmPowerState.Running;
         }
 
-        /// <summary>
-        /// Deploy a vm from a template.
-        /// </summary>
-        /// <param name="id">Template Id</param>
-        /// <returns></returns>
-        [HttpPost("api/vm-template/{id}")]
-        [SwaggerOperation(OperationId = "DeployVm")]
-        [Authorize]
-        public async Task<ActionResult<Vm>> DeployVm(string id)
+        // SendBroadcast(vm, "deploy");
+        VmState state = new()
         {
-            VmTemplate template  = await _templateService
-                .GetDeployableTemplate(id, null)
-            ;
+            Id = template.Id.ToString(),
+            Name = vm.Name.Untagged(),
+            IsolationId = vm.Name.Tag(),
+            IsRunning = vm.State == VmPowerState.Running
+        };
 
-            string name = $"{template.Name}#{template.IsolationTag}";
+        await Hub.Clients
+            .Group(state.IsolationId)
+            .VmEvent(new BroadcastEvent<VmState>(User, "VM.DEPLOY", state))
+        ;
 
-            if (!AuthorizeAny(
-                () => CanManageVm(name, Actor).Result
-            )) return Forbid();
+        return Ok(vm);
+    }
 
-            Vm vm = await _pod.Deploy(template, Actor.IsBuilder);
+    /// <summary>
+    /// Initialize vm disks.
+    /// </summary>
+    /// <param name="id">Template Id</param>
+    /// <returns></returns>
+    [HttpPut("api/vm-template/{id}")]
+    [SwaggerOperation(OperationId = "InitializeVmTemplate")]
+    [Authorize]
+    public async Task<ActionResult<int>> InitializeVmTemplate(string id)
+    {
+        VmTemplate template  = await templateService.GetDeployableTemplate(id, null);
 
-            if (template.HostAffinity)
-            {
-                await _pod.SetAffinity(
-                    template.IsolationTag,
-                    new Vm[] { vm },
-                    true
-                );
+        string name = $"{template.Name}#{template.IsolationTag}";
 
-                vm.State = VmPowerState.Running;
-            }
+        if (!AuthorizeAny(
+            () => CanManageVm(name, Actor).Result
+        )) return Forbid();
 
-            // SendBroadcast(vm, "deploy");
-            VmState state = new()
-            {
-                Id = template.Id.ToString(),
-                Name = vm.Name.Untagged(),
-                IsolationId = vm.Name.Tag(),
-                IsRunning = vm.State == VmPowerState.Running
-            };
+        return Ok(
+            await podService.CreateDisks(template)
+        );
+    }
 
-            await Hub.Clients
-                .Group(state.IsolationId)
-                .VmEvent(new BroadcastEvent<VmState>(User, "VM.DEPLOY", state))
-            ;
+    /// <summary>
+    /// Initiate hypervisor manager reload
+    /// </summary>
+    /// <param name="host"></param>
+    /// <returns></returns>
+    [HttpPost("api/pod/{host}")]
+    [Authorize(AppConstants.AdminOnlyPolicy)]
+    [ApiExplorerSettings(IgnoreApi = true)]
+    public async Task<ActionResult> ReloadHost(string host)
+    {
+        await podService.ReloadHost(host);
+        return Ok();
+    }
 
-            return Ok(vm);
-        }
+    private async Task<bool> CanDeleteVm(string id, string subjectId)
+    {
+        return await userService.CanInteract(
+            subjectId,
+            await GetVmIsolationTag(id)
+        );
+    }
 
-        /// <summary>
-        /// Initialize vm disks.
-        /// </summary>
-        /// <param name="id">Template Id</param>
-        /// <returns></returns>
-        [HttpPut("api/vm-template/{id}")]
-        [SwaggerOperation(OperationId = "InitializeVmTemplate")]
-        [Authorize]
-        public async Task<ActionResult<int>> InitializeVmTemplate(string id)
+    private async Task<bool> CanManageVm(string id, User actor)
+    {
+        string isolationTag = await GetVmIsolationTag(id);
+        return actor.Id == isolationTag ||
+            (actor.IsObserver && await userService.CanInteractWithAudience(actor.Scope, isolationTag)) ||
+            (await userService.CanInteract(actor.Id, isolationTag));
+    }
+
+    private async Task<bool> CanManageVmOperation(VmOperation op)
+    {
+        return op.Type == VmOperationType.Delete
+            ? await CanDeleteVm(op.Id, Actor.Id)
+            : await CanManageVm(op.Id, Actor);
+    }
+
+    private async Task<string> GetVmIsolationTag(string id)
+    {
+        // id here can be name#isolationId, vm-id, or just isolationId
+        return id.Contains('#')
+            ? id.Tag()
+            : (await podService.Load(id))?.Name.Tag() ?? id
+        ;
+    }
+
+    private void SendBroadcast(Vm vm, string action)
+    {
+        VmState state = new()
         {
-            VmTemplate template  = await _templateService.GetDeployableTemplate(id, null);
+            Id = vm.Id,
+            Name = vm.Name.Untagged(),
+            IsolationId = vm.Name.Tag(),
+            IsRunning = vm.State == VmPowerState.Running
+        };
 
-            string name = $"{template.Name}#{template.IsolationTag}";
-
-            if (!AuthorizeAny(
-                () => CanManageVm(name, Actor).Result
-            )) return Forbid();
-
-            return Ok(
-                await _pod.CreateDisks(template)
-            );
-        }
-
-        /// <summary>
-        /// Initiate hypervisor manager reload
-        /// </summary>
-        /// <param name="host"></param>
-        /// <returns></returns>
-        [HttpPost("api/pod/{host}")]
-        [Authorize(AppConstants.AdminOnlyPolicy)]
-        [ApiExplorerSettings(IgnoreApi = true)]
-        public async Task<ActionResult> ReloadHost(string host)
-        {
-            await _pod.ReloadHost(host);
-            return Ok();
-        }
-
-        private async Task<bool> CanDeleteVm(string id, string subjectId)
-        {
-            return await _userService.CanInteract(
-                subjectId,
-                await GetVmIsolationTag(id)
-            );
-        }
-
-        private async Task<bool> CanManageVm(string id, User actor)
-        {
-            string isolationTag = await GetVmIsolationTag(id);
-            return actor.Id == isolationTag ||
-                (actor.IsObserver && await _userService.CanInteractWithAudience(actor.Scope, isolationTag)) ||
-                (await _userService.CanInteract(actor.Id, isolationTag));
-        }
-
-        private async Task<bool> CanManageVmOperation(VmOperation op)
-        {
-            return op.Type == VmOperationType.Delete
-                ? await CanDeleteVm(op.Id, Actor.Id)
-                : await CanManageVm(op.Id, Actor);
-        }
-
-        private async Task<string> GetVmIsolationTag(string id)
-        {
-            // id here can be name#isolationId, vm-id, or just isolationId
-            return id.Contains('#')
-                ? id.Tag()
-                : (await _pod.Load(id))?.Name.Tag() ?? id
-            ;
-        }
-
-        private void SendBroadcast(Vm vm, string action)
-        {
-            VmState state = new()
-            {
-                Id = vm.Id,
-                Name = vm.Name.Untagged(),
-                IsolationId = vm.Name.Tag(),
-                IsRunning = vm.State == VmPowerState.Running
-            };
-
-            Hub.Clients
-                .Group(vm.Name.Tag())
-                .VmEvent(new BroadcastEvent<VmState>(User, "VM." + action.ToUpper(), state))
-            ;
-        }
+        Hub.Clients
+            .Group(vm.Name.Tag())
+            .VmEvent(new BroadcastEvent<VmState>(User, "VM." + action.ToUpper(), state))
+        ;
     }
 }

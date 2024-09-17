@@ -1,118 +1,115 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using TopoMojo.Api.Data.Abstractions;
-using TopoMojo.Api.Extensions;
 using TopoMojo.Api.Models;
-using TopoMojo.Api.Exceptions;
+using Microsoft.AspNetCore.Mvc.Filters;
 
-namespace TopoMojo.Api.Validators
+namespace TopoMojo.Api.Controllers;
+
+public class GamespaceValidator(
+    IGamespaceStore store,
+    ILogger<GamespaceValidator> logger
+    ) : _ValidationFilter
 {
-    public class GamespaceValidator : IModelValidator
+    public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        private readonly IGamespaceStore _store;
-
-        public GamespaceValidator(
-            IGamespaceStore store
-        )
+        foreach (var key in context.ActionArguments.Keys)
         {
-            _store = store;
-        }
+            var value = context.ActionArguments[key];
 
-        public Task Validate(object model)
-        {
-
-            if (model is Entity)
-                return _validate(model as Entity);
-
-            if (model is WorkspaceEntity)
-                return _validate(model as WorkspaceEntity);
-
-            if (model is SpaceEntity)
-                return _validate(model as SpaceEntity);
-
-            if (model is GamespaceSearch)
-                return _validate(model as GamespaceSearch);
-
-            if (model is Player)
-                return _validate(model as Player);
-
-            if (model is GamespaceRegistration)
-                return _validate(model as GamespaceRegistration);
-
-            throw new NotImplementedException();
-        }
-
-        private async Task _validate(Entity model)
-        {
-            if (! await Exists(model.Id))
-                throw new ResourceNotFound();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(WorkspaceEntity model)
-        {
-            if (await _store.DbContext.Workspaces.FindAsync(model.Id) == null)
-                throw new ResourceNotFound();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(SpaceEntity model)
-        {
-            if (
-                ! await Exists(model.Id) &&
-                ! await WorkspaceExists(model.Id)
-            )
+            switch (value)
             {
-                throw new ResourceNotFound();
+                case string val:
+                switch (key.ToLower())
+                {
+                    case "id":
+                    await Exists(key, val);
+                    break;
+
+                    case "wid":
+                    await WorkspaceExists(key, val);
+                    break;
+
+                    case "sid":
+                    await SpaceExists(key, val);
+                    break;
+                }
+                break;
+
+                case ChangedGamespace model:
+                await Validate(key, model);
+                break;
+
+                case SectionSubmission model:
+                await Validate(key, model);
+                break;
+
+                case Player model:
+                await Validate(key, model);
+                break;
+
+                case GamespaceRegistration model:
+                await Validate(key, model);
+                break;
+
+                case GamespaceSearch search:
+                await Validate(key, search);
+                break;
+
+                default:
+                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                break;
+
             }
-
-            await Task.CompletedTask;
         }
 
-        private async Task _validate(GamespaceSearch model)
-        {
-            await Task.CompletedTask;
-        }
+        // call this after all the validation checks
+        await base.OnActionExecutionAsync(context, next);
+    }
 
-        private async Task _validate(GamespaceRegistration model)
-        {
-            if (! await WorkspaceExists(model.ResourceId))
-                throw new ResourceNotFound();
+    private async Task Exists(string key, string? id)
+    {
+        var entity = await store.Retrieve(id ?? "invalid");
+        if (entity is null)
+            Problems.Add(new Problem(key, Message.ResourceNotFound));
+    }
 
-            await Task.CompletedTask;
-        }
+    private async Task WorkspaceExists(string key, string? id)
+    {
+        var entity = await store.DbContext.Workspaces.FindAsync(id ?? "invalid");
+        if (entity is null)
+            Problems.Add(new Problem(key, Message.ResourceNotFound));
+    }
 
-        private async Task _validate(Player model)
-        {
-            var entity = await _store.DbContext.Players.FindAsync(model.SubjectId, model.GamespaceId);
+    private async Task SpaceExists(string key, string? id)
+    {
+        var gs = await store.Retrieve(id ?? "invalid");
+        var ws = await store.DbContext.Workspaces.FindAsync(id ?? "invalid");
+        if (gs is null && ws is null)
+            Problems.Add(new Problem(key, Message.ResourceNotFound));
+    }
 
-            if (entity != null)
-                throw new ResourceNotFound();
 
-            await Task.CompletedTask;
-        }
+    private async Task Validate(string key, GamespaceRegistration model)
+    {
+        await SpaceExists(key, model.ResourceId);
+    }
 
-        private async Task<bool> Exists(string id)
-        {
-            return
-                id.NotEmpty() &&
-                (await _store.Retrieve(id)) is Data.Gamespace
-            ;
-        }
+    private async Task Validate(string key, ChangedGamespace model)
+    {
+        await Exists(key, model.Id);
+    }
 
-        private async Task<bool> WorkspaceExists(string id)
-        {
-            return
-                id.NotEmpty() &&
-                (await _store.DbContext.Workspaces.FindAsync(id)) is Data.Workspace
-            ;
-        }
+    private async Task Validate(string key, SectionSubmission model)
+    {
+        await Exists(key, model.Id);
+    }
 
+    private async Task Validate(string key, Player model)
+    {
+        var entity = await store.DbContext.Players.FindAsync(model.SubjectId, model.GamespaceId);
+        if (entity is null)
+            Problems.Add(new Problem(key, Message.ResourceNotFound));
     }
 }
