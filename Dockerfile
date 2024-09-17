@@ -2,12 +2,8 @@
 #multi-stage target: dev
 #
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dev
-
-ENV ASPNETCORE_URLS=http://*:5000 \
-    ASPNETCORE_ENVIRONMENT=DEVELOPMENT
-
+ENV ASPNETCORE_ENVIRONMENT=DEVELOPMENT
 COPY . /app
-
 WORKDIR /app/src/TopoMojo.Api
 RUN dotnet publish -c Release -o /app/dist
 CMD ["dotnet", "run"]
@@ -22,6 +18,5 @@ ENV DOTNET_HOSTBUILDER__RELOADCONFIGCHANGE=false
 COPY --from=dev /app/dist /app
 COPY --from=dev /app/LICENSE.md /app/LICENSE.md
 WORKDIR /app
-EXPOSE 80
-ENV ASPNETCORE_URLS=http://*:80
+USER $APP_UID
 CMD [ "dotnet", "TopoMojo.Api.dll" ]
