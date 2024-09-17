@@ -1,11 +1,9 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Http;
+using Microsoft.IdentityModel.JsonWebTokens;
 using TopoMojo.Api;
 
 namespace Microsoft.Extensions.DependencyInjection
@@ -16,7 +14,7 @@ namespace Microsoft.Extensions.DependencyInjection
             this IServiceCollection services,
             OidcOptions oidc
         ) {
-            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+            JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
             services
                 .AddScoped<IClaimsTransformation, UserClaimsTransformation>()
