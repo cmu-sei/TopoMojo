@@ -373,6 +373,11 @@ namespace TopoMojo.Api.Services
                                 tmp.Parent = null;
                                 tmp.Workspace = null;
                                 newTemplates.Add(tmp);
+                                // handle the case where a parent template was attached to a workspace that is not in the upload
+                                if (tmp.WorkspaceId != null && !existingWorkspaceIds.Contains(tmp.WorkspaceId))
+                                {
+                                    tmp.WorkspaceId = null;
+                                }
                                 existingTemplateIds.Add(tmp.Id);
                             }
                         }
