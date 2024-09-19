@@ -5,7 +5,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dev
 ENV ASPNETCORE_ENVIRONMENT=DEVELOPMENT
 COPY . /home/app
 WORKDIR /home/app/src/TopoMojo.Api
-RUN dotnet publish -c Release -o /home/app/dist
+RUN dotnet publish --use-current-runtime -o /home/app/dist
 CMD ["dotnet", "run"]
 
 #
