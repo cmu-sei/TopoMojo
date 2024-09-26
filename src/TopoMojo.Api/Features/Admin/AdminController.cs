@@ -84,8 +84,8 @@ public class AdminController(
     public async Task<ActionResult> DownloadWorkspaces([FromBody] string[] ids)
     {
         string srcPath = fileUploadOptions.TopoRoot;
-        (var byteArray, var fileName) = await transferSvc.Download(ids, srcPath);
-        return File(byteArray, "application/zip", fileName);
+        var stream = await transferSvc.Download(ids, srcPath);
+        return File(stream, "application/zip", "topomojo-export.zip");
     }
 
     /// <summary>
