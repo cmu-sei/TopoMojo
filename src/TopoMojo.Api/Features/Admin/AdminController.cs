@@ -49,12 +49,11 @@ public class AdminController(
     [SwaggerOperation(OperationId = "ExportWorkspaces")]
     public async Task<ActionResult> ExportWorkspaces([FromBody] string[] ids)
     {
-        string srcPath = fileUploadOptions.TopoRoot;
-        string destPath = Path.Combine(
-            fileUploadOptions.TopoRoot,
-            "_export"
+        await transferSvc.Export(
+            ids,
+            fileUploadOptions.DocRoot,
+            Path.Combine(fileUploadOptions.TopoRoot, "_export")
         );
-        await transferSvc.Export(ids, srcPath, destPath);
 
         return Ok();
     }
@@ -83,8 +82,7 @@ public class AdminController(
     [SwaggerOperation(OperationId = "DownloadWorkspaces")]
     public async Task<ActionResult> DownloadWorkspaces([FromBody] string[] ids)
     {
-        string srcPath = fileUploadOptions.TopoRoot;
-        var stream = await transferSvc.Download(ids, srcPath);
+        var stream = await transferSvc.Download(ids, fileUploadOptions.DocRoot);
         return File(stream, "application/zip", "topomojo-export.zip");
     }
 

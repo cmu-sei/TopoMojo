@@ -43,17 +43,17 @@ public class TransferService(
         return results;
     }
 
-    public async Task Export(string[] ids, string src, string dest)
+    public async Task Export(string[] ids, string docPath, string dest)
     {
         string fn = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss") + "_export.zip";
         string path = Path.Combine(dest, fn);
         using FileStream writer = File.Create(path);
         await writer.CopyToAsync(
-            await Download(ids, src)
+            await Download(ids, docPath)
         );
     }
 
-    public async Task<Stream> Download(string[] ids, string src)
+    public async Task<Stream> Download(string[] ids, string docPath)
     {
         List<Workspace> list = [];
         List<Template> stock = [];
@@ -161,7 +161,7 @@ public class TransferService(
         return await CreateZipfile(
             list,
             allDisks.Distinct(),
-            Path.Combine(src, "docs")
+            docPath
         );
 
     }
