@@ -25,6 +25,28 @@ public class TransferService(
         WriteIndented = true
     };
 
+    private readonly string DisksReadme = """
+        # README
+        # This is a list disks where the folder matches the *workspace-id*.
+        # Any leading, non-hex character sequence of the workspace-id is its *tenant-prefix*.
+        # When importing data, workspace-id is changed to match the destination tenant-prefix,
+        # so care must be taken to ensure the destination folders match the new workspace-id.
+        #
+        # Folder with all zeros is "stock" folder; don't alter it.
+        #
+        # If neither source nor destination use a tenant-prefix, no action necessary.
+        #
+        # First, if the source has tenant-prefix, replace those characters with zeros.
+        #
+        # Then, if destination has tenant-prefix replace the leading characters with the
+        # destination tenant-prefix.
+        #
+        # The resulting folder names should be 32 characters; only *replace*
+        # characters, don't add or remove any.
+        # ----------
+
+        """;
+
     public async Task<IEnumerable<string>> Import(string repoPath, string docPath)
     {
         List<string> results = [];
@@ -212,6 +234,27 @@ public class TransferService(
         return [.. (await ImportWorkspaces(data))];
     }
 
+    private void UpdateTenant(Workspace ws)
+    {
+        string src = ws.Id.ExtractTenant();
+        string dst = _options.Tenant;
+        string tenant = src.Length > dst.Length
+            ? string.Concat(dst, new string('0', src.Length - dst.Length))
+            : dst
+        ;
+
+        if (tenant.NotEmpty() && !ws.Id.StartsWith(tenant))
+        {
+            string target = ws.Id;
+            ws.Id = string.Concat(tenant, ws.Id.AsSpan(tenant.Length));
+            foreach (Template t in ws.Templates)
+            {
+                t.WorkspaceId = ws.Id;
+                t.Detail = t.Detail?.Replace(target, ws.Id);
+            }
+        }
+    }
+
     private async Task<string[]> ImportWorkspaces(IEnumerable<Workspace> data)
     {
         List<string> results = [];
@@ -220,17 +263,22 @@ public class TransferService(
 
         foreach(var topo in data)
         {
-            // prevent overwriting
-            if (wids.Contains(topo.Id)) {
-                results.Add($"Duplicate: {topo.Name} {topo.Id}");
-                continue;
-            }
-
             // add new stock templates
-            if (Guid.Parse(topo.Id) == Guid.Empty) {
+            if (Guid.TryParse(topo.Id, out Guid guid) && guid == Guid.Empty)
+            {
                 var stock = topo.Templates.Where(t => !tids.Contains(t.Id)).ToArray();
                 workspaceStore.DbContext.Templates.AddRange(stock);
                 results.Add($"Stock templates: {stock.Length}");
+                continue;
+            }
+
+            // add or remove tenant prefix
+            UpdateTenant(topo);
+
+            // prevent overwriting
+            if (wids.Contains(topo.Id))
+            {
+                results.Add($"Duplicate: {topo.Name} {topo.Id}");
                 continue;
             }
 
@@ -258,7 +306,7 @@ public class TransferService(
             WriteFileToArchive(
                 zipArchive,
                 "_disks.txt",
-                Encoding.UTF8.GetBytes(string.Join("\n", disks))
+                Encoding.UTF8.GetBytes(string.Concat(DisksReadme, string.Join("\n", disks)))
             );
 
             // export markdown doc artifacts
@@ -303,11 +351,11 @@ public class TransferService(
         foreach (var entry in zipArchive.Entries)
         {
             // skip disks
-            if (entry.FullName == "_disks.txt")
+            if (entry.FullName.Equals("_disks.txt"))
                 continue;
 
             // deserialize workspace data
-            if (entry.FullName == "_data.json")
+            if (entry.FullName.Equals("_data.json"))
             {
                 results = await ImportSerializedWorkspaces(entry.Open());
                 continue;

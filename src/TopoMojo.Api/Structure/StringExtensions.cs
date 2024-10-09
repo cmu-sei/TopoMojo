@@ -310,5 +310,21 @@ namespace TopoMojo.Api.Extensions
 
             return result;
         }
+
+        private static readonly char[] hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+
+        public static string ExtractTenant(this string s)
+        {
+            string r = "";
+            char[] c = s.ToLower().ToCharArray();
+            for (int i = 0; i < c.Length; i++)
+            {
+                if (hex.Contains(c[i]))
+                    break;
+                else
+                    r += c[i];
+            }
+            return r;
+        }
     }
 }

@@ -231,7 +231,10 @@ namespace TopoMojo.Api.Services
 
             ctx.Gamespace = new Data.Gamespace
             {
-                Id = Guid.NewGuid().ToString("n"),
+                Id = string.Concat(
+                    _options.Tenant,
+                    Guid.NewGuid().ToString("n").AsSpan(_options.Tenant.Length)
+                ),
                 Name = ctx.Workspace.Name,
                 Workspace = ctx.Workspace,
                 ManagerId = actor.Id,
@@ -243,9 +246,6 @@ namespace TopoMojo.Api.Services
                 PlayerCount = ctx.Request.PlayerCount > 0 ? ctx.Request.PlayerCount : ctx.Request.Players.Count(),
                 GraderKey = ctx.Request.GraderKey.ToSha256()
             };
-
-            if (string.IsNullOrEmpty(_options.Tenant).Equals(false))
-                ctx.Gamespace.Id = _options.Tenant + ctx.Gamespace.Id.Substring(0, ctx.Gamespace.Id.Length - _options.Tenant.Length);
 
             var gamespace = ctx.Gamespace;
 
