@@ -1,40 +1,28 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
+using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Hubs;
 using TopoMojo.Hypervisor;
 using TopoMojo.Api.Models;
 using TopoMojo.Api.Services;
 using TopoMojo.Api.Validators;
-using Swashbuckle.AspNetCore.Annotations;
 
 namespace TopoMojo.Api.Controllers
 {
     [Authorize]
     [ApiController]
-    public class WorkspaceController : _Controller
+    [TypeFilter(typeof(WorkspaceValidator))]
+    public class WorkspaceController(
+        ILogger<WorkspaceController> logger,
+        IHubContext<AppHub, IHubEvent> hub,
+        IHypervisorService podService,
+        WorkspaceService workspaceService
+        ) : _Controller(logger, hub)
     {
-        public WorkspaceController(
-            ILogger<WorkspaceController> logger,
-            IHubContext<AppHub, IHubEvent> hub,
-            WorkspaceValidator validator,
-            IHypervisorService podService,
-            WorkspaceService workspaceService
-        ) : base(logger, hub, validator)
-        {
-            _pod = podService;
-            _svc = workspaceService;
-        }
-
-        private readonly IHypervisorService _pod;
-        private readonly WorkspaceService _svc;
 
         /// <summary>
         /// List workspaces according to search parameters.
@@ -55,20 +43,18 @@ namespace TopoMojo.Api.Controllers
         [SwaggerOperation(OperationId = "ListWorkspaces")]
         public async Task<ActionResult<WorkspaceSummary[]>> ListWorkspaces([FromQuery]WorkspaceSearch search, CancellationToken ct)
         {
-            await Validate(search);
-
-            await Validate(new ClientAudience
+            if (search.WantsAudience && !Actor.HasScope(search.aud))
             {
-                Audience = search.aud,
-                Scope = Actor.Scope
-            });
+                ModelState.AddModelError("search", "ActorLacksAudienceScope");
+                return ValidationProblem();
+            }
 
-            AuthorizeAll();
+            if (!AuthorizeAll()) return Forbid();
 
             search.scope = Actor.Scope;
 
             return Ok(
-                await _svc.List(search, Actor.Id, Actor.IsAdmin, ct)
+                await workspaceService.List(search, Actor.Id, Actor.IsAdmin, ct)
             );
         }
 
@@ -82,15 +68,12 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<Workspace>> LoadWorkspace(string id)
         {
-            await Validate(new Entity{ Id = id });
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(id, Actor.Id).Result
+            )) return Forbid();
 
             return Ok(
-                await _svc.Load(id)
+                await workspaceService.Load(id)
             );
         }
 
@@ -104,16 +87,13 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<Workspace>> CreateWorkspace([FromBody]NewWorkspace model)
         {
-            await Validate(model);
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => Actor.IsCreator,
-                () => _svc.CheckWorkspaceLimit(Actor.Id).Result
-            );
+                () => workspaceService.CheckWorkspaceLimit(Actor.Id).Result
+            )) return Forbid();
 
             return Ok(
-                await _svc.Create(model, Actor.Id, Actor.Name, Actor.IsCreator)
+                await workspaceService.Create(model, Actor.Id, Actor.Name, Actor.IsCreator)
             );
         }
 
@@ -127,16 +107,13 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<Workspace>> CloneWorkspace([FromRoute]string id)
         {
-            await Validate(new Entity { Id = id });
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
+            if (!AuthorizeAny(
                 () => Actor.IsCreator,
-                () => _svc.CheckWorkspaceLimit(Actor.Id).Result
-            );
+                () => workspaceService.CheckWorkspaceLimit(Actor.Id).Result
+            )) return Forbid();
 
             return Ok(
-                await _svc.Clone(id)
+                await workspaceService.Clone(id)
             );
         }
 
@@ -150,14 +127,11 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult> UpdateWorkspace([FromBody]RestrictedChangedWorkspace model)
         {
-            await Validate(model);
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(model.Id, Actor.Id).Result
+            )) return Forbid();
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanEdit(model.Id, Actor.Id).Result
-            );
-
-            Workspace workspace = await _svc.Update(model);
+            Workspace workspace = await workspaceService.Update(model);
 
             await Hub.Clients
                 .Group(workspace.Id)
@@ -177,13 +151,11 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult> PrivilegedUpdateWorkspace([FromBody]ChangedWorkspace model)
         {
-            await Validate(model);
-
-            AuthorizeAny(
+            if (!AuthorizeAny(
                 () => Actor.IsAdmin
-            );
+            )) return Forbid();
 
-            Workspace workspace = await _svc.Update(model);
+            Workspace workspace = await workspaceService.Update(model);
 
             await Hub.Clients
                 .Group(workspace.Id)
@@ -203,12 +175,11 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult> DeleteWorkspace(string id)
         {
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanManage(id, Actor.Id).Result
-            );
+            if (!AuthorizeAny(
+                () => workspaceService.CanManage(id, Actor.Id).Result
+            )) return Forbid();
 
-            var workspace = await _svc.Delete(id);
+            var workspace = await workspaceService.Delete(id);
 
             Log("deleted", workspace);
 
@@ -229,15 +200,12 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<VmOptions>> LoadWorkspaceIsos(string id)
         {
-            await Validate(new Entity { Id = id });
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(id, Actor.Id).Result
+            )) return Forbid();
 
             return Ok(
-                await _pod.GetVmIsoOptions(id)
+                await podService.GetVmIsoOptions(id)
             );
         }
 
@@ -251,15 +219,12 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<VmOptions>> LoadWorkspaceNets(string id)
         {
-            await Validate(new Entity { Id = id });
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(id, Actor.Id).Result
+            )) return Forbid();
 
             return Ok(
-                await _pod.GetVmNetOptions(id)
+                await podService.GetVmNetOptions(id)
             );
         }
 
@@ -273,15 +238,12 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<WorkspaceStats>> GetWorkspaceStats(string id)
         {
-            await Validate(new Entity { Id = id });
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(id, Actor.Id).Result
+            )) return Forbid();
 
             return Ok(
-                await _svc.GetStats(id)
+                await workspaceService.GetStats(id)
             );
         }
 
@@ -295,15 +257,12 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<TemplateSummary[]>> LoadWorkspaceTemplates(string id)
         {
-            await Validate(new Entity { Id = id });
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(id, Actor.Id).Result
+            )) return Forbid();
 
             return Ok(
-                await _svc.GetScopedTemplates(id, Actor.Scope)
+                await workspaceService.GetScopedTemplates(id, Actor.Scope)
             );
         }
 
@@ -321,16 +280,13 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<WorkspaceStats>> DeleteWorkspaceGames(string id)
         {
-            await Validate(new Entity { Id = id });
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(id, Actor.Id).Result
+            )) return Forbid();
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            var games = await workspaceService.KillGames(id);
 
-            var games = await _svc.KillGames(id);
-
-            List<Task> tasklist = new List<Task>();
+            List<Task> tasklist = [];
 
             foreach (var game in games)
                 tasklist.Add(
@@ -339,7 +295,7 @@ namespace TopoMojo.Api.Controllers
                         .GameEvent(new BroadcastEvent<GameState>(User, "GAME.OVER", game))
                 );
 
-            await Task.WhenAll(tasklist.ToArray());
+            await Task.WhenAll([.. tasklist]);
 
             return Ok(
                 await GetWorkspaceStats(id)
@@ -356,15 +312,12 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<JoinCode>> GetWorkspaceInvite(string id)
         {
-            await Validate(new Entity { Id = id });
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanManage(id, Actor.Id).Result
-            );
+            if (!AuthorizeAny(
+                () => workspaceService.CanManage(id, Actor.Id).Result
+            )) return Forbid();
 
             return Ok(
-                await _svc.Invite(id)
+                await workspaceService.Invite(id)
             );
         }
 
@@ -378,15 +331,12 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<ChallengeSpec>> GetChallengeSpec([FromRoute] string id)
         {
-            await Validate(new Entity { Id = id });
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanEdit(id, Actor.Id).Result
-            );
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(id, Actor.Id).Result
+            )) return Forbid();
 
             return Ok(
-                await _svc.GetChallenge(id)
+                await workspaceService.GetChallenge(id)
             );
         }
 
@@ -401,16 +351,11 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<IActionResult> UpdateChallengeSpec([FromRoute]string id, [FromBody] ChallengeSpec model)
         {
-            await Validate(new Entity{ Id = id });
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(id, Actor.Id).Result
+            )) return Forbid();
 
-            await Validate(model);
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanEdit(id, Actor.Id).Result
-            );
-
-            await _svc.UpdateChallenge(id, model);
+            await workspaceService.UpdateChallenge(id, model);
 
             // TODO: broadcast updated
 
@@ -432,7 +377,7 @@ namespace TopoMojo.Api.Controllers
         public async Task<ActionResult<WorkspaceSummary>> BecomeWorker(string code)
         {
             return Ok(
-                await _svc.Enlist(code, Actor.Id, Actor.Name)
+                await workspaceService.Enlist(code, Actor.Id, Actor.Name)
             );
         }
 
@@ -447,14 +392,11 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult> RemoveWorker([FromRoute] string id, string sid)
         {
-            await Validate(new Entity{ Id = id });
+            if (!AuthorizeAny(
+                () => workspaceService.CanManage(id, Actor.Id).Result
+            )) return Forbid();
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => _svc.CanManage(id, Actor.Id).Result
-            );
-
-            await _svc.Delist(id, sid, Actor.IsAdmin);
+            await workspaceService.Delist(id, sid, Actor.IsAdmin);
 
             return Ok();
         }

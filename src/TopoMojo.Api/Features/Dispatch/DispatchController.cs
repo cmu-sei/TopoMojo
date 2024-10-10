@@ -1,168 +1,151 @@
-﻿using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
+// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Hubs;
 using TopoMojo.Api.Models;
 using TopoMojo.Api.Services;
 using TopoMojo.Api.Validators;
 
-namespace TopoMojo.Api.Controllers
+namespace TopoMojo.Api.Controllers;
+
+[Authorize]
+[ApiController]
+[TypeFilter<DispatchValidator>]
+public class DispatchController(
+    ILogger<AdminController> logger,
+    IHubContext<AppHub, IHubEvent> hub,
+    DispatchService dispatchService,
+    GamespaceService gamespaceService
+    ) : _Controller(logger, hub)
 {
-    [Authorize]
-    [ApiController]
-    public class DispatchController : _Controller
+
+    /// <summary>
+    /// Create new dispatch
+    /// </summary>
+    /// <param name="model"></param>
+    /// <returns></returns>
+    [HttpPost("api/dispatch")]
+    [SwaggerOperation(OperationId = "CreateDispatch")]
+    public async Task<ActionResult<Dispatch>> Create([FromBody] NewDispatch model)
     {
-        DispatchService DispatchService { get; }
-        GamespaceService GamespaceService { get; }
+        if (!AuthorizeAny(
+            () => Actor.IsAdmin,
+            () => model.TargetGroup == Actor.Id, // gamespace agent
+            () => gamespaceService.CanManage(model.TargetGroup, Actor.Id).Result,
+            () => Actor.IsObserver && gamespaceService.HasValidUserScopeGamespace(model.TargetGroup, Actor.Scope).Result
+        )) return Forbid();
 
-        public DispatchController(
-            ILogger<AdminController> logger,
-            IHubContext<AppHub, IHubEvent> hub,
-            DispatchValidator validator,
-            DispatchService dispatchService,
-            GamespaceService gamespaceService
-        ) : base(logger, hub, validator)
-        {
-            DispatchService = dispatchService;
-            GamespaceService = gamespaceService;
-        }
+        var result = await dispatchService.Create(model);
 
-        /// <summary>
-        /// Create new dispatch
-        /// </summary>
-        /// <param name="model"></param>
-        /// <returns></returns>
-        [HttpPost("api/dispatch")]
-        [SwaggerOperation(OperationId = "CreateDispatch")]
-        public async Task<Dispatch> Create([FromBody] NewDispatch model)
-        {
-            await Validate(model);
+        SendBroadcast(result, "CREATE");
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => model.TargetGroup == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(model.TargetGroup, Actor.Id).Result,
-                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(model.TargetGroup, Actor.Scope).Result
-            );
+        return result;
+    }
 
-            var result = await DispatchService.Create(model);
+    /// <summary>
+    /// Retrieve dispatch
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    [HttpGet("api/dispatch/{id}")]
+    [SwaggerOperation(OperationId = "GetDispatch")]
+    public async Task<ActionResult<Dispatch>> Retrieve([FromRoute] string id)
+    {
+        var model = await dispatchService.Retrieve(id);
 
-            SendBroadcast(result, "CREATE");
+        if (!AuthorizeAny(
+            () => Actor.IsAdmin,
+            () => model.TargetGroup == Actor.Id, // gamespace agent
+            () => gamespaceService.CanManage(model.TargetGroup, Actor.Id).Result,
+            () => Actor.IsObserver && gamespaceService.HasValidUserScopeGamespace(model.TargetGroup, Actor.Scope).Result
+        )) return Forbid();
 
-            return result;
-        }
+        return await dispatchService.Retrieve(id);
+    }
 
-        /// <summary>
-        /// Retrieve dispatch
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        [HttpGet("api/dispatch/{id}")]
-        [SwaggerOperation(OperationId = "GetDispatch")]
-        public async Task<Dispatch> Retrieve([FromRoute] string id)
-        {
-            await Validate(new Entity { Id = id });
+    /// <summary>
+    /// Change dispatch
+    /// </summary>
+    /// <param name="model"></param>
+    /// <returns></returns>
+    [HttpPut("api/dispatch")]
+    [SwaggerOperation(OperationId = "UpdateDispatch")]
+    public async Task<ActionResult> Update([FromBody] ChangedDispatch model)
+    {
+        var dispatch = await dispatchService.Retrieve(model.Id);
 
-            var model = await DispatchService.Retrieve(id);
+        if (!AuthorizeAny(
+            () => Actor.IsAdmin,
+            () => dispatch.TargetGroup == Actor.Id, // gamespace agent
+            () => gamespaceService.CanManage(dispatch.TargetGroup, Actor.Id).Result,
+            () => Actor.IsObserver && gamespaceService.HasValidUserScopeGamespace(dispatch.TargetGroup, Actor.Scope).Result
+        )) return Forbid();
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => model.TargetGroup == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(model.TargetGroup, Actor.Id).Result,
-                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(model.TargetGroup, Actor.Scope).Result
-            );
+        dispatch = await dispatchService.Update(model);
 
-            return await DispatchService.Retrieve(id);
-        }
+        SendBroadcast(
+            dispatch,
+            "UPDATE"
+        );
+        return Ok();
+    }
 
-        /// <summary>
-        /// Change dispatch
-        /// </summary>
-        /// <param name="model"></param>
-        /// <returns></returns>
-        [HttpPut("api/dispatch")]
-        [SwaggerOperation(OperationId = "UpdateDispatch")]
-        public async Task Update([FromBody] ChangedDispatch model)
-        {
-            await Validate(model);
+    /// <summary>
+    /// Delete dispatch
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    [HttpDelete("/api/dispatch/{id}")]
+    [SwaggerOperation(OperationId = "DeleteDispatch")]
+    public async Task<ActionResult> Delete([FromRoute] string id)
+    {
+        var entity = await dispatchService.Retrieve(id);
 
-            var dispatch = await DispatchService.Retrieve(model.Id);
+        if (!AuthorizeAny(
+            () => Actor.IsAdmin,
+            () => entity.TargetGroup == Actor.Id, // gamespace agent
+            () => gamespaceService.CanManage(entity.TargetGroup, Actor.Id).Result,
+            () => Actor.IsObserver && gamespaceService.HasValidUserScopeGamespace(entity.TargetGroup, Actor.Scope).Result
+        )) return Forbid();
 
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => dispatch.TargetGroup == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(dispatch.TargetGroup, Actor.Id).Result,
-                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(dispatch.TargetGroup, Actor.Scope).Result
-            );
+        await dispatchService.Delete(id);
 
-            dispatch = await DispatchService.Update(model);
+        SendBroadcast(new Dispatch { Id = id, TargetGroup = entity.TargetGroup }, "DELETE");
+        return Ok();
+    }
 
-            SendBroadcast(
-                dispatch,
-                "UPDATE"
-            );
-        }
+    /// <summary>
+    /// Find dispatches
+    /// </summary>
+    /// <param name="model"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    [HttpGet("/api/dispatches")]
+    [SwaggerOperation(OperationId = "ListDispatches")]
+    public async Task<ActionResult<Dispatch[]>> List([FromQuery] DispatchSearch model, CancellationToken ct)
+    {
+        if (!AuthorizeAny(
+            () => Actor.IsAdmin,
+            () => model.gs == Actor.Id, // gamespace agent
+            () => gamespaceService.CanManage(model.gs, Actor.Id).Result,
+            () => Actor.IsObserver && gamespaceService.HasValidUserScopeGamespace(model.gs, Actor.Scope).Result
+        )) return Forbid();
 
-        /// <summary>
-        /// Delete dispatch
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        [HttpDelete("/api/dispatch/{id}")]
-        [SwaggerOperation(OperationId = "DeleteDispatch")]
-        public async Task Delete([FromRoute] string id)
-        {
-            await Validate(new Entity { Id = id });
+        return await dispatchService.List(model, ct);
+    }
 
-            var entity = await DispatchService.Retrieve(id);
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => entity.TargetGroup == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(entity.TargetGroup, Actor.Id).Result,
-                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(entity.TargetGroup, Actor.Scope).Result
-            );
-
-            await DispatchService.Delete(id);
-
-            SendBroadcast(new Dispatch { Id = id, TargetGroup = entity.TargetGroup }, "DELETE");
-        }
-
-        /// <summary>
-        /// Find dispatches
-        /// </summary>
-        /// <param name="model"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        [HttpGet("/api/dispatches")]
-        [SwaggerOperation(OperationId = "ListDispatches")]
-        public async Task<Dispatch[]> List([FromQuery] DispatchSearch model, CancellationToken ct)
-        {
-            await Validate(model);
-
-            AuthorizeAny(
-                () => Actor.IsAdmin,
-                () => model.gs == Actor.Id, // gamespace agent
-                () => GamespaceService.CanManage(model.gs, Actor.Id).Result,
-                () => Actor.IsObserver && GamespaceService.HasValidUserScopeGamespace(model.gs, Actor.Scope).Result
-            );
-
-            return await DispatchService.List(model, ct);
-        }
-
-        private void SendBroadcast(Dispatch dispatch, string action)
-        {
-            Hub.Clients.Group(dispatch.TargetGroup).DispatchEvent(
-                new BroadcastEvent<Dispatch>(
-                    User,
-                    "DISPATCH." + action.ToUpper(),
-                    dispatch
-                )
-            );
-        }
+    private void SendBroadcast(Dispatch dispatch, string action)
+    {
+        Hub.Clients.Group(dispatch.TargetGroup).DispatchEvent(
+            new BroadcastEvent<Dispatch>(
+                User,
+                "DISPATCH." + action.ToUpper(),
+                dispatch
+            )
+        );
     }
 }

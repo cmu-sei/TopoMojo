@@ -1,145 +1,130 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc.Filters;
 using TopoMojo.Api.Data.Abstractions;
-using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Models;
 using TopoMojo.Api.Extensions;
+using TopoMojo.Api.Controllers;
 
-namespace TopoMojo.Api.Validators
+namespace TopoMojo.Api.Validators;
+
+public class TemplateValidator(
+    ITemplateStore store,
+    ILogger<TemplateValidator> logger
+    ) : _ValidationFilter
 {
-    public class TemplateValidator : IModelValidator
+    public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        private readonly ITemplateStore _store;
-
-        public TemplateValidator(
-            ITemplateStore store
-        )
+        foreach (var key in context.ActionArguments.Keys)
         {
-            _store = store;
+            var value = context.ActionArguments[key];
+
+            switch (value)
+            {
+                case string val:
+                switch (key.ToLower())
+                {
+                    case "id":
+                    await Exists(key, val);
+                    break;
+                }
+                break;
+
+                case TemplateSearch search:
+                await Validate(key, search);
+                break;
+
+                case ChangedTemplate model:
+                    await Validate(key, model);
+                    break;
+
+                case TemplateLink model:
+                    await Validate(key, model);
+                    break;
+
+                case TemplateReLink model:
+                    await Validate(key, model);
+                    break;
+
+                case NewTemplateDetail model:
+                    await Validate(key, model);
+                    break;
+
+                case ChangedTemplateDetail model:
+                    await Validate(key, model);
+                    break;
+
+                case TemplateClone model:
+                    await Validate(key, model);
+                    break;
+
+                case TemplateDetail model:
+                    await Validate(key, model);
+                    break;
+
+                default:
+                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                break;
+            }
         }
 
-        public Task Validate(object model)
-        {
+        // call this after all the validation checks
+        await base.OnActionExecutionAsync(context, next);
+    }
 
-            if (model is Entity)
-                return _validate(model as Entity);
+    private async Task Exists(string key, string? id)
+    {
+        var entity = await store.Retrieve(id ?? "invalid");
+        if (entity is null)
+            Problems.Add(new Problem(key, Message.ResourceNotFound));
+    }
 
-            if (model is ChangedTemplate)
-                return _validate(model as ChangedTemplate);
+    private async Task Validate(string key, TemplateDetail model)
+    {
+        await Exists(key, model.Id);
+    }
 
-            if (model is TemplateLink)
-                return _validate(model as TemplateLink);
+    private async Task Validate(string key, ChangedTemplateDetail model)
+    {
+        await Exists(key, model.Id);
+    }
 
-            if (model is TemplateReLink)
-                return _validate(model as TemplateReLink);
+    private async Task Validate(string key, NewTemplateDetail model)
+    {
+        var entity = await store.Retrieve(model.Id);
+        if (entity is not null)
+            Problems.Add(new Problem(key, Message.ResourceAlreadyExists));
+    }
 
-            if (model is NewTemplateDetail)
-                return _validate(model as NewTemplateDetail);
+    private async Task Validate(string key, TemplateClone model)
+    {
+        await Exists(key, model.Id);
+    }
 
-            if (model is ChangedTemplateDetail)
-                return _validate(model as ChangedTemplateDetail);
-
-            if (model is TemplateClone)
-                return _validate(model as TemplateClone);
-
-            if (model is TemplateDetail)
-                return _validate(model as TemplateDetail);
-
-            if (model is TemplateSearch)
-                return _validate(model as TemplateSearch);
-
-            throw new NotImplementedException();
-        }
-
-        private async Task _validate(TemplateSearch model)
-        {
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(TemplateDetail model)
-        {
-            if ((await Exists(model.Id)).Equals(false))
-                throw new ResourceNotFound();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(ChangedTemplateDetail model)
-        {
-            if ((await Exists(model.Id)).Equals(false))
-                throw new ResourceNotFound();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(NewTemplateDetail model)
-        {
-            if ((await Exists(model.Id)).Equals(true))
-                throw new ResourceAlreadyExists();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(TemplateClone model)
-        {
-            if ((await Exists(model.Id)).Equals(false))
-                throw new ResourceNotFound();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(TemplateReLink model)
-        {
-            if (
-                (await Exists(model.TemplateId)).Equals(false) ||
-                (await Exists(model.ParentId)).Equals(false) ||
-                (await _store.Retrieve(model.TemplateId))?.WorkspaceId != model.WorkspaceId
-            )
-                throw new ResourceNotFound();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(TemplateLink model)
-        {
-            if ((await Exists(model.TemplateId)).Equals(false))
-                throw new ResourceNotFound();
-
-            if ((await _store.DbContext.Workspaces.FindAsync(model.WorkspaceId)) == null)
-                throw new ResourceNotFound();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(ChangedTemplate model)
-        {
-            if (model.Name.IsEmpty())
-                throw new ArgumentException("ChangedTemplate.Name");
-
-            if ((await Exists(model.Id)).Equals(false))
-                throw new ResourceNotFound();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task _validate(Entity model)
-        {
-            if ((await Exists(model.Id)).Equals(false))
-                throw new ResourceNotFound();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task<bool> Exists(string id)
-        {
-            return
-                id.NotEmpty() &&
-                (await _store.Retrieve(id)) is Data.Template
-            ;
+    private async Task Validate(string key, TemplateReLink model)
+    {
+        await Exists(key, model.TemplateId);
+        await Exists(key, model.ParentId);
+        if (Problems.Count == 0) {
+            var t = await store.Retrieve(model.TemplateId);
+            if (t?.WorkspaceId != model.WorkspaceId)
+                Problems.Add(new Problem(key, Message.ResourceNotFound));
         }
     }
+
+    private async Task Validate(string key, TemplateLink model)
+    {
+        await Exists(key, model.TemplateId);
+        if ((await store.DbContext.Workspaces.FindAsync(model.WorkspaceId)) == null)
+            Problems.Add(new Problem(key, Message.ResourceNotFound));
+    }
+
+    private async Task Validate(string key, ChangedTemplate model)
+    {
+        await Exists(key, model.Id);
+        if (model.Name.IsEmpty())
+            Problems.Add(new Problem(key, "Missing value for required property 'name'"));
+    }
+
 }

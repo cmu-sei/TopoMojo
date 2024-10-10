@@ -3,6 +3,8 @@
 
 using System;
 using System.Linq;
+using System.Text.Json.Serialization;
+using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Extensions;
 
 namespace TopoMojo.Api.Models
@@ -94,10 +96,10 @@ namespace TopoMojo.Api.Models
         public string aud { get; set; }
         public string scope { get; set; }
         public int doc { get; set; }
-        public bool WantsAudience => string.IsNullOrEmpty(aud).Equals(false);
-        public bool WantsManaged => Filter.Contains("my");
-        public bool WantsDoc => doc > 0;
-        public bool WantsPartialDoc => doc == 1;
+        [SwaggerIgnore][JsonIgnore] public bool WantsAudience => string.IsNullOrEmpty(aud).Equals(false);
+        [SwaggerIgnore][JsonIgnore] public bool WantsManaged => Filter.Contains("my");
+        [SwaggerIgnore][JsonIgnore] public bool WantsDoc => doc > 0;
+        [SwaggerIgnore][JsonIgnore] public bool WantsPartialDoc => doc == 1;
     }
 
     public class ClientAudience

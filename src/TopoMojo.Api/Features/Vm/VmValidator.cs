@@ -1,54 +1,56 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc.Filters;
+using TopoMojo.Api.Controllers;
 using TopoMojo.Api.Data.Abstractions;
-using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Hypervisor;
 
-namespace TopoMojo.Api.Validators
+namespace TopoMojo.Api.Validators;
+
+public class VmValidator(
+    IHypervisorService pod,
+    IWorkspaceStore store,
+    ILogger<VmValidator> logger
+) : _ValidationFilter
 {
-        public class VmValidator : IModelValidator
+    public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        private readonly IWorkspaceStore _store;
-        private readonly IHypervisorService _pod;
-
-        public VmValidator(
-            IHypervisorService pod,
-            IWorkspaceStore store
-        )
+        foreach (var key in context.ActionArguments.Keys)
         {
-            _pod = pod;
-            _store = store;
-        }
+            var value = context.ActionArguments[key];
 
-        public Task Validate(object model)
-        {
-
-            if (model is VmOperation)
-                return _validate(model as VmOperation);
-
-            throw new NotImplementedException();
-        }
-
-        private async Task _validate(VmOperation model)
-        {
-            if (model.Type != VmOperationType.Save)
+            switch (value)
             {
-                await Task.CompletedTask;
-                return;
+
+                case VmOperation model:
+                await Validate(key, model);
+                break;
+
+                default:
+                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                break;
+
             }
+        }
 
-            string isolationId = model.Id.Contains("#")
+        // call this after all the validation checks
+        await base.OnActionExecutionAsync(context, next);
+    }
+
+    private async Task Validate(string key, VmOperation model)
+    {
+        if (model.Type == VmOperationType.Save)
+        {
+            string isolationId = model.Id.Contains('#')
                 ? model.Id.Tag()
-                : (await _pod.Load(model.Id))?.Name.Tag();
+                : (await pod.Load(model.Id))?.Name.Tag();
 
-            if (await _store.HasActiveGames(isolationId))
-                throw new WorkspaceNotIsolated();
-
-            await Task.CompletedTask;
+            if (await store.HasActiveGames(isolationId))
+            {
+                Problems.Add(new Problem(key, Message.WorkspaceNotIsolated));
+            }
         }
     }
 }

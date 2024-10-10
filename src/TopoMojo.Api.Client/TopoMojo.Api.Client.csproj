@@ -11,11 +11,11 @@
     <PackageId>TopoMojo.Api.Client</PackageId>
     <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/cmu-sei/TopoMojo</RepositoryUrl>
-    <Version>2.2.0</Version>
+    <Version>2.3.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="6.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.4" />
   </ItemGroup>
 
 </Project>

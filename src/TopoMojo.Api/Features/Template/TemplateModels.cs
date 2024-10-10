@@ -2,6 +2,8 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.Linq;
+using System.Text.Json.Serialization;
+using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Extensions;
 
 namespace TopoMojo.Api.Models
@@ -119,9 +121,9 @@ namespace TopoMojo.Api.Models
     {
         public const string PublishFilter = "published";
         public const string ParentFilter = "parents";
-        public bool WantsAudience => aud.NotEmpty();
-        public bool WantsPublished => Filter.Contains(PublishFilter);
-        public bool WantsParents => Filter.Contains(ParentFilter);
+        [SwaggerIgnore][JsonIgnore] public bool WantsAudience => aud.NotEmpty();
+        [SwaggerIgnore][JsonIgnore] public bool WantsPublished => Filter.Contains(PublishFilter);
+        [SwaggerIgnore][JsonIgnore] public bool WantsParents => Filter.Contains(ParentFilter);
 
         public string aud { get; set; }
         public string pid { get; set; }

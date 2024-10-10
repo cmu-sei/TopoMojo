@@ -4,6 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
+using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Extensions;
 
 namespace TopoMojo.Api.Models
@@ -91,8 +93,8 @@ namespace TopoMojo.Api.Models
     {
         public const string FilterAll = "all";
         public const string FilterActive = "active";
-        public bool WantsAll => Filter.Contains(FilterAll);
-        public bool WantsActive => Filter.Contains(FilterActive);
+        [SwaggerIgnore][JsonIgnore] public bool WantsAll => Filter.Contains(FilterAll);
+        [SwaggerIgnore][JsonIgnore] public bool WantsActive => Filter.Contains(FilterActive);
 
     }
 

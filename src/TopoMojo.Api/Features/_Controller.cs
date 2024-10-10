@@ -58,25 +58,24 @@ namespace TopoMojo.Api.Controllers
         /// Authorize if all requirements are met
         /// </summary>
         /// <param name="requirements"></param>
-        protected void AuthorizeAll(params Func<Boolean>[] requirements)
+        protected bool AuthorizeAll(params Func<Boolean>[] requirements)
         {
             bool valid = true;
 
             foreach(var requirement in requirements)
                 valid &= requirement.Invoke();
 
-            if (valid.Equals(false))
-                throw new ActionForbidden();
+            return valid;
         }
 
         /// <summary>
         /// Authorized if any requirement is met
         /// </summary>
         /// <param name="requirements"></param>
-        protected void AuthorizeAny(params Func<Boolean>[] requirements)
+        protected bool AuthorizeAny(params Func<Boolean>[] requirements)
         {
             if (Actor.IsAdmin)
-                return;
+                return true;
 
             bool valid = false;
 
@@ -86,8 +85,7 @@ namespace TopoMojo.Api.Controllers
                 if (valid) break;
             }
 
-            if (valid.Equals(false))
-                throw new ActionForbidden();
+            return valid;
         }
 
         internal void Log(string action, dynamic item, string msg = "")
@@ -98,29 +96,6 @@ namespace TopoMojo.Api.Controllers
             Logger.LogInformation(entry);
         }
 
-        // / <summary>
-        // / Apply PathBase to urls generated in service
-        // / </summary>
-        // / <param name="target"></param>
-        // internal string ApplyPathBase(string target)
-        // {
-        //     if (
-        //         !string.IsNullOrEmpty(Request.PathBase)
-        //         && !string.IsNullOrEmpty(target)
-        //         && !target.Contains("://")
-        //     )
-        //     {
-        //         return Request.PathBase + target;
-        //     }
-
-        //     return target;
-        // }
-
     }
 
-    public enum AuthRequirement
-    {
-        None,
-        Self
-    }
 }
