@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Models;
 using TopoMojo.Api.Controllers;
+using System.Threading.Tasks;
 
 namespace TopoMojo.Api.Validators;
 
@@ -22,29 +23,29 @@ public class DispatchValidator(
             switch (value)
             {
                 case string val:
-                switch (key.ToLower())
-                {
-                    case "id":
-                    await Exists(key, val);
+                    switch (key.ToLower())
+                    {
+                        case "id":
+                            await Exists(key, val);
+                            break;
+                    }
                     break;
-                }
-                break;
 
                 case NewDispatch model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case ChangedDispatch model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case DispatchSearch search:
-                await Validate(key, search);
-                break;
+                    await Validate(key, search);
+                    break;
 
                 default:
-                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
-                break;
+                    logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                    break;
             }
         }
 
@@ -52,7 +53,7 @@ public class DispatchValidator(
         await base.OnActionExecutionAsync(context, next);
     }
 
-    private async Task Exists(string key, string? id)
+    private async Task Exists(string key, string id)
     {
         var entity = await store.Retrieve(id ?? "invalid");
         if (entity is null)

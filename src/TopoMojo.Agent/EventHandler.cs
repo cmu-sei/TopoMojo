@@ -74,7 +74,12 @@ public class EventHandler
         var dispatches = await Mojo.ListDispatchesAsync(
             Config.GroupId,
             since,
-            "", null, null, "", new string[] { "pending" }
+            null,
+            "",
+            null,
+            null,
+            "",
+            new string[] { "pending" }
         );
 
         await Task.WhenAll(

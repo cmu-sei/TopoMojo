@@ -62,7 +62,7 @@ namespace TopoMojo.Api.Validators
             await base.OnActionExecutionAsync(context, next);
         }
 
-        private async Task Exists(string key, string? id)
+        private async Task Exists(string key, string id)
         {
             var entity = await store.Retrieve(id ?? "invalid");
             if (entity is null)

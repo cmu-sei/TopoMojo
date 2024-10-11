@@ -1,14 +1,9 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Linq;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Extensions;
@@ -273,8 +268,21 @@ namespace TopoMojo.Api.Services
         {
             var entity = await _store.Retrieve(id);
 
-            entity.Challenge = JsonSerializer.Serialize<ChallengeSpec>(spec, jsonOptions);
+            foreach (var variant in spec.Variants)
+            {
+                // the first question set in a variant can't have a prerequisite weight
+                var firstSection = variant.Sections.FirstOrDefault();
+                firstSection.PreReqPrevSection = 0;
+                firstSection.PreReqTotal = 0;
 
+                foreach (var section in variant.Sections)
+                {
+                    // return section names to null if they're blank/empty
+                    section.Name = string.IsNullOrWhiteSpace(section.Name) ? null : section.Name.Trim();
+                }
+            }
+
+            entity.Challenge = JsonSerializer.Serialize<ChallengeSpec>(spec, jsonOptions);
             await _store.Update(entity);
         }
 

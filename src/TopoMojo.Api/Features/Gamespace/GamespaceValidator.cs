@@ -21,45 +21,45 @@ public class GamespaceValidator(
             switch (value)
             {
                 case string val:
-                switch (key.ToLower())
-                {
-                    case "id":
-                    await Exists(key, val);
-                    break;
+                    switch (key.ToLower())
+                    {
+                        case "id":
+                            await Exists(key, val);
+                            break;
 
-                    case "wid":
-                    await WorkspaceExists(key, val);
-                    break;
+                        case "wid":
+                            await WorkspaceExists(key, val);
+                            break;
 
-                    case "sid":
-                    await SpaceExists(key, val);
+                        case "sid":
+                            await SpaceExists(key, val);
+                            break;
+                    }
                     break;
-                }
-                break;
 
                 case ChangedGamespace model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case SectionSubmission model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case Player model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case GamespaceRegistration model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case GamespaceSearch search:
-                await Validate(key, search);
-                break;
+                    await Validate(key, search);
+                    break;
 
                 default:
-                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
-                break;
+                    logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                    break;
 
             }
         }
@@ -68,21 +68,21 @@ public class GamespaceValidator(
         await base.OnActionExecutionAsync(context, next);
     }
 
-    private async Task Exists(string key, string? id)
+    private async Task Exists(string key, string id)
     {
         var entity = await store.Retrieve(id ?? "invalid");
         if (entity is null)
             Problems.Add(new Problem(key, Message.ResourceNotFound));
     }
 
-    private async Task WorkspaceExists(string key, string? id)
+    private async Task WorkspaceExists(string key, string id)
     {
         var entity = await store.DbContext.Workspaces.FindAsync(id ?? "invalid");
         if (entity is null)
             Problems.Add(new Problem(key, Message.ResourceNotFound));
     }
 
-    private async Task SpaceExists(string key, string? id)
+    private async Task SpaceExists(string key, string id)
     {
         var gs = await store.Retrieve(id ?? "invalid");
         var ws = await store.DbContext.Workspaces.FindAsync(id ?? "invalid");
