@@ -323,15 +323,19 @@ public class TransferService(
                             await File.ReadAllBytesAsync(filePath + ".md")
                         );
 
-                        string[] docFiles = Directory.GetFiles(filePath, "*", SearchOption.TopDirectoryOnly);
-                        foreach (var docFile in docFiles)
+                        if (Directory.Exists(filePath))
                         {
-                            WriteFileToArchive(
-                                zipArchive,
-                                Path.Combine(topo.Id, Path.GetFileName(docFile)),
-                                await File.ReadAllBytesAsync(docFile)
-                            );
+                            string[] docFiles = Directory.GetFiles(filePath, "*", SearchOption.TopDirectoryOnly);
+                            foreach (var docFile in docFiles)
+                            {
+                                WriteFileToArchive(
+                                    zipArchive,
+                                    Path.Combine(topo.Id, Path.GetFileName(docFile)),
+                                    await File.ReadAllBytesAsync(docFile)
+                                );
+                            }
                         }
+
                     }
                 }
                 catch (Exception ex)
