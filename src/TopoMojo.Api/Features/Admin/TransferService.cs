@@ -310,11 +310,11 @@ public class TransferService(
             );
 
             // export markdown doc artifacts
-            try
+            foreach (var topo in data)
             {
-                foreach (var topo in data)
+                string filePath = Path.Combine(docPath, topo.Id);
+                try
                 {
-                    string filePath = Path.Combine(docPath, topo.Id);
                     if (File.Exists(filePath + ".md"))
                     {
                         WriteFileToArchive(
@@ -323,19 +323,26 @@ public class TransferService(
                             await File.ReadAllBytesAsync(filePath + ".md")
                         );
 
-                        string[] docFiles = Directory.GetFiles(filePath, "*", SearchOption.TopDirectoryOnly);
-                        foreach (var docFile in docFiles)
+                        if (Directory.Exists(filePath))
                         {
-                            WriteFileToArchive(
-                                zipArchive,
-                                Path.Combine(topo.Id, Path.GetFileName(docFile)),
-                                await File.ReadAllBytesAsync(docFile)
-                            );
+                            string[] docFiles = Directory.GetFiles(filePath, "*", SearchOption.TopDirectoryOnly);
+                            foreach (var docFile in docFiles)
+                            {
+                                WriteFileToArchive(
+                                    zipArchive,
+                                    Path.Combine(topo.Id, Path.GetFileName(docFile)),
+                                    await File.ReadAllBytesAsync(docFile)
+                                );
+                            }
                         }
+
                     }
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to zip {filePath}", filePath);
+                }
             }
-            catch { }
         }
 
         zipStream.Position = 0;
