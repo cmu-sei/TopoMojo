@@ -310,11 +310,11 @@ public class TransferService(
             );
 
             // export markdown doc artifacts
-            try
+            foreach (var topo in data)
             {
-                foreach (var topo in data)
+                string filePath = Path.Combine(docPath, topo.Id);
+                try
                 {
-                    string filePath = Path.Combine(docPath, topo.Id);
                     if (File.Exists(filePath + ".md"))
                     {
                         WriteFileToArchive(
@@ -334,8 +334,11 @@ public class TransferService(
                         }
                     }
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to zip {filePath}", filePath);
+                }
             }
-            catch { }
         }
 
         zipStream.Position = 0;
