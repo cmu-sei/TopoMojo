@@ -9,7 +9,6 @@ using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Hubs;
 using TopoMojo.Api.Models;
 using TopoMojo.Api.Services;
-using TopoMojo.Hypervisor;
 
 namespace TopoMojo.Api.Controllers;
 
@@ -25,9 +24,9 @@ public class GamespaceController(
     ) : _Controller(logger, hub)
 {
     private readonly DistributedCacheEntryOptions _cacheOpts = new()
-        {
-            SlidingExpiration = new TimeSpan(0, 0, 180)
-        };
+    {
+        SlidingExpiration = new TimeSpan(0, 0, 180)
+    };
 
     /// <summary>
     /// List running gamespaces.
