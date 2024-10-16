@@ -26,7 +26,6 @@ namespace TopoMojo.Api.Services
             IWorkspaceStore workspaceStore,
             ILockService lockService,
             IDistributedCache distributedCache
-
         ) : base(logger, mapper, options)
         {
             _pod = podService;
@@ -161,6 +160,29 @@ namespace TopoMojo.Api.Services
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(entity.Challenge, jsonOptions);
 
             return spec;
+        }
+
+        public async Task<ChallengeProgressView> LoadChallengeProgress(string gamespaceId)
+        {
+            var gamespaceEntity = await _store.Retrieve(gamespaceId);
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespaceEntity.Challenge, jsonOptions);
+            var mappedVariant = Mapper.Map<VariantView>(spec.Challenge);
+
+            // only include available question sets in the output viewmodel
+            var eligibility = GetQuestionSetEligibity(spec.Challenge);
+            var eligibleForSetIndices = eligibility.Where(e => e.IsEligible).Select(e => e.SetIndex).ToArray();
+            mappedVariant.Sections = mappedVariant.Sections.Where((s, index) => eligibleForSetIndices.Contains(index)).ToArray();
+
+            return new ChallengeProgressView
+            {
+                Attempts = spec.Submissions.Count,
+                LastScoreTime = spec.LastScoreTime == DateTimeOffset.MinValue ? null : spec.LastScoreTime,
+                MaxAttempts = spec.MaxAttempts,
+                MaxPoints = spec.MaxPoints,
+                Score = Math.Round(spec.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
+                Text = string.Join("\n\n", spec.Text, spec.Challenge.Text),
+                Variant = mappedVariant
+            };
         }
 
         public async Task Update(ChangedGamespace model)
@@ -546,6 +568,7 @@ namespace TopoMojo.Api.Services
                     ?? $"# {workspace.Name}"
             };
         }
+
         private async Task<GameState> LoadState(TopoMojo.Api.Data.Gamespace gamespace, bool preview = false)
         {
             var state = Mapper.Map<GameState>(gamespace);
@@ -581,8 +604,13 @@ namespace TopoMojo.Api.Services
                 if (spec.Challenge == null || spec.Challenge.Sections.Count == 0)
                     return state;
 
+
+                var questionSetEligibility = GetQuestionSetEligibity(spec.Challenge);
+                // this model only returns info about the "active" question set", so select the lowest indexed question set we haven't solved
+                var activeSectionIndex = questionSetEligibility.Where(e => e.IsEligible).OrderByDescending(e => e.SetIndex).FirstOrDefault()?.SetIndex ?? 0;
+
                 // map challenge to safe model
-                state.Challenge = MapChallenge(spec, gamespace.Variant);
+                state.Challenge = MapChallengeView(spec, gamespace.Variant, 0);
             }
 
             return state;
@@ -850,9 +878,8 @@ namespace TopoMojo.Api.Services
             var result = await LoadState(ctx.Gamespace);
 
             // merge submission into return model
-            var activeSection = result.Challenge.Variant.Sections.ElementAt(submission.SectionIndex);
             int i = 0;
-            foreach (var question in activeSection.Questions)
+            foreach (var question in result.Challenge.Questions)
                 question.Answer = submission.Questions.ElementAtOrDefault(i++)?.Answer ?? "";
 
             await _locker.Unlock(id);
@@ -945,18 +972,15 @@ namespace TopoMojo.Api.Services
 
         }
 
-        private ChallengeView MapChallenge(ChallengeSpec spec, int variantIndex)
+        private ChallengeView MapChallengeView(ChallengeSpec spec, int variantIndex, int sectionIndex)
         {
             if (variantIndex > spec.Variants.Count)
             {
                 throw new ArgumentException($"Challenge spec has {spec.Variants.Count}, but variant with index {variantIndex} was requested.");
             }
 
-            // only include available question sets in the output viewmodel
-            var mappedVariant = Mapper.Map<VariantView>(spec.Challenge);
-            var eligibility = GetQuestionSetEligibity(spec.Challenge);
-            var eligibleForSetIndices = eligibility.Where(e => e.IsEligible).Select(e => e.SetIndex).ToArray();
-            mappedVariant.Sections = mappedVariant.Sections.Where((s, index) => eligibleForSetIndices.Contains(index)).ToArray();
+            var variant = spec.Variants.ElementAt(variantIndex);
+            var section = spec.Challenge.Sections?.ElementAtOrDefault(sectionIndex) ?? new SectionSpec();
 
             var challenge = new ChallengeView
             {
@@ -966,8 +990,18 @@ namespace TopoMojo.Api.Services
                 MaxAttempts = spec.MaxAttempts,
                 Attempts = spec.Submissions.Count,
                 Score = Math.Round(spec.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
-                Variant = mappedVariant
+                SectionIndex = sectionIndex,
+                SectionCount = spec.Challenge.Sections?.Count ?? 0,
+                SectionScore = Math.Round(section.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
+                SectionText = section.Text,
+                Questions = Mapper.Map<QuestionView[]>(section.Questions.Where(q => !q.Hidden))
             };
+
+            foreach (var q in challenge.Questions)
+            {
+                q.Weight = (float)Math.Round(q.Weight * spec.MaxPoints, 0, MidpointRounding.AwayFromZero);
+                q.Penalty = (float)Math.Round(q.Penalty * spec.MaxPoints, 0, MidpointRounding.AwayFromZero);
+            }
 
             return challenge;
         }

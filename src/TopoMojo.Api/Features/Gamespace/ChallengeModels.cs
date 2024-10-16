@@ -10,8 +10,23 @@ namespace TopoMojo.Api.Models
         public int MaxAttempts { get; set; }
         public int Attempts { get; set; }
         public double Score { get; set; }
+        public int SectionCount { get; set; }
+        public int SectionIndex { get; set; }
+        public double SectionScore { get; set; }
+        public string SectionText { get; set; }
         public DateTimeOffset LastScoreTime { get; set; }
-        public VariantView Variant { get; set; }
+        public ICollection<QuestionView> Questions { get; set; } = [];
+    }
+
+    public class ChallengeProgressView
+    {
+        public required int Attempts { get; set; }
+        public required int MaxAttempts { get; set; }
+        public required int MaxPoints { get; set; }
+        public required DateTimeOffset? LastScoreTime { get; set; }
+        public required double Score { get; set; }
+        public required VariantView Variant { get; set; }
+        public required string Text { get; set; }
     }
 
     public class VariantView

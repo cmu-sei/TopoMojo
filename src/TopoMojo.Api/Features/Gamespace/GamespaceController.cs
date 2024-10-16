@@ -106,6 +106,20 @@ public class GamespaceController(
         );
     }
 
+    [HttpGet("api/gamespace/{gamespaceId}/challenge/progress")]
+    [SwaggerOperation(OperationId = "LoadGamespaceChallengeProgress")]
+    [Authorize(AppConstants.AnyUserPolicy)]
+    public async Task<ActionResult<ChallengeProgressView>> LoadChallengeProgress(string gamespaceId)
+    {
+        if (!AuthorizeAny(
+            () => gamespaceId == Actor.Id,
+            () => gamespaceService.CanInteract(gamespaceId, Actor.Id).Result
+        )) return Forbid();
+
+        var progress = await gamespaceService.LoadChallengeProgress(gamespaceId);
+        return Ok(progress);
+    }
+
     /// <summary>
     /// Register a gamespace on behalf of a user
     /// </summary>
