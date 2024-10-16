@@ -60,7 +60,6 @@ public class GamespaceValidator(
                 default:
                     logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
                     break;
-
             }
         }
 
@@ -68,21 +67,21 @@ public class GamespaceValidator(
         await base.OnActionExecutionAsync(context, next);
     }
 
-    private async Task Exists(string key, string id)
+    private async Task Exists(string key, string? id)
     {
         var entity = await store.Retrieve(id ?? "invalid");
         if (entity is null)
             Problems.Add(new Problem(key, Message.ResourceNotFound));
     }
 
-    private async Task WorkspaceExists(string key, string id)
+    private async Task WorkspaceExists(string key, string? id)
     {
         var entity = await store.DbContext.Workspaces.FindAsync(id ?? "invalid");
         if (entity is null)
             Problems.Add(new Problem(key, Message.ResourceNotFound));
     }
 
-    private async Task SpaceExists(string key, string id)
+    private async Task SpaceExists(string key, string? id)
     {
         var gs = await store.Retrieve(id ?? "invalid");
         var ws = await store.DbContext.Workspaces.FindAsync(id ?? "invalid");

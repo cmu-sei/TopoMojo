@@ -162,7 +162,10 @@ namespace TopoMojo.Api.Services
                 workspace.TemplateScope = "";
             }
 
-            workspace.Id = Guid.NewGuid().ToString("n");
+            workspace.Id = string.Concat(
+                _options.Tenant,
+                Guid.NewGuid().ToString("n").AsSpan(_options.Tenant.Length)
+            );
             workspace.WhenCreated = DateTimeOffset.UtcNow;
             workspace.LastActivity = DateTimeOffset.UtcNow;
 
@@ -178,9 +181,6 @@ namespace TopoMojo.Api.Services
                 SubjectName = subjectName,
                 Permission = Permission.Manager
             });
-
-            if (string.IsNullOrEmpty(_options.Tenant).Equals(false))
-                workspace.Id = _options.Tenant + workspace.Id.Substring(0, workspace.Id.Length - _options.Tenant.Length);
 
             workspace = await _store.Create(workspace);
 

@@ -291,8 +291,14 @@ namespace TopoMojo.Api.Services
         {
             var entity = await _store.Load(id);
 
+            string isolationTag = entity.WorkspaceId
+                ?? string.Concat(
+                    _options.Tenant,
+                    Guid.Empty.ToString("n").AsSpan(_options.Tenant.Length)
+                );
+
             return Mapper.Map<ConvergedTemplate>(entity)
-                .ToVirtualTemplate()
+                .ToVirtualTemplate(isolationTag)
                 .SetHostAffinity(entity.Workspace?.HostAffinity ?? false)
             ;
         }

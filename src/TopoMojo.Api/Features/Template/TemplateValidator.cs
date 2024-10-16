@@ -6,8 +6,6 @@ using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Models;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Api.Controllers;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 
 namespace TopoMojo.Api.Validators;
 
@@ -75,7 +73,7 @@ public class TemplateValidator(
         await base.OnActionExecutionAsync(context, next);
     }
 
-    private async Task Exists(string key, string id)
+    private async Task Exists(string key, string? id)
     {
         var entity = await store.Retrieve(id ?? "invalid");
         if (entity is null)

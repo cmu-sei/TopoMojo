@@ -120,6 +120,7 @@ public class GamespaceController(
         return Ok(progress);
     }
 
+
     /// <summary>
     /// Register a gamespace on behalf of a user
     /// </summary>

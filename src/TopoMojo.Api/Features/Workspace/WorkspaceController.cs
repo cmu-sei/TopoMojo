@@ -16,13 +16,12 @@ namespace TopoMojo.Api.Controllers
     [Authorize]
     [ApiController]
     [TypeFilter(typeof(WorkspaceValidator))]
-    public class WorkspaceController
-    (
-            ILogger<WorkspaceController> logger,
-            IHubContext<AppHub, IHubEvent> hub,
-            IHypervisorService podService,
-            WorkspaceService workspaceService
-    ) : _Controller(logger, hub)
+    public class WorkspaceController(
+        ILogger<WorkspaceController> logger,
+        IHubContext<AppHub, IHubEvent> hub,
+        IHypervisorService podService,
+        WorkspaceService workspaceService
+        ) : _Controller(logger, hub)
     {
         /// <summary>
         /// List workspaces according to search parameters.
