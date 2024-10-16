@@ -61,6 +61,7 @@ namespace TopoMojo.Api.Models
     public class QuestionSetEligibility
     {
         public required int SetIndex { get; set; }
+        public required bool IsComplete { get; set; }
         public required bool IsEligible { get; set; }
         public required double PreReqPrevSection { get; set; }
         public required double PreReqTotal { get; set; }

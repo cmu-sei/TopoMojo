@@ -604,10 +604,12 @@ namespace TopoMojo.Api.Services
                 if (spec.Challenge == null || spec.Challenge.Sections.Count == 0)
                     return state;
 
-
                 var questionSetEligibility = GetQuestionSetEligibity(spec.Challenge);
                 // this model only returns info about the "active" question set", so select the lowest indexed question set we haven't solved
-                var activeSectionIndex = questionSetEligibility.Where(e => e.IsEligible).OrderByDescending(e => e.SetIndex).FirstOrDefault()?.SetIndex ?? 0;
+                var activeSectionIndex = questionSetEligibility
+                    .Where(e => e.IsEligible && !e.IsComplete)
+                    .OrderBy(e => e.SetIndex)
+                    .FirstOrDefault()?.SetIndex ?? 0;
 
                 // map challenge to safe model
                 state.Challenge = MapChallengeView(spec, gamespace.Variant, activeSectionIndex);
@@ -955,6 +957,7 @@ namespace TopoMojo.Api.Services
                 retVal.Add(new QuestionSetEligibility
                 {
                     SetIndex = i,
+                    IsComplete = currentSection.Questions.All(q => q.IsCorrect),
                     IsEligible = passesPrevSectionPreReq && passesTotalPreReq,
                     PreReqPrevSection = currentSection.PreReqPrevSection,
                     PreReqTotal = currentSection.PreReqTotal,
