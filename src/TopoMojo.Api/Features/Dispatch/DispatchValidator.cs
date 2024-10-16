@@ -22,29 +22,29 @@ public class DispatchValidator(
             switch (value)
             {
                 case string val:
-                switch (key.ToLower())
-                {
-                    case "id":
-                    await Exists(key, val);
+                    switch (key.ToLower())
+                    {
+                        case "id":
+                            await Exists(key, val);
+                            break;
+                    }
                     break;
-                }
-                break;
 
                 case NewDispatch model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case ChangedDispatch model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case DispatchSearch search:
-                await Validate(key, search);
-                break;
+                    await Validate(key, search);
+                    break;
 
                 default:
-                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
-                break;
+                    logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                    break;
             }
         }
 

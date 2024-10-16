@@ -1,6 +1,7 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
+
 using Microsoft.AspNetCore.Mvc.Filters;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Models;
@@ -21,22 +22,21 @@ public class UserValidator(
             switch (value)
             {
                 case string val:
-                switch (key.ToLower())
-                {
-                    case "id":
-                    await Exists(key, val);
+                    switch (key.ToLower())
+                    {
+                        case "id":
+                            await Exists(key, val);
+                            break;
+                    }
                     break;
-                }
-                break;
 
                 case UserSearch search:
-                await Validate(key, search);
-                break;
+                    await Validate(key, search);
+                    break;
 
                 default:
-                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
-                break;
-
+                    logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                    break;
             }
         }
 
