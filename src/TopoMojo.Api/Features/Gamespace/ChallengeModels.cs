@@ -24,6 +24,8 @@ namespace TopoMojo.Api.Models
         public required int MaxAttempts { get; set; }
         public required int MaxPoints { get; set; }
         public required DateTimeOffset? LastScoreTime { get; set; }
+        public required double? NextSectionPreReqThisSection { get; set; }
+        public required double? NextSectionPreReqTotal { get; set; }
         public required double Score { get; set; }
         public required VariantView Variant { get; set; }
         public required string Text { get; set; }

@@ -173,12 +173,25 @@ namespace TopoMojo.Api.Services
             var eligibleForSetIndices = eligibility.Where(e => e.IsEligible).Select(e => e.SetIndex).ToArray();
             mappedVariant.Sections = mappedVariant.Sections.Where((s, index) => eligibleForSetIndices.Contains(index)).ToArray();
 
+            // if any sections remain locked, note their prereqs in the model
+            var nextSectionPreReqTotal = default(double?);
+            var nextSectionPreReqThisSection = default(double?);
+            var ineligibleSections = eligibility.Where(s => !s.IsEligible && !s.IsComplete).ToArray();
+
+            if (ineligibleSections.Length != 0)
+            {
+                nextSectionPreReqThisSection = ineligibleSections[0].PreReqPrevSection;
+                nextSectionPreReqTotal = ineligibleSections[0].PreReqTotal;
+            }
+
             return new ChallengeProgressView
             {
                 Attempts = spec.Submissions.Count,
                 LastScoreTime = spec.LastScoreTime == DateTimeOffset.MinValue ? null : spec.LastScoreTime,
                 MaxAttempts = spec.MaxAttempts,
                 MaxPoints = spec.MaxPoints,
+                NextSectionPreReqThisSection = nextSectionPreReqThisSection,
+                NextSectionPreReqTotal = nextSectionPreReqTotal,
                 Score = Math.Round(spec.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
                 Text = string.Join("\n\n", spec.Text, spec.Challenge.Text),
                 Variant = mappedVariant
