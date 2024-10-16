@@ -610,7 +610,7 @@ namespace TopoMojo.Api.Services
                 var activeSectionIndex = questionSetEligibility.Where(e => e.IsEligible).OrderByDescending(e => e.SetIndex).FirstOrDefault()?.SetIndex ?? 0;
 
                 // map challenge to safe model
-                state.Challenge = MapChallengeView(spec, gamespace.Variant, 0);
+                state.Challenge = MapChallengeView(spec, gamespace.Variant, activeSectionIndex);
             }
 
             return state;
