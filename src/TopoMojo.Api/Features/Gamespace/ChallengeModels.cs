@@ -20,6 +20,7 @@ namespace TopoMojo.Api.Models
 
     public class ChallengeProgressView
     {
+        public required string Id { get; set; }
         public required int Attempts { get; set; }
         public required int MaxAttempts { get; set; }
         public required int MaxPoints { get; set; }

@@ -186,6 +186,7 @@ namespace TopoMojo.Api.Services
 
             return new ChallengeProgressView
             {
+                Id = gamespaceId,
                 Attempts = spec.Submissions.Count,
                 LastScoreTime = spec.LastScoreTime == DateTimeOffset.MinValue ? null : spec.LastScoreTime,
                 MaxAttempts = spec.MaxAttempts,
