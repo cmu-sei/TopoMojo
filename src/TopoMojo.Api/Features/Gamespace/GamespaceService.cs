@@ -193,7 +193,7 @@ namespace TopoMojo.Api.Services
                 MaxPoints = spec.MaxPoints,
                 NextSectionPreReqThisSection = nextSectionPreReqThisSection,
                 NextSectionPreReqTotal = nextSectionPreReqTotal,
-                Score = Math.Round(spec.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
+                Score = WeightToPoints(spec.Score, spec.MaxPoints),
                 Text = string.Join("\n\n", spec.Text, spec.Challenge.Text),
                 Variant = mappedVariant
             };
@@ -1006,18 +1006,18 @@ namespace TopoMojo.Api.Services
                 MaxPoints = spec.MaxPoints,
                 MaxAttempts = spec.MaxAttempts,
                 Attempts = spec.Submissions.Count,
-                Score = Math.Round(spec.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
+                Score = WeightToPoints(spec.Score, spec.MaxPoints),
                 SectionIndex = sectionIndex,
                 SectionCount = spec.Challenge.Sections?.Count ?? 0,
-                SectionScore = Math.Round(section.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
+                SectionScore = WeightToPoints(section.Score, spec.MaxPoints),
                 SectionText = section.Text,
                 Questions = Mapper.Map<QuestionView[]>(section.Questions.Where(q => !q.Hidden))
             };
 
             foreach (var q in challenge.Questions)
             {
-                q.Weight = (float)Math.Round(q.Weight * spec.MaxPoints, 0, MidpointRounding.AwayFromZero);
-                q.Penalty = (float)Math.Round(q.Penalty * spec.MaxPoints, 0, MidpointRounding.AwayFromZero);
+                q.Penalty = WeightToPoints(q.Penalty, spec.MaxPoints);
+                q.Weight = WeightToPoints(q.Weight, spec.MaxPoints);
             }
 
             return challenge;
@@ -1096,5 +1096,9 @@ namespace TopoMojo.Api.Services
 
             return await _store.HasValidUserScopeGamespace(id, scope);
         }
+
+
+        private int WeightToPoints(double weight, double maxPoints)
+            => Math.Round(weight * maxPoints, 0, MidpointRounding.AwayFromZero);
     }
 }
