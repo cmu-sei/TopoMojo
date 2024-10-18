@@ -114,7 +114,8 @@ public class TransferService(
                 foreach (Template t in topo.Templates.ToArray())
                 {
                     // remove non-stock linked templates
-                    if (t.IsLinked) {
+                    if (t.IsLinked)
+                    {
                         topo.Templates.Remove(t);
                         continue;
                     }
@@ -134,17 +135,18 @@ public class TransferService(
             .ToArray()
         ;
 
-        foreach (var id in stock_ids) {
+        foreach (var id in stock_ids)
+        {
             var t = await templateStore.Retrieve(id);
             if (t is not null)
                 stock.Add(t);
         }
 
         list.Add(new()
-            {
-                Id = Guid.Empty.ToString("n"),
-                Templates = stock
-            }
+        {
+            Id = Guid.Empty.ToString("n"),
+            Templates = stock
+        }
         );
 
         foreach (var topo in list)
@@ -155,7 +157,8 @@ public class TransferService(
             topo.ShareCode = "";
             topo.LaunchCount = 0;
             topo.LastActivity = DateTimeOffset.UtcNow;
-            foreach (var template in topo.Templates) {
+            foreach (var template in topo.Templates)
+            {
                 template.Workspace = null;
                 template.Parent = null;
             }
@@ -165,7 +168,8 @@ public class TransferService(
             foreach (var template in topo.Templates)
             {
                 string detail = template.Detail ?? template.Parent?.Detail ?? null;
-                if (detail is not null) {
+                if (detail is not null)
+                {
                     var tu = new TemplateUtility(template.Detail ?? template.Parent.Detail);
                     var t = tu.AsTemplate();
                     foreach (var disk in t.Disks)
@@ -261,7 +265,7 @@ public class TransferService(
         var tids = await templateStore.List().Select(m => m.Id).ToArrayAsync();
         var wids = await workspaceStore.List().Select(m => m.Id).ToArrayAsync();
 
-        foreach(var topo in data)
+        foreach (var topo in data)
         {
             // add new stock templates
             if (Guid.TryParse(topo.Id, out Guid guid) && guid == Guid.Empty)
