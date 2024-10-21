@@ -1097,8 +1097,7 @@ namespace TopoMojo.Api.Services
             return await _store.HasValidUserScopeGamespace(id, scope);
         }
 
-
         private int WeightToPoints(double weight, double maxPoints)
-            => Math.Round(weight * maxPoints, 0, MidpointRounding.AwayFromZero);
+            => (int)Math.Round(weight * maxPoints, 0, MidpointRounding.AwayFromZero);
     }
 }
