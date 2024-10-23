@@ -188,6 +188,7 @@ namespace TopoMojo.Api.Services
             {
                 Id = gamespaceId,
                 Attempts = spec.Submissions.Count,
+                ExpiresAtTimestamp = gamespaceEntity.ExpirationTime.ToUnixTimeMilliseconds(),
                 LastScoreTime = spec.LastScoreTime == DateTimeOffset.MinValue ? null : spec.LastScoreTime,
                 MaxAttempts = spec.MaxAttempts,
                 MaxPoints = spec.MaxPoints,

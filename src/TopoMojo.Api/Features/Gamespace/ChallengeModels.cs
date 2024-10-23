@@ -22,6 +22,7 @@ namespace TopoMojo.Api.Models
     {
         public required string Id { get; set; }
         public required int Attempts { get; set; }
+        public required long ExpiresAtTimestamp { get; set; }
         public required int MaxAttempts { get; set; }
         public required int MaxPoints { get; set; }
         public required DateTimeOffset? LastScoreTime { get; set; }
