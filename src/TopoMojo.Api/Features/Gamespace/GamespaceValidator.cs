@@ -21,46 +21,45 @@ public class GamespaceValidator(
             switch (value)
             {
                 case string val:
-                switch (key.ToLower())
-                {
-                    case "id":
-                    await Exists(key, val);
-                    break;
+                    switch (key.ToLower())
+                    {
+                        case "id":
+                            await Exists(key, val);
+                            break;
 
-                    case "wid":
-                    await WorkspaceExists(key, val);
-                    break;
+                        case "wid":
+                            await WorkspaceExists(key, val);
+                            break;
 
-                    case "sid":
-                    await SpaceExists(key, val);
+                        case "sid":
+                            await SpaceExists(key, val);
+                            break;
+                    }
                     break;
-                }
-                break;
 
                 case ChangedGamespace model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case SectionSubmission model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case Player model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case GamespaceRegistration model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 case GamespaceSearch search:
-                await Validate(key, search);
-                break;
+                    await Validate(key, search);
+                    break;
 
                 default:
-                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
-                break;
-
+                    logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                    break;
             }
         }
 
