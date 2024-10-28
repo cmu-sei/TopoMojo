@@ -20,24 +20,24 @@ namespace TopoMojo.Api.Models
 
     public class ChallengeProgressView
     {
-        public required string Id { get; set; }
-        public required int Attempts { get; set; }
-        public required long ExpiresAtTimestamp { get; set; }
-        public required int MaxAttempts { get; set; }
-        public required int MaxPoints { get; set; }
-        public required DateTimeOffset? LastScoreTime { get; set; }
-        public required double? NextSectionPreReqThisSection { get; set; }
-        public required double? NextSectionPreReqTotal { get; set; }
-        public required double Score { get; set; }
-        public required VariantView Variant { get; set; }
-        public required string Text { get; set; }
+        public string Id { get; set; }
+        public int Attempts { get; set; }
+        public long ExpiresAtTimestamp { get; set; }
+        public int MaxAttempts { get; set; }
+        public int MaxPoints { get; set; }
+        public DateTimeOffset? LastScoreTime { get; set; }
+        public double? NextSectionPreReqThisSection { get; set; }
+        public double? NextSectionPreReqTotal { get; set; }
+        public double Score { get; set; }
+        public VariantView Variant { get; set; } = new();
+        public string Text { get; set; }
     }
 
     public class VariantView
     {
-        public required string Text { get; set; }
-        public required ICollection<SectionView> Sections { get; set; } = [];
-        public required int TotalSectionCount { get; set; }
+        public string Text { get; set; }
+        public ICollection<SectionView> Sections { get; set; } = [];
+        public int TotalSectionCount { get; set; }
     }
 
     public class SectionView
@@ -64,13 +64,13 @@ namespace TopoMojo.Api.Models
 
     public class QuestionSetEligibility
     {
-        public required int SetIndex { get; set; }
-        public required bool IsComplete { get; set; }
-        public required bool IsEligible { get; set; }
-        public required double PreReqPrevSection { get; set; }
-        public required double PreReqTotal { get; set; }
-        public required double WeightScoredPreviousSection { get; set; }
-        public required double WeightScoredTotal { get; set; }
+        public int SetIndex { get; set; }
+        public bool IsComplete { get; set; }
+        public bool IsEligible { get; set; }
+        public double PreReqPrevSection { get; set; }
+        public double PreReqTotal { get; set; }
+        public double WeightScoredPreviousSection { get; set; }
+        public double WeightScoredTotal { get; set; }
     }
 
     public class SectionSubmission
