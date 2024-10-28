@@ -169,7 +169,7 @@ namespace TopoMojo.Api.Services
             var mappedVariant = Mapper.Map<VariantView>(spec.Challenge).FilterSections();
 
             // only include available question sets in the output viewmodel
-            var eligibility = GetQuestionSetEligibity(spec.Challenge);
+            var eligibility = GetQuestionSetEligibility(spec.Challenge);
             var eligibleForSetIndices = eligibility.Where(e => e.IsEligible).Select(e => e.SetIndex).ToArray();
             mappedVariant.Sections = mappedVariant.Sections.Where((s, index) => eligibleForSetIndices.Contains(index)).ToArray();
 
@@ -619,7 +619,7 @@ namespace TopoMojo.Api.Services
                 if (spec.Challenge == null || spec.Challenge.Sections.Count == 0)
                     return state;
 
-                var questionSetEligibility = GetQuestionSetEligibity(spec.Challenge);
+                var questionSetEligibility = GetQuestionSetEligibility(spec.Challenge);
                 // this model only returns info about the "active" question set", so select the lowest indexed question set we haven't solved
                 var activeSectionIndex = questionSetEligibility
                     .Where(e => e.IsEligible && !e.IsComplete)
@@ -862,7 +862,7 @@ namespace TopoMojo.Api.Services
             if (spec.MaxAttempts > 0 && spec.Submissions.Where(s => s.SectionIndex == submission.SectionIndex).Count() >= spec.MaxAttempts)
                 _locker.Unlock(id, new AttemptLimitReached()).Wait();
 
-            var challengeEligibility = GetQuestionSetEligibity(spec.Challenge);
+            var challengeEligibility = GetQuestionSetEligibility(spec.Challenge);
             var setEligibility = challengeEligibility.Single(e => e.SetIndex == submission.SectionIndex);
 
             if (!setEligibility.IsEligible)
@@ -953,7 +953,7 @@ namespace TopoMojo.Api.Services
                 spec.LastScoreTime = submission.Timestamp;
         }
 
-        private QuestionSetEligibility[] GetQuestionSetEligibity(VariantSpec variant)
+        private QuestionSetEligibility[] GetQuestionSetEligibility(VariantSpec variant)
         {
             var previousSectionTotal = 0f;
             var retVal = new List<QuestionSetEligibility>();
@@ -994,7 +994,7 @@ namespace TopoMojo.Api.Services
         {
             if (variantIndex > spec.Variants.Count)
             {
-                throw new ArgumentException($"Challenge spec has {spec.Variants.Count}, but variant with index {variantIndex} was requested.");
+                variantIndex = 0;
             }
 
             var variant = spec.Variants.ElementAt(variantIndex);
