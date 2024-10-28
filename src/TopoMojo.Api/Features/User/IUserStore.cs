@@ -14,5 +14,6 @@ namespace TopoMojo.Api.Data.Abstractions
         Task<User> ResolveApiKey(string hash);
         Task DeleteApiKey(string id);
         Task<string[]> ListScopes();
+        Task<int> WorkspaceCount(string id);
     }
 }

@@ -34,17 +34,16 @@ namespace TopoMojo.Api.Models
         ;
         public bool IsObserver =>
             Role == UserRole.Observer ||
+            Role == UserRole.Creator ||
             Role == UserRole.Administrator
         ;
         public bool IsCreator =>
             Role == UserRole.Creator ||
-            Role == UserRole.Observer ||
             Role == UserRole.Administrator
         ;
         public bool IsBuilder =>
             Role == UserRole.Builder ||
             Role == UserRole.Creator ||
-            Role == UserRole.Observer ||
             Role == UserRole.Administrator
         ;
         public bool HasScope(string scope) {

@@ -78,14 +78,14 @@ namespace TopoMojo.Api.Data
                 );
             if (gamespace != null)
                 return gamespace.Workspace.Audience.HasAnyToken(scope);
-            
+
             var workspace = await DbContext.Workspaces
                 .FirstOrDefaultAsync(g =>
                     g.Id == isolationId
                 );
             if (workspace != null)
                 return workspace.Audience.HasAnyToken(scope);
-            
+
             return false;
         }
 
@@ -138,6 +138,11 @@ namespace TopoMojo.Api.Data
                 .Select(u => u.Scope)
                 .ToArrayAsync()
             ;
+        }
+
+        public async Task<int> WorkspaceCount(string id)
+        {
+            return await DbContext.Workers.CountAsync(w => w.SubjectId == id);
         }
     }
 }

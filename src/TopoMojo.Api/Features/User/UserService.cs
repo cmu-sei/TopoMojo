@@ -1,14 +1,9 @@
 // Copyright 2021 Carnegie Mellon University.
 // Released under a MIT (SEI) license. See LICENSE.md in the project root.
 
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Api.Models;
@@ -47,7 +42,7 @@ namespace TopoMojo.Api.Services
 
             if (search.WantsAdmins)
                 q = q.Where(p => p.Role == UserRole.Administrator);
-            
+
             if (search.WantsObservers)
                 q = q.Where(p => p.Role == UserRole.Observer);
 
@@ -161,6 +156,13 @@ namespace TopoMojo.Api.Services
             var entity = await _store.Retrieve(id);
 
             await _store.Delete(id);
+        }
+
+        public async Task<bool> CanWork(string id)
+        {
+            var user = await Load(id);
+            int count = await _store.WorkspaceCount(id);
+            return user.IsCreator || user.WorkspaceLimit > 0 || count > 0;
         }
 
         public async Task<bool> CanInteract(string subjectId, string isolationId)
