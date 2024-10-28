@@ -175,6 +175,16 @@ public class UserController : _Controller
         return Ok();
     }
 
+    [HttpGet("api/user/{id}/worker")]
+    [SwaggerOperation(OperationId = "IsWorker")]
+    [Authorize]
+    public async Task<IActionResult> IsWorker(string id)
+    {
+        return Ok(
+            await _svc.CanWork(id)
+        );
+    }
+
     /// <summary>
     /// Get a user's api key records (no values)
     /// </summary>
