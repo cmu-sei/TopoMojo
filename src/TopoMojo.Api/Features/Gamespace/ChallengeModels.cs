@@ -1,12 +1,9 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-
 namespace TopoMojo.Api.Models
 {
-   public class ChallengeView
+    public class ChallengeView
     {
         public string Text { get; set; }
         public int MaxPoints { get; set; }
@@ -18,14 +15,39 @@ namespace TopoMojo.Api.Models
         public double SectionScore { get; set; }
         public string SectionText { get; set; }
         public DateTimeOffset LastScoreTime { get; set; }
-        public ICollection<QuestionView> Questions { get; set; } = new List<QuestionView>();
+        public ICollection<QuestionView> Questions { get; set; } = [];
+    }
+
+    public class ChallengeProgressView
+    {
+        public required string Id { get; set; }
+        public required int Attempts { get; set; }
+        public required long ExpiresAtTimestamp { get; set; }
+        public required int MaxAttempts { get; set; }
+        public required int MaxPoints { get; set; }
+        public required DateTimeOffset? LastScoreTime { get; set; }
+        public required double? NextSectionPreReqThisSection { get; set; }
+        public required double? NextSectionPreReqTotal { get; set; }
+        public required double Score { get; set; }
+        public required VariantView Variant { get; set; }
+        public required string Text { get; set; }
+    }
+
+    public class VariantView
+    {
+        public required string Text { get; set; }
+        public required ICollection<SectionView> Sections { get; set; } = [];
+        public required int TotalSectionCount { get; set; }
     }
 
     public class SectionView
     {
-        public string Text { get; set; }
+        public string Name { get; set; }
+        public double PreReqPrevSection { get; set; }
+        public double PreReqTotal { get; set; }
         public float Score { get; set; }
-        public ICollection<QuestionView> Questions { get; set; } = new List<QuestionView>();
+        public string Text { get; set; }
+        public ICollection<QuestionView> Questions { get; set; } = [];
     }
 
     public class QuestionView
@@ -40,13 +62,23 @@ namespace TopoMojo.Api.Models
         public bool IsGraded { get; set; }
     }
 
+    public class QuestionSetEligibility
+    {
+        public required int SetIndex { get; set; }
+        public required bool IsComplete { get; set; }
+        public required bool IsEligible { get; set; }
+        public required double PreReqPrevSection { get; set; }
+        public required double PreReqTotal { get; set; }
+        public required double WeightScoredPreviousSection { get; set; }
+        public required double WeightScoredTotal { get; set; }
+    }
+
     public class SectionSubmission
     {
         public string Id { get; set; }
         public DateTimeOffset Timestamp { get; set; }
         public int SectionIndex { get; set; }
-        public ICollection<AnswerSubmission> Questions { get; set; } = new List<AnswerSubmission>();
-
+        public ICollection<AnswerSubmission> Questions { get; set; } = [];
     }
 
     public class AnswerSubmission

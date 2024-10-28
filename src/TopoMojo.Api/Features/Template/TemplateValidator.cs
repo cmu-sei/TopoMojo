@@ -23,17 +23,17 @@ public class TemplateValidator(
             switch (value)
             {
                 case string val:
-                switch (key.ToLower())
-                {
-                    case "id":
-                    await Exists(key, val);
+                    switch (key.ToLower())
+                    {
+                        case "id":
+                            await Exists(key, val);
+                            break;
+                    }
                     break;
-                }
-                break;
 
                 case TemplateSearch search:
-                await Validate(key, search);
-                break;
+                    await Validate(key, search);
+                    break;
 
                 case ChangedTemplate model:
                     await Validate(key, model);
@@ -64,8 +64,8 @@ public class TemplateValidator(
                     break;
 
                 default:
-                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
-                break;
+                    logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                    break;
             }
         }
 
@@ -106,7 +106,8 @@ public class TemplateValidator(
     {
         await Exists(key, model.TemplateId);
         await Exists(key, model.ParentId);
-        if (Problems.Count == 0) {
+        if (Problems.Count == 0)
+        {
             var t = await store.Retrieve(model.TemplateId);
             if (t?.WorkspaceId != model.WorkspaceId)
                 Problems.Add(new Problem(key, Message.ResourceNotFound));

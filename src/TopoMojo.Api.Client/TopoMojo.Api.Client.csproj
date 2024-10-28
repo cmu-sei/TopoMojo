@@ -11,7 +11,7 @@
     <PackageId>TopoMojo.Api.Client</PackageId>
     <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/cmu-sei/TopoMojo</RepositoryUrl>
-    <Version>2.3.0</Version>
+    <Version>2.3.1</Version>
   </PropertyGroup>
 
   <ItemGroup>

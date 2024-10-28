@@ -23,37 +23,37 @@ namespace TopoMojo.Api.Validators
                 switch (value)
                 {
                     case string val:
-                    switch (key.ToLower())
-                    {
-                        case "id":
-                        await Exists(key, val);
+                        switch (key.ToLower())
+                        {
+                            case "id":
+                                await Exists(key, val);
+                                break;
+                        }
                         break;
-                    }
-                    break;
 
                     case NewWorkspace model:
-                    await Validate(key, model);
-                    break;
+                        await Validate(key, model);
+                        break;
 
                     case ChangedWorkspace model:
-                    await Validate(key, model);
-                    break;
+                        await Validate(key, model);
+                        break;
 
                     case RestrictedChangedWorkspace model:
-                    await Validate(key, model);
-                    break;
+                        await Validate(key, model);
+                        break;
 
                     case ChallengeSpec model:
-                    await Validate(key, model);
-                    break;
+                        await Validate(key, model);
+                        break;
 
                     case WorkspaceSearch search:
-                    await Validate(key, search);
-                    break;
+                        await Validate(key, search);
+                        break;
 
                     default:
-                    logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
-                    break;
+                        logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                        break;
 
                 }
             }

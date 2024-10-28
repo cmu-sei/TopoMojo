@@ -23,7 +23,6 @@ namespace TopoMojo.Api.Controllers
         WorkspaceService workspaceService
         ) : _Controller(logger, hub)
     {
-
         /// <summary>
         /// List workspaces according to search parameters.
         /// </summary>
@@ -41,7 +40,7 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         [HttpGet("api/workspaces")]
         [SwaggerOperation(OperationId = "ListWorkspaces")]
-        public async Task<ActionResult<WorkspaceSummary[]>> ListWorkspaces([FromQuery]WorkspaceSearch search, CancellationToken ct)
+        public async Task<ActionResult<WorkspaceSummary[]>> ListWorkspaces([FromQuery] WorkspaceSearch search, CancellationToken ct)
         {
             if (search.WantsAudience && !Actor.HasScope(search.aud))
             {
@@ -85,7 +84,7 @@ namespace TopoMojo.Api.Controllers
         [HttpPost("api/workspace")]
         [SwaggerOperation(OperationId = "CreateWorkspace")]
         [Authorize]
-        public async Task<ActionResult<Workspace>> CreateWorkspace([FromBody]NewWorkspace model)
+        public async Task<ActionResult<Workspace>> CreateWorkspace([FromBody] NewWorkspace model)
         {
             if (!AuthorizeAny(
                 () => Actor.IsCreator,
@@ -105,7 +104,7 @@ namespace TopoMojo.Api.Controllers
         [HttpPost("api/workspace/{id}/clone")]
         [SwaggerOperation(OperationId = "CloneWorkspace")]
         [Authorize]
-        public async Task<ActionResult<Workspace>> CloneWorkspace([FromRoute]string id)
+        public async Task<ActionResult<Workspace>> CloneWorkspace([FromRoute] string id)
         {
             if (!AuthorizeAny(
                 () => Actor.IsCreator,
@@ -125,7 +124,7 @@ namespace TopoMojo.Api.Controllers
         [HttpPut("api/workspace")]
         [SwaggerOperation(OperationId = "UpdateWorkspace")]
         [Authorize]
-        public async Task<ActionResult> UpdateWorkspace([FromBody]RestrictedChangedWorkspace model)
+        public async Task<ActionResult> UpdateWorkspace([FromBody] RestrictedChangedWorkspace model)
         {
             if (!AuthorizeAny(
                 () => workspaceService.CanEdit(model.Id, Actor.Id).Result
@@ -149,7 +148,7 @@ namespace TopoMojo.Api.Controllers
         [HttpPut("api/workspace/priv")]
         [SwaggerOperation(OperationId = "PrivilegedUpdateWorkspace")]
         [Authorize]
-        public async Task<ActionResult> PrivilegedUpdateWorkspace([FromBody]ChangedWorkspace model)
+        public async Task<ActionResult> PrivilegedUpdateWorkspace([FromBody] ChangedWorkspace model)
         {
             if (!AuthorizeAny(
                 () => Actor.IsAdmin
@@ -349,7 +348,7 @@ namespace TopoMojo.Api.Controllers
         [HttpPut("api/challenge/{id}")]
         [SwaggerOperation(OperationId = "UpdateChallengeSpec")]
         [Authorize]
-        public async Task<IActionResult> UpdateChallengeSpec([FromRoute]string id, [FromBody] ChallengeSpec model)
+        public async Task<IActionResult> UpdateChallengeSpec([FromRoute] string id, [FromBody] ChallengeSpec model)
         {
             if (!AuthorizeAny(
                 () => workspaceService.CanEdit(id, Actor.Id).Result

@@ -1,15 +1,9 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Data.Extensions;
 using TopoMojo.Api.Exceptions;
@@ -32,8 +26,7 @@ namespace TopoMojo.Api.Services
             IWorkspaceStore workspaceStore,
             ILockService lockService,
             IDistributedCache distributedCache
-
-        ) : base (logger, mapper, options)
+        ) : base(logger, mapper, options)
         {
             _pod = podService;
             _store = gamespaceStore;
@@ -127,14 +120,14 @@ namespace TopoMojo.Api.Services
             if (gamespace is Data.Gamespace)
                 return gamespace;
 
-            if (! await _store.IsBelowGamespaceLimit(actor.Id, actor.GamespaceLimit))
+            if (!await _store.IsBelowGamespaceLimit(actor.Id, actor.GamespaceLimit))
                 throw new ClientGamespaceLimitReached();
 
             string lockKey = $"{playerId}{request.ResourceId}";
 
             var ctx = await LoadContext(request);
 
-            if (! await _locker.Lock(lockKey))
+            if (!await _locker.Lock(lockKey))
                 throw new ResourceIsLocked();
 
             try
@@ -167,6 +160,44 @@ namespace TopoMojo.Api.Services
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(entity.Challenge, jsonOptions);
 
             return spec;
+        }
+
+        public async Task<ChallengeProgressView> LoadChallengeProgress(string gamespaceId)
+        {
+            var gamespaceEntity = await _store.Retrieve(gamespaceId);
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespaceEntity.Challenge, jsonOptions);
+            var mappedVariant = Mapper.Map<VariantView>(spec.Challenge).FilterSections();
+
+            // only include available question sets in the output viewmodel
+            var eligibility = GetQuestionSetEligibility(spec.Challenge);
+            var eligibleForSetIndices = eligibility.Where(e => e.IsEligible).Select(e => e.SetIndex).ToArray();
+            mappedVariant.Sections = mappedVariant.Sections.Where((s, index) => eligibleForSetIndices.Contains(index)).ToArray();
+
+            // if any sections remain locked, note their prereqs in the model
+            var nextSectionPreReqTotal = default(double?);
+            var nextSectionPreReqThisSection = default(double?);
+            var ineligibleSections = eligibility.Where(s => !s.IsEligible && !s.IsComplete).ToArray();
+
+            if (ineligibleSections.Length != 0)
+            {
+                nextSectionPreReqThisSection = ineligibleSections[0].PreReqPrevSection;
+                nextSectionPreReqTotal = ineligibleSections[0].PreReqTotal;
+            }
+
+            return new ChallengeProgressView
+            {
+                Id = gamespaceId,
+                Attempts = spec.Submissions.Count,
+                ExpiresAtTimestamp = gamespaceEntity.ExpirationTime.ToUnixTimeMilliseconds(),
+                LastScoreTime = spec.LastScoreTime == DateTimeOffset.MinValue ? null : spec.LastScoreTime,
+                MaxAttempts = spec.MaxAttempts,
+                MaxPoints = spec.MaxPoints,
+                NextSectionPreReqThisSection = nextSectionPreReqThisSection,
+                NextSectionPreReqTotal = nextSectionPreReqTotal,
+                Score = WeightToPoints(spec.Score, spec.MaxPoints),
+                Text = string.Join("\n\n", spec.Text, spec.Challenge.Text),
+                Variant = mappedVariant
+            };
         }
 
         public async Task Update(ChangedGamespace model)
@@ -288,8 +319,6 @@ namespace TopoMojo.Api.Services
 
             spec.MaxAttempts = ctx.Request.MaxAttempts;
 
-            spec.Variants = null;
-
             StringBuilder sb = new(
                 JsonSerializer.Serialize(spec, jsonOptions)
             );
@@ -301,14 +330,13 @@ namespace TopoMojo.Api.Services
             gamespace.Challenge = sb.ToString();
 
             await _store.Create(gamespace);
-
         }
 
         private void ResolveTransforms(ChallengeSpec spec, RegistrationContext ctx)
         {
             int index = 0;
 
-            foreach(var kvp in spec.Transforms.ToArray())
+            foreach (var kvp in spec.Transforms.ToArray())
             {
                 kvp.Value = ResolveRandom(kvp.Value, ctx, index);
 
@@ -316,7 +344,7 @@ namespace TopoMojo.Api.Services
                     index = 0;
 
                 // insert `key_index: value` for any multi-token values (i.e. list-resolver)
-                var tokens =  kvp.Value.Split(" ", StringSplitOptions.RemoveEmptyEntries);
+                var tokens = kvp.Value.Split(" ", StringSplitOptions.RemoveEmptyEntries);
                 if (tokens.Length > 1)
                 {
                     int i = 0;
@@ -348,114 +376,114 @@ namespace TopoMojo.Api.Services
             switch (seg[0])
             {
                 case "id":
-                result = ctx.Gamespace.Id;
-                break;
+                    result = ctx.Gamespace.Id;
+                    break;
 
                 case "variant":
-                result = ctx.Gamespace.Variant.ToString();
-                break;
+                    result = ctx.Gamespace.Variant.ToString();
+                    break;
 
                 case "app_url":
                 case "topomojo_url":
-                result = ctx.Request.GraderUrl.Split("/api").First();
-                break;
+                    result = ctx.Request.GraderUrl.Split("/api").First();
+                    break;
 
                 case "grader_key":
                 case "api_key":
                 case "apikey":
-                result = ctx.Request.GraderKey;
-                break;
+                    result = ctx.Request.GraderKey;
+                    break;
 
                 case "grader_url":
-                result = ctx.Request.GraderUrl;
-                break;
+                    result = ctx.Request.GraderUrl;
+                    break;
 
                 case "uid":
-                result = Guid.NewGuid().ToString("n");
-                break;
+                    result = Guid.NewGuid().ToString("n");
+                    break;
 
                 case "hex":
-                if (seg.Length < 2 || !int.TryParse(seg[1], out count))
-                    count = 8;
+                    if (seg.Length < 2 || !int.TryParse(seg[1], out count))
+                        count = 8;
 
-                count = Math.Min(count, 256) / 2;
+                    count = Math.Min(count, 256) / 2;
 
-                buffer = new byte[count];
+                    buffer = new byte[count];
 
-                _random.NextBytes(buffer);
+                    _random.NextBytes(buffer);
 
-                result = BitConverter.ToString(buffer).Replace("-", "").ToLower();
+                    result = BitConverter.ToString(buffer).Replace("-", "").ToLower();
 
-                break;
+                    break;
 
                 case "b64":
-                if (seg.Length < 2 || !int.TryParse(seg[1], out count))
-                    count = 16;
+                    if (seg.Length < 2 || !int.TryParse(seg[1], out count))
+                        count = 16;
 
-                count = Math.Min(count, 256);
+                    count = Math.Min(count, 256);
 
-                buffer = new byte[count];
+                    buffer = new byte[count];
 
-                _random.NextBytes(buffer);
+                    _random.NextBytes(buffer);
 
-                result = Convert.ToBase64String(buffer);
+                    result = Convert.ToBase64String(buffer);
 
-                break;
+                    break;
 
                 case "list":
-                if (seg.Length < 3 || !int.TryParse(seg[1], out count))
-                    count = 1;
+                    if (seg.Length < 3 || !int.TryParse(seg[1], out count))
+                        count = 1;
 
-                options = seg.Last()
-                    .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                    .ToList();
+                    options = seg.Last()
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .ToList();
 
-                while (count > 0 && options.Count > 0)
-                {
-                    string val = options[_random.Next(options.Count)];
-                    result += val + " ";
-                    options.Remove(val);
-                    count -= 1;
-                }
+                    while (count > 0 && options.Count > 0)
+                    {
+                        string val = options[_random.Next(options.Count)];
+                        result += val + " ";
+                        options.Remove(val);
+                        count -= 1;
+                    }
 
-                result = result.Trim();
-                break;
+                    result = result.Trim();
+                    break;
 
                 case "index":
-                // if value doesn't specify index, use index from prior transform
-                if (seg.Length > 1 && !int.TryParse(seg[1], out count))
-                    count = index;
+                    // if value doesn't specify index, use index from prior transform
+                    if (seg.Length > 1 && !int.TryParse(seg[1], out count))
+                        count = index;
 
-                options = seg.Last()
-                    .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                    .ToList();
+                    options = seg.Last()
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .ToList();
 
-                result = options[Math.Min(count, options.Count - 1)];
-                break;
+                    result = options[Math.Min(count, options.Count - 1)];
+                    break;
 
                 case "ipv4":
-                result = seg.Last().ToRandomIPv4();
-                break;
+                    result = seg.Last().ToRandomIPv4();
+                    break;
 
                 case "int":
                 default:
-                int min = 0;
-                int max = int.MaxValue;
-                if (seg.Length > 1)
-                {
-                    string[] range = seg[1].Split('-');
-                    if (range.Length > 1)
+                    int min = 0;
+                    int max = int.MaxValue;
+                    if (seg.Length > 1)
                     {
-                        int.TryParse(range[0], out min);
-                        int.TryParse(range[1], out max);
+                        string[] range = seg[1].Split('-');
+                        if (range.Length > 1)
+                        {
+                            int.TryParse(range[0], out min);
+                            int.TryParse(range[1], out max);
+                        }
+                        else
+                        {
+                            int.TryParse(range[0], out max);
+                        }
                     }
-                    else
-                    {
-                        int.TryParse(range[0], out max);
-                    }
-                }
-                result = _random.Next(min, max).ToString();
-                break;
+                    result = _random.Next(min, max).ToString();
+                    break;
 
             }
 
@@ -506,7 +534,7 @@ namespace TopoMojo.Api.Services
                     {
                         var tt = template.Clone<ConvergedTemplate>();
 
-                        tt.Name += $"_{i+1}";
+                        tt.Name += $"_{i + 1}";
 
                         templates.Add(tt);
                     }
@@ -555,6 +583,7 @@ namespace TopoMojo.Api.Services
                     ?? $"# {workspace.Name}"
             };
         }
+
         private async Task<GameState> LoadState(TopoMojo.Api.Data.Gamespace gamespace, bool preview = false)
         {
             var state = Mapper.Map<GameState>(gamespace);
@@ -575,7 +604,7 @@ namespace TopoMojo.Api.Services
                         Id = vm.Id,
                         Name = vm.Name.Untagged(),
                         IsolationId = vm.Name.Tag(),
-                        IsRunning = (vm.State == VmPowerState.Running),
+                        IsRunning = vm.State == VmPowerState.Running,
                         IsVisible = gamespace.IsTemplateVisible(vm.Name)
                     })
                     .Where(s => s.IsVisible)
@@ -590,10 +619,15 @@ namespace TopoMojo.Api.Services
                 if (spec.Challenge == null || spec.Challenge.Sections.Count == 0)
                     return state;
 
-                // TODO: get active question set
+                var questionSetEligibility = GetQuestionSetEligibility(spec.Challenge);
+                // this model only returns info about the "active" question set", so select the lowest indexed question set we haven't solved
+                var activeSectionIndex = questionSetEligibility
+                    .Where(e => e.IsEligible && !e.IsComplete)
+                    .OrderBy(e => e.SetIndex)
+                    .FirstOrDefault()?.SetIndex ?? 0;
 
                 // map challenge to safe model
-                state.Challenge = MapChallenge(spec, 0);
+                state.Challenge = MapChallengeView(spec, gamespace.Variant, activeSectionIndex);
             }
 
             return state;
@@ -683,7 +717,7 @@ namespace TopoMojo.Api.Services
 
         public async Task<Enlistment> Enlist(Enlistee model)
         {
-           string id = await _distCache.GetStringAsync(model.Code);
+            string id = await _distCache.GetStringAsync(model.Code);
 
             if (id.IsEmpty())
                 throw new InvalidInvitation();
@@ -719,7 +753,7 @@ namespace TopoMojo.Api.Services
 
             var results = new List<SectionSubmission[]>();
 
-            foreach(var g in q)
+            foreach (var g in q)
                 results.Add(
                     (await AuditSubmission(g.Id)).ToArray()
                 );
@@ -740,13 +774,13 @@ namespace TopoMojo.Api.Services
         {
             var q = _store.List().Where(g => g.WorkspaceId == workspaceId);
 
-            foreach(var g in q)
+            foreach (var g in q)
                 await Regrade(g.Id);
         }
 
         public async Task<GameState> Regrade(string id)
         {
-            if (! await _locker.Lock(id))
+            if (!await _locker.Lock(id))
                 throw new ResourceIsLocked();
 
             var ctx = await LoadContext(id);
@@ -778,8 +812,7 @@ namespace TopoMojo.Api.Services
                 }
             }
 
-
-            foreach(var submission in spec.Submissions)
+            foreach (var submission in spec.Submissions)
             {
                 _Grade(spec, submission);
 
@@ -805,7 +838,7 @@ namespace TopoMojo.Api.Services
 
             string id = submission.Id;
 
-            if (! await _locker.Lock(id))
+            if (!await _locker.Lock(id))
                 throw new ResourceIsLocked();
 
             var ctx = await LoadContext(id);
@@ -828,6 +861,14 @@ namespace TopoMojo.Api.Services
 
             if (spec.MaxAttempts > 0 && spec.Submissions.Where(s => s.SectionIndex == submission.SectionIndex).Count() >= spec.MaxAttempts)
                 _locker.Unlock(id, new AttemptLimitReached()).Wait();
+
+            var challengeEligibility = GetQuestionSetEligibility(spec.Challenge);
+            var setEligibility = challengeEligibility.Single(e => e.SetIndex == submission.SectionIndex);
+
+            if (!setEligibility.IsEligible)
+            {
+                await _locker.Unlock(id, new QuestionSetLockedByPreReq($"Can't grade gamespace {submission.Id} / section {submission.SectionIndex} due to set eligibility ({setEligibility.PreReqPrevSection} / {setEligibility.PreReqTotal})"));
+            }
 
             submission.Timestamp = ts;
             spec.Submissions.Add(submission);
@@ -889,8 +930,7 @@ namespace TopoMojo.Api.Services
         private void _Grade(ChallengeSpec spec, SectionSubmission submission)
         {
             var section = spec.Challenge.Sections.ElementAtOrDefault(submission.SectionIndex);
-
-            double lastScore = spec.Score;
+            var lastScore = spec.Score;
 
             int i = 0;
             foreach (var question in section.Questions)
@@ -913,8 +953,51 @@ namespace TopoMojo.Api.Services
                 spec.LastScoreTime = submission.Timestamp;
         }
 
-        private ChallengeView MapChallenge(ChallengeSpec spec, int sectionIndex = 0)
+        private QuestionSetEligibility[] GetQuestionSetEligibility(VariantSpec variant)
         {
+            var previousSectionTotal = 0f;
+            var retVal = new List<QuestionSetEligibility>();
+            var totalWeightScored = variant
+                .Sections
+                .SelectMany(s => s.Questions)
+                .Where(q => q.IsCorrect && q.IsGraded)
+                .Sum(q => q.Weight);
+
+            for (var i = 0; i < variant.Sections.Count; i++)
+            {
+                var currentSection = variant.Sections.ElementAt(i);
+                var passesTotalPreReq = currentSection.PreReqTotal == 0 || totalWeightScored >= currentSection.PreReqTotal;
+                var passesPrevSectionPreReq = currentSection.PreReqPrevSection == 0 || previousSectionTotal >= currentSection.PreReqPrevSection;
+
+                retVal.Add(new QuestionSetEligibility
+                {
+                    SetIndex = i,
+                    IsComplete = currentSection.Questions.All(q => q.IsCorrect),
+                    IsEligible = passesPrevSectionPreReq && passesTotalPreReq,
+                    PreReqPrevSection = currentSection.PreReqPrevSection,
+                    PreReqTotal = currentSection.PreReqTotal,
+                    WeightScoredPreviousSection = previousSectionTotal,
+                    WeightScoredTotal = totalWeightScored
+                });
+
+                previousSectionTotal = currentSection
+                    .Questions
+                    .Where(q => q.IsCorrect && q.IsGraded)
+                    .Sum(q => q.Weight);
+            }
+
+            return [.. retVal];
+
+        }
+
+        private ChallengeView MapChallengeView(ChallengeSpec spec, int variantIndex, int sectionIndex)
+        {
+            if (variantIndex > spec.Variants.Count)
+            {
+                variantIndex = 0;
+            }
+
+            var variant = spec.Variants.ElementAt(variantIndex);
             var section = spec.Challenge.Sections?.ElementAtOrDefault(sectionIndex) ?? new SectionSpec();
 
             var challenge = new ChallengeView
@@ -924,18 +1007,18 @@ namespace TopoMojo.Api.Services
                 MaxPoints = spec.MaxPoints,
                 MaxAttempts = spec.MaxAttempts,
                 Attempts = spec.Submissions.Count,
-                Score = Math.Round(spec.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
+                Score = WeightToPoints(spec.Score, spec.MaxPoints),
                 SectionIndex = sectionIndex,
                 SectionCount = spec.Challenge.Sections?.Count ?? 0,
-                SectionScore = Math.Round(section.Score * spec.MaxPoints, 0, MidpointRounding.AwayFromZero),
+                SectionScore = WeightToPoints(section.Score, spec.MaxPoints),
                 SectionText = section.Text,
                 Questions = Mapper.Map<QuestionView[]>(section.Questions.Where(q => !q.Hidden))
             };
 
-            foreach(var q in challenge.Questions)
+            foreach (var q in challenge.Questions)
             {
-                q.Weight = (float) Math.Round(q.Weight * spec.MaxPoints, 0, MidpointRounding.AwayFromZero);
-                q.Penalty = (float) Math.Round(q.Penalty * spec.MaxPoints, 0, MidpointRounding.AwayFromZero);
+                q.Penalty = WeightToPoints(q.Penalty, spec.MaxPoints);
+                q.Weight = WeightToPoints(q.Weight, spec.MaxPoints);
             }
 
             return challenge;
@@ -1014,5 +1097,8 @@ namespace TopoMojo.Api.Services
 
             return await _store.HasValidUserScopeGamespace(id, scope);
         }
+
+        private int WeightToPoints(double weight, double maxPoints)
+            => (int)Math.Round(weight * maxPoints, 0, MidpointRounding.AwayFromZero);
     }
 }

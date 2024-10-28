@@ -9,7 +9,6 @@ using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Hubs;
 using TopoMojo.Api.Models;
 using TopoMojo.Api.Services;
-using TopoMojo.Hypervisor;
 
 namespace TopoMojo.Api.Controllers;
 
@@ -25,9 +24,9 @@ public class GamespaceController(
     ) : _Controller(logger, hub)
 {
     private readonly DistributedCacheEntryOptions _cacheOpts = new()
-        {
-            SlidingExpiration = new TimeSpan(0, 0, 180)
-        };
+    {
+        SlidingExpiration = new TimeSpan(0, 0, 180)
+    };
 
     /// <summary>
     /// List running gamespaces.
@@ -106,6 +105,21 @@ public class GamespaceController(
             await gamespaceService.LoadChallenge(id, Actor.IsAdmin)
         );
     }
+
+    [HttpGet("api/gamespace/{gamespaceId}/challenge/progress")]
+    [SwaggerOperation(OperationId = "LoadGamespaceChallengeProgress")]
+    [Authorize(AppConstants.AnyUserPolicy)]
+    public async Task<ActionResult<ChallengeProgressView>> LoadChallengeProgress(string gamespaceId)
+    {
+        if (!AuthorizeAny(
+            () => gamespaceId == Actor.Id,
+            () => gamespaceService.CanInteract(gamespaceId, Actor.Id).Result
+        )) return Forbid();
+
+        var progress = await gamespaceService.LoadChallengeProgress(gamespaceId);
+        return Ok(progress);
+    }
+
 
     /// <summary>
     /// Register a gamespace on behalf of a user

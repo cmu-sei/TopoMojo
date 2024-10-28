@@ -1,9 +1,6 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-
 namespace TopoMojo.Api.Models
 {
     public class ChallengeSpec
@@ -43,7 +40,9 @@ namespace TopoMojo.Api.Models
 
     public class SectionSpec
     {
-        public double Prerequisite { get; set; }
+        public string Name { get; set; }
+        public double PreReqPrevSection { get; set; }
+        public double PreReqTotal { get; set; }
         public double Score { get; set; }
         public string Text { get; set; }
         public ICollection<QuestionSpec> Questions { get; set; } = new List<QuestionSpec>();
@@ -76,5 +75,4 @@ namespace TopoMojo.Api.Models
         public string Key { get; set; }
         public string Value { get; set; }
     }
-
 }

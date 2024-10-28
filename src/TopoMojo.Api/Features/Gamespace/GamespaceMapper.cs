@@ -3,8 +3,6 @@
 
 using AutoMapper;
 using TopoMojo.Api.Models;
-using TopoMojo.Api.Data.Extensions;
-using TopoMojo.Api.Extensions;
 
 namespace TopoMojo.Api
 {
@@ -40,7 +38,19 @@ namespace TopoMojo.Api
 
             CreateMap<QuestionSpec, QuestionView>()
                 .ForMember(d => d.Answer, opt => opt.Ignore())
+                .AfterMap((source, destination) =>
+                {
+                    // if they've solved this question, do include the
+                    // answer for display purposes
+                    if (source.IsCorrect && source.IsGraded)
+                    {
+                        destination.Answer = source.Answer;
+                    }
+                })
             ;
+
+            CreateMap<VariantSpec, VariantView>()
+                .ForMember(d => d.TotalSectionCount, opt => opt.MapFrom(s => s.Sections.Count));
         }
     }
 }

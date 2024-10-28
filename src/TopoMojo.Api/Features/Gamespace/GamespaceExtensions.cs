@@ -43,23 +43,23 @@ namespace TopoMojo.Api.Models
             {
 
                 case AnswerGrader.MatchAll:
-                question.IsCorrect = a.Intersect(
-                    b.Split(new char[] { ' ', ',', ';', ':', '|'}, StringSplitOptions.RemoveEmptyEntries)
-                ).ToArray().Length == a.Length;
-                break;
+                    question.IsCorrect = a.Intersect(
+                        b.Split(new char[] { ' ', ',', ';', ':', '|' }, StringSplitOptions.RemoveEmptyEntries)
+                    ).ToArray().Length == a.Length;
+                    break;
 
                 case AnswerGrader.MatchAny:
-                question.IsCorrect = a.Contains(c);
-                break;
+                    question.IsCorrect = a.Contains(c);
+                    break;
 
                 case AnswerGrader.MatchAlpha:
-                question.IsCorrect = a.First().WithoutSymbols().Equals(c.WithoutSymbols());
-                break;
+                    question.IsCorrect = a.First().WithoutSymbols().Equals(c.WithoutSymbols());
+                    break;
 
                 case AnswerGrader.Match:
                 default:
-                question.IsCorrect = a.First().Equals(c);
-                break;
+                    question.IsCorrect = a.First().Equals(c);
+                    break;
             }
 
             question.IsGraded = true;
@@ -88,7 +88,7 @@ namespace TopoMojo.Api.Models
             if (unweighted.Any())
             {
                 float val = (1 - max) / unweighted.Length;
-                foreach(var q in unweighted.Take(unweighted.Length - 1))
+                foreach (var q in unweighted.Take(unweighted.Length - 1))
                 {
                     q.Weight = val;
                     max += val;
@@ -112,6 +112,38 @@ namespace TopoMojo.Api.Models
                 request.ExpirationTime = ts.AddMinutes(max);
 
             return request.ExpirationTime;
+        }
+
+        public static VariantView FilterSections(this VariantView variantView)
+        {
+            var totalWeightScored = variantView.Sections
+                .SelectMany(s => s.Questions)
+                .Where(q => q.IsCorrect && q.IsGraded)
+                .Sum(q => q.Weight);
+
+            // hide sections for which the player is ineligible based on score
+            var availableSections = new List<SectionView>();
+            var lastSectionTotal = 0f;
+
+            foreach (var section in variantView.Sections)
+            {
+                var failsTotalPreReq = section.PreReqTotal > 0 && totalWeightScored < section.PreReqTotal;
+                var failsPrevSectionPreReq = section.PreReqPrevSection > 0 && lastSectionTotal < section.PreReqPrevSection;
+
+                if (!failsTotalPreReq && !failsPrevSectionPreReq)
+                {
+                    availableSections.Add(section);
+                }
+
+                lastSectionTotal = section
+                    .Questions
+                    .Where(q => q.IsCorrect && q.IsGraded)
+                    .Sum(q => q.Weight);
+            }
+
+            variantView.Sections = availableSections;
+
+            return variantView;
         }
     }
 }
