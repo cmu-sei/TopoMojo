@@ -166,7 +166,7 @@ namespace TopoMojo.Api.Services
         {
             var gamespaceEntity = await _store.Retrieve(gamespaceId);
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespaceEntity.Challenge, jsonOptions);
-            var mappedVariant = Mapper.Map<VariantView>(spec.Challenge);
+            var mappedVariant = Mapper.Map<VariantView>(spec.Challenge).FilterSections();
 
             // only include available question sets in the output viewmodel
             var eligibility = GetQuestionSetEligibity(spec.Challenge);
@@ -867,7 +867,7 @@ namespace TopoMojo.Api.Services
 
             if (!setEligibility.IsEligible)
             {
-                await _locker.Unlock(id, new QuestionSetLockedByPreReq { Eligibility = setEligibility });
+                await _locker.Unlock(id, new QuestionSetLockedByPreReq($"Can't grade gamespace {submission.Id} / section {submission.SectionIndex} due to set eligibility ({setEligibility.PreReqPrevSection} / {setEligibility.PreReqTotal})"));
             }
 
             submission.Timestamp = ts;

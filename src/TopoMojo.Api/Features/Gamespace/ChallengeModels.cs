@@ -38,6 +38,38 @@ namespace TopoMojo.Api.Models
         public required string Text { get; set; }
         public required ICollection<SectionView> Sections { get; set; } = [];
         public required int TotalSectionCount { get; set; }
+
+        public VariantView FilterSections()
+        {
+            var totalWeightScored = Sections
+                .SelectMany(s => s.Questions)
+                .Where(q => q.IsCorrect && q.IsGraded)
+                .Sum(q => q.Weight);
+
+            // hide sections for which the player is ineligible based on score
+            var availableSections = new List<SectionView>();
+            var lastSectionTotal = 0f;
+
+            foreach (var section in Sections)
+            {
+                var failsTotalPreReq = section.PreReqTotal > 0 && totalWeightScored < section.PreReqTotal;
+                var failsPrevSectionPreReq = section.PreReqPrevSection > 0 && lastSectionTotal < section.PreReqPrevSection;
+
+                if (!failsTotalPreReq && !failsPrevSectionPreReq)
+                {
+                    availableSections.Add(section);
+                }
+
+                lastSectionTotal = section
+                    .Questions
+                    .Where(q => q.IsCorrect && q.IsGraded)
+                    .Sum(q => q.Weight);
+            }
+
+            Sections = availableSections;
+
+            return this;
+        }
     }
 
     public class SectionView

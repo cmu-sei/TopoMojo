@@ -50,37 +50,7 @@ namespace TopoMojo.Api
             ;
 
             CreateMap<VariantSpec, VariantView>()
-                .ForMember(d => d.TotalSectionCount, opt => opt.MapFrom(s => s.Sections.Count))
-                .AfterMap((source, destination) =>
-                {
-                    var totalWeightScored = source
-                        .Sections
-                        .SelectMany(s => s.Questions)
-                        .Where(q => q.IsCorrect && q.IsGraded)
-                        .Sum(q => q.Weight);
-
-                    // hide sections for which the player is ineligible based on score
-                    var availableSections = new List<SectionView>();
-                    var lastSectionTotal = 0f;
-
-                    foreach (var section in destination.Sections)
-                    {
-                        var failsTotalPreReq = section.PreReqTotal > 0 && totalWeightScored < section.PreReqTotal;
-                        var failsPrevSectionPreReq = section.PreReqPrevSection > 0 && lastSectionTotal < section.PreReqPrevSection;
-
-                        if (!failsTotalPreReq && !failsPrevSectionPreReq)
-                        {
-                            availableSections.Add(section);
-                        }
-
-                        lastSectionTotal = section
-                            .Questions
-                            .Where(q => q.IsCorrect && q.IsGraded)
-                            .Sum(q => q.Weight);
-                    }
-
-                    destination.Sections = availableSections;
-                });
+                .ForMember(d => d.TotalSectionCount, opt => opt.MapFrom(s => s.Sections.Count));
         }
     }
 }

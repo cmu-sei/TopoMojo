@@ -1,9 +1,6 @@
 // Copyright 2021 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using TopoMojo.Api.Models;
-
 namespace TopoMojo.Api.Exceptions
 {
     public class ClientGamespaceLimitReached : Exception { }
@@ -24,13 +21,8 @@ namespace TopoMojo.Api.Exceptions
     public class AttemptLimitReached : Exception { }
     public class GamespaceIsExpired : Exception { }
     public class GamespaceNotRegistered : Exception { }
-    public class SectionLockedByPreReq : Exception { }
+    public class QuestionSetLockedByPreReq(string message) : Exception(message) { }
     public class UserDisabled : Exception { }
-
-    public class QuestionSetLockedByPreReq : Exception
-    {
-        public required QuestionSetEligibility Eligibility { get; set; }
-    }
 
     public class TimestampedException
     {
