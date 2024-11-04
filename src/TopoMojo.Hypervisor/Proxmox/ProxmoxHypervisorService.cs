@@ -486,6 +486,16 @@ namespace TopoMojo.Hypervisor.Proxmox
             };
         }
 
+        public async Task<int> ExecCommand(string id, string[] command)
+        {
+            return await _pveClient.ExecCommand(id, command);
+        }
+
+        public async Task<VmExecResponse> GetCommandOutput(string id, int pid)
+        {
+            return await _pveClient.GetCommandOutput(id, pid);
+        }
+
         public Task ReloadHost(string host)
         {
             throw new NotImplementedException();

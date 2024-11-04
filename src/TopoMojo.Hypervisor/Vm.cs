@@ -75,6 +75,18 @@ namespace TopoMojo.Hypervisor
         Reset
     }
 
+
+    public class VmExecResponse
+    {
+        public string ErrData { get; set; } // Optional, stderr of the process
+        public bool? ErrTruncated { get; set; } // Optional, true if stderr was not fully captured
+        public int? ExitCode { get; set; } // Optional, process exit code if it was normally terminated
+        public bool Exited { get; set; } // Required, tells if the command has exited yet
+        public string OutData { get; set; } // Optional, stdout of the process
+        public bool? OutTruncated { get; set; } // Optional, true if stdout was not fully captured
+        public int? Signal { get; set; } // Optional, signal number or exception code if the process was abnormally terminated
+    }
+
     public class VmConsole
     {
         public string Id { get; set; }

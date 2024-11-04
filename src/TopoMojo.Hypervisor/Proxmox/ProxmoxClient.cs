@@ -504,6 +504,52 @@ namespace TopoMojo.Hypervisor.Proxmox
             return vm;
         }
 
+        public async Task<int> ExecCommand(string id, string[] command)
+        {
+            var vm = _vmCache[id];
+            var task = await _pveClient.Nodes[vm.Host].Qemu[vm.Id].Agent.Exec.Exec(command);
+            await _pveClient.WaitForTaskToFinish(task);
+
+            if (task.IsSuccessStatusCode)
+            {
+                return (int)task.Response.data.pid;
+            }
+            else
+            {
+                throw new Exception(task.ReasonPhrase);
+            }
+        }
+
+        public async Task<VmExecResponse> GetCommandOutput(string id, int pid)
+        {
+            var vm = _vmCache[id];
+            var task = await _pveClient.Nodes[vm.Host].Qemu[vm.GetId()].Agent.ExecStatus.ExecStatus(pid);
+            await _pveClient.WaitForTaskToFinish(task);
+
+            if (task.IsSuccessStatusCode)
+            {
+                var responseData = (IDictionary<string, object>)task.Response.data;
+                
+                // Create a new VmExecResponse object and populate it from the ExpandoObject
+                var execResponse = new VmExecResponse
+                {
+                    ErrData = responseData.ContainsKey("err-data") ? (string)responseData["err-data"] : null,
+                    ErrTruncated = responseData.ContainsKey("err-truncated") ? (bool?)responseData["err-truncated"] : false,
+                    ExitCode = responseData.ContainsKey("exitcode") ? Convert.ToInt32(responseData["exitcode"]) : (int?)null,
+                    Exited = Convert.ToInt32(responseData["exited"]) != 0,
+                    OutData = responseData.ContainsKey("out-data") ? (string)responseData["out-data"] : null,
+                    OutTruncated = responseData.ContainsKey("out-truncated") ? (bool?)responseData["out-truncated"] : false,
+                    Signal = responseData.ContainsKey("signal") ? Convert.ToInt32(responseData["signal"]) : (int?)null
+                };
+
+                return execResponse;
+            }
+            else
+            {
+                throw new Exception(task.ReasonPhrase);
+            }
+        }
+
         private async Task CompleteSave(Result task, string oldId, int nextId, Vm template, string vmId)
         {
             try

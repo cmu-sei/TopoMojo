@@ -514,6 +514,18 @@ namespace TopoMojo.Hypervisor.vMock
             throw new NotImplementedException();
         }
 
+        public async Task<int> ExecCommand(string id, string[] command)
+        {
+            await Task.Delay(0);
+            return 0;
+        }
+
+        public async Task<VmExecResponse> GetCommandOutput(string id, int pid)
+        {
+            await Task.Delay(0);
+            return new VmExecResponse();
+        }
+
         private void NormalizeOptions(HypervisorServiceConfiguration options)
         {
             var regex = new Regex("(]|/)$");
