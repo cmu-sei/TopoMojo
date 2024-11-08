@@ -84,48 +84,55 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await Task.Delay(0);
 
+            ProvisionAll(template.Eth, template.UseUplinkSwitch).Wait();
+
+            foreach (var eth in template.Eth)
+            {
+                eth.Key = _pgAllocation[eth.Net].Key;
+                _pgAllocation[eth.Net].Counter += 1;
+            }
+        }
+
+        public async Task ProvisionAll(VmNet[] nets, bool useUplinkSwitch)
+        {
+            await Task.Delay(0);
+
             lock (_pgAllocation)
             {
                 string sw = _client.UplinkSwitch;
-                if (_client.dvs == null && _client.net != null && !template.UseUplinkSwitch)
+                if (_client.dvs == null && _client.net != null && !useUplinkSwitch)
                 {
-                    sw = template.IsolationTag.ToSwitchName();
-                    if (!_swAllocation.ContainsKey(sw))
+                    sw = nets[0].Net.Tag().ToSwitchName();
+                    if (_swAllocation.TryAdd(sw, 0))
                     {
                         AddSwitch(sw).Wait();
-                        _swAllocation.Add(sw, 0);
                     }
                 }
 
-                foreach (VmNet eth in template.Eth)
+                var manifest = nets
+                    .Where(e => _pgAllocation.ContainsKey(e.Net).Equals(false))
+                    .Distinct()
+                    .ToArray()
+                ;
+
+                var pgs = AddPortGroups(sw, manifest).Result;
+
+                _vlanManager.Activate(
+                    pgs.Select(p => new Vlan {
+                        Id = p.VlanId,
+                        Name = p.Net,
+                        OnUplink = sw == _client.UplinkSwitch
+                    }).ToArray()
+                );
+
+                foreach (var pg in pgs)
                 {
-                    if (!_pgAllocation.ContainsKey(eth.Net))
-                    {
-                        var pg = AddPortGroup(sw, eth).Result;
-                        pg.Timestamp = DateTimeOffset.UtcNow;
-                        pg.Counter = 1;
-
-                        _pgAllocation.Add(pg.Net, pg);
-
-                        _vlanManager.Activate(new Vlan[] {
-                            new Vlan {
-                                Id = pg.VlanId,
-                                Name = pg.Net,
-                                OnUplink = sw == _client.UplinkSwitch
-                            }
-                        });
-
-                        if (_swAllocation.ContainsKey(sw))
-                            _swAllocation[sw] += 1;
-
-                    }
-                    else
-                    {
-                        _pgAllocation[eth.Net].Counter += 1;
-                    }
-
-                    eth.Key = _pgAllocation[eth.Net].Key;
+                    pg.Timestamp = DateTimeOffset.UtcNow;
+                    _pgAllocation.Add(pg.Net, pg);
                 }
+
+                if (_swAllocation.ContainsKey(sw))
+                    _swAllocation[sw] += pgs.Length;
             }
         }
 
@@ -223,6 +230,15 @@ namespace TopoMojo.Hypervisor.vSphere
         public abstract Task<VmNetwork[]> GetVmNetworks(ManagedObjectReference managedObjectReference);
         public abstract Task<PortGroupAllocation[]> LoadPortGroups();
         public abstract Task<PortGroupAllocation> AddPortGroup(string sw, VmNet eth);
+        public virtual async Task<PortGroupAllocation[]> AddPortGroups(string sw, VmNet[] eths)
+        {
+            List<PortGroupAllocation> pgs = [];
+            foreach (var eth in eths)
+                pgs.Add(
+                    await AddPortGroup(sw, eth)
+                );
+            return [.. pgs];
+        }
         public abstract Task<bool> RemovePortgroup(string pgReference);
         public abstract Task AddSwitch(string sw);
         public abstract Task RemoveSwitch(string sw);

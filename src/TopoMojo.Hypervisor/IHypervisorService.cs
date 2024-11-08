@@ -19,6 +19,7 @@ namespace TopoMojo.Hypervisor
         Task<Vm> ChangeState(VmOperation op);
         Task<Vm> ChangeConfiguration(string id, VmKeyValue change, bool privileged = false);
         Task<Vm> Deploy(VmTemplate template, bool privileged = false);
+        Task Deploy(DeploymentContext ctx, bool wait = false);
         Task SetAffinity(string isolationTag, Vm[] vms, bool start);
         Task<Vm> Refresh(VmTemplate template);
         Task<Vm[]> Find(string searchText);
@@ -32,7 +33,6 @@ namespace TopoMojo.Hypervisor
         Task<VmOptions> GetVmNetOptions(string key);
         string Version { get; }
         Task ReloadHost(string host);
-
         HypervisorServiceConfiguration Options { get; }
     }
 

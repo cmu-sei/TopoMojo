@@ -166,6 +166,9 @@ namespace TopoMojo.Api.Services
         {
             var gamespaceEntity = await _store.Retrieve(gamespaceId);
             var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespaceEntity.Challenge, jsonOptions);
+            if (spec.Challenge is null)
+                return new();
+
             var mappedVariant = Mapper.Map<VariantView>(spec.Challenge).FilterSections();
 
             // only include available question sets in the output viewmodel
@@ -543,34 +546,28 @@ namespace TopoMojo.Api.Services
                 }
             }
 
-            foreach (var template in templates)
-            {
-                tasks.Add(
-                    _pod.Deploy(
-                        template
+            await _pod.Deploy(new DeploymentContext(
+                gamespace.Id,
+                gamespace.Workspace.HostAffinity,
+                sudo,
+                templates.Select(t => t
                         .ToVirtualTemplate(gamespace.Id)
-                        .SetHostAffinity(gamespace.Workspace.HostAffinity),
-                        sudo
-                    )
-                );
-            }
+                        .SetHostAffinity(gamespace.Workspace.HostAffinity)
+                ).ToArray()
+            ), _options.WaitForDeployment);
 
-            await Task.WhenAll(tasks.ToArray());
-
-            if (gamespace.Workspace.HostAffinity)
+            for (int i = 0; i < 18 ; i++)
             {
-                var vms = tasks.Select(t => t.Result).ToArray();
-
-                await _pod.SetAffinity(gamespace.Id, vms, true);
-
-                foreach (var vm in vms)
-                    vm.State = VmPowerState.Running;
-            }
-
-            if (gamespace.StartTime.Year <= 1)
-            {
-                gamespace.StartTime = DateTimeOffset.UtcNow;
-                await _store.Update(gamespace);
+                await Task.Delay(5000);
+                var existing = await _pod.Find(gamespace.Id);
+                if (existing.Length == templates.Count) {
+                    if (gamespace.StartTime.Year <= 1)
+                    {
+                        gamespace.StartTime = DateTimeOffset.UtcNow;
+                        await _store.Update(gamespace);
+                    }
+                    break;
+                }
             }
         }
 

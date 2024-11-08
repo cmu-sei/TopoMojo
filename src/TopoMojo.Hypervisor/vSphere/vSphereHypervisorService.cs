@@ -30,6 +30,7 @@ namespace TopoMojo.Hypervisor.vSphere
             _vlanman = new VlanManager(_options.Vlan);
 
             NormalizeOptions(_options);
+            _ = Task.Run(() => DeploymentHandler());
         }
 
         private readonly HypervisorServiceConfiguration _options;
@@ -41,7 +42,7 @@ namespace TopoMojo.Hypervisor.vSphere
         private DateTimeOffset _lastCacheUpdate = DateTimeOffset.MinValue;
         private Dictionary<string, VimClient> _affinityMap;
         private ConcurrentDictionary<string, Vm> _vmCache;
-
+        private BlockingCollection<DeploymentContext> DeploymentCollection = new BlockingCollection<DeploymentContext>();
         public HypervisorServiceConfiguration Options { get {return _options;}}
 
         public async Task ReloadHost(string hostname)
@@ -93,6 +94,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             return vm;
         }
+
         public async Task<Vm> Deploy(VmTemplate template, bool privileged = false)
         {
 
@@ -697,6 +699,54 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (!regex.IsMatch(options.IsoStore))
                 options.IsoStore += "/";
+        }
+
+        private Task DeploymentHandler()
+        {
+            foreach(var ctx in DeploymentCollection.GetConsumingEnumerable())
+                _ = DeployBatch(ctx);
+
+            return Task.CompletedTask;
+        }
+
+        private async Task DeployBatch(DeploymentContext ctx)
+        {
+            var existing = (await Find(ctx.Id)).Select(vm => vm.Name);
+            var missing = ctx.Templates
+                .Where(t => existing.Contains(t.Name).Equals(false))
+                .ToArray()
+            ;
+            if (missing.Length == 0)
+                return;
+
+            if (_hostCache.Count == 1 && _hostCache.First().Value.Options.IsNsxNetwork)
+            {
+                var eths = ctx.Templates.SelectMany(t => t.Eth).ToArray();
+                foreach (var eth in eths)
+                    eth.Net += $"#{ctx.Id}";
+                await _hostCache.First().Value.PreDeployNets(eths, false);
+            }
+
+            var tasks = missing.Select(t => Deploy(t, ctx.Privileged)).ToArray();
+            await Task.WhenAll(tasks);
+
+            if (ctx.Affinity)
+            {
+                var vms = tasks.Select(t => t.Result).ToArray();
+
+                await SetAffinity(ctx.Id, vms, true);
+
+                foreach (var vm in vms)
+                    vm.State = VmPowerState.Running;
+            }
+        }
+
+        public async Task Deploy(DeploymentContext ctx, bool wait = false)
+        {
+            if (wait)
+                await DeployBatch(ctx);
+            else
+                DeploymentCollection.Add(ctx);
         }
     }
 

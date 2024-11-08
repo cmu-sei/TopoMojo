@@ -169,6 +169,53 @@ namespace TopoMojo.Hypervisor.vSphere
 
         }
 
+        public override async Task<PortGroupAllocation[]> AddPortGroups(string sw, VmNet[] eths)
+        {
+            await InitClient();
+
+            string tag = eths[0].Net.Tag();
+            var names = new List<string>();
+
+            foreach (var eth in eths)
+            {
+                string url = $"{_apiUrl}/{_apiSegments}/{eth.Net.Replace("#","%23")}";
+
+                var response = await _sddc.PutAsync(
+                    url,
+                    new StringContent(
+                        "{\"advanced_config\": { \"connectivity\": \"OFF\" } }",
+                        Encoding.UTF8,
+                        "application/json"
+                    )
+                );
+
+                if (response.IsSuccessStatusCode)
+                    names.Add(eth.Net);
+                else
+                    _logger.LogDebug("Failed to add SDDC PortGroup {net}", eth.Net);
+            }
+
+            int count = 10;
+            bool complete = false;
+            PortGroupAllocation[] pgas = [];
+            do
+            {
+                await Task.Delay(1500);
+
+                pgas = (await LoadPortGroups())
+                    .Where(p => names.Contains(p.Net))
+                    .ToArray()
+                ;
+                complete = pgas.Length == names.Count;
+                count -= 1;
+            } while (count > 0 && !complete);
+
+            if (!complete)
+                throw new Exception($"Failed to create net(s) for {tag}");
+
+            return pgas;
+        }
+
         public override Task AddSwitch(string sw)
         {
             return Task.FromResult(0);
