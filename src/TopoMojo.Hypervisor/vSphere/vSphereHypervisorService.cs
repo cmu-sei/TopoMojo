@@ -723,7 +723,11 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 var eths = ctx.Templates.SelectMany(t => t.Eth).ToArray();
                 foreach (var eth in eths)
+                {
+                    if (ctx.Privileged && _vlanman.Contains(eth.Net))
+                        continue;
                     eth.Net += $"#{ctx.Id}";
+                }
                 await _hostCache.First().Value.PreDeployNets(eths, false);
             }
 

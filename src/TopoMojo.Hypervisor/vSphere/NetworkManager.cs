@@ -84,7 +84,7 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await Task.Delay(0);
 
-            ProvisionAll(template.Eth, template.UseUplinkSwitch).Wait();
+            await ProvisionAll(template.Eth, template.UseUplinkSwitch);
 
             foreach (var eth in template.Eth)
             {
@@ -115,6 +115,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     .ToArray()
                 ;
 
+                _logger.LogDebug("AddPortGroups for {count} nets...", manifest.Length);
                 var pgs = AddPortGroups(sw, manifest).Result;
 
                 _vlanManager.Activate(

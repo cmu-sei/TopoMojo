@@ -171,6 +171,9 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public override async Task<PortGroupAllocation[]> AddPortGroups(string sw, VmNet[] eths)
         {
+            if (eths.Length == 0)
+                return [];
+
             await InitClient();
 
             string tag = eths[0].Net.Tag();
@@ -192,7 +195,9 @@ namespace TopoMojo.Hypervisor.vSphere
                 if (response.IsSuccessStatusCode)
                     names.Add(eth.Net);
                 else
-                    _logger.LogDebug("Failed to add SDDC PortGroup {net}", eth.Net);
+                    _logger.LogDebug("Failed to add SDDC PortGroup {net} {reason}", eth.Net, response.ReasonPhrase);
+
+                await Task.Delay(250);
             }
 
             int count = 10;
@@ -201,7 +206,7 @@ namespace TopoMojo.Hypervisor.vSphere
             do
             {
                 await Task.Delay(1500);
-
+                _logger.LogDebug("SDDC resolving new portgroups [{count}]", count);
                 pgas = (await LoadPortGroups())
                     .Where(p => names.Contains(p.Net))
                     .ToArray()
