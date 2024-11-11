@@ -197,7 +197,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 else
                     _logger.LogDebug("Failed to add SDDC PortGroup {net} {reason}", eth.Net, response.ReasonPhrase);
 
-                await Task.Delay(250);
+                await Task.Delay(100);
             }
 
             int count = 10;

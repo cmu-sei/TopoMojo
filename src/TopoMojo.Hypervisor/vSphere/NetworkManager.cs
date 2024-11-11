@@ -109,9 +109,10 @@ namespace TopoMojo.Hypervisor.vSphere
                     }
                 }
 
+                // filter only unallocated nets
                 var manifest = nets
                     .Where(e => _pgAllocation.ContainsKey(e.Net).Equals(false))
-                    .Distinct()
+                    .DistinctBy(e => e.Net)
                     .ToArray()
                 ;
 

@@ -721,7 +721,10 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (_hostCache.Count == 1 && _hostCache.First().Value.Options.IsNsxNetwork)
             {
-                var eths = ctx.Templates.SelectMany(t => t.Eth).ToArray();
+                var eths = ctx.Templates.SelectMany(t => t.Eth)
+                    .DistinctBy(e => e.Net)
+                    .ToArray();
+
                 foreach (var eth in eths)
                 {
                     if (ctx.Privileged && _vlanman.Contains(eth.Net))

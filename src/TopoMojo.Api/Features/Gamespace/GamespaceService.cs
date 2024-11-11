@@ -554,7 +554,8 @@ namespace TopoMojo.Api.Services
                         .ToVirtualTemplate(gamespace.Id)
                         .SetHostAffinity(gamespace.Workspace.HostAffinity)
                 ).ToArray()
-            ), _options.WaitForDeployment);
+            ), true);
+            // TODO: allow clients to specify `WaitForDeployment` bool #27
 
             for (int i = 0; i < 18 ; i++)
             {
