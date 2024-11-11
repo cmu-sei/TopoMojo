@@ -2,6 +2,7 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -28,6 +29,7 @@ namespace TopoMojo.Hypervisor.vMock
             _rand = new Random();
 
             NormalizeOptions(_optPod);
+            _ = Task.Run(() => DeploymentHandler());
         }
 
         private readonly HypervisorServiceConfiguration _optPod;
@@ -36,6 +38,7 @@ namespace TopoMojo.Hypervisor.vMock
         private Random _rand;
         private Dictionary<string, Vm> _vms;
         private Dictionary<string, VmTask> _tasks;
+        private BlockingCollection<DeploymentContext> DeploymentCollection = [];
 
         public HypervisorServiceConfiguration Options { get { return _optPod; } }
 
@@ -526,6 +529,35 @@ namespace TopoMojo.Hypervisor.vMock
 
             if (!regex.IsMatch(options.IsoStore))
                 options.IsoStore += "/";
+        }
+
+        private Task DeploymentHandler()
+        {
+            foreach (var ctx in DeploymentCollection.GetConsumingEnumerable())
+                _ = DeployBatch(ctx);
+
+            return Task.CompletedTask;
+        }
+
+        private async Task DeployBatch(DeploymentContext ctx)
+        {
+            _logger.LogInformation("Deploying Batch {id}", ctx.Id);
+            var tasks = new List<Task<Vm>>();
+            var existing = (await Find(ctx.Id)).Select(vm => vm.Name);
+            var missing = ctx.Templates.Where(t => existing.Contains(t.Name).Equals(false));
+
+            foreach (var template in missing)
+                tasks.Add(Deploy(template, ctx.Privileged));
+
+            await Task.WhenAll(tasks.ToArray());
+        }
+
+        public async Task Deploy(DeploymentContext ctx, bool wait = false)
+        {
+            if (wait)
+                await DeployBatch(ctx);
+            else
+                DeploymentCollection.Add(ctx);
         }
     }
 

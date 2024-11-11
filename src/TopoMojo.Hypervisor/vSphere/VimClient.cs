@@ -1386,6 +1386,11 @@ namespace TopoMojo.Hypervisor.vSphere
             }
             // _logger.LogDebug("taskMonitor ended.");
         }
+
+        internal async Task PreDeployNets(VmNet[] eths, bool useUplinkSwitch)
+        {
+            await _netman.ProvisionAll(eths, useUplinkSwitch);
+        }
     }
 
 }

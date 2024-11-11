@@ -39,6 +39,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                 nameService,
                 vlanManager,
                 random);
+
+            _ = Task.Run(() => DeploymentHandler());
         }
 
         private readonly HypervisorServiceConfiguration _options;
@@ -53,6 +55,8 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly IProxmoxVlanManager _vlanManager;
 
         public HypervisorServiceConfiguration Options { get { return _options; } }
+        private BlockingCollection<DeploymentContext> DeploymentCollection = [];
+
 
         public async Task<Vm> Deploy(VmTemplate template, bool privileged = false)
         {
@@ -489,6 +493,34 @@ namespace TopoMojo.Hypervisor.Proxmox
         public Task ReloadHost(string host)
         {
             throw new NotImplementedException();
+        }
+
+        private Task DeploymentHandler()
+        {
+            foreach(var ctx in DeploymentCollection.GetConsumingEnumerable())
+                _ = DeployBatch(ctx);
+
+            return Task.CompletedTask;
+        }
+
+        private async Task DeployBatch(DeploymentContext ctx)
+        {
+            var tasks = new List<Task<Vm>>();
+            var existing = (await Find(ctx.Id)).Select(vm => vm.Name);
+            var missing = ctx.Templates.Where(t => existing.Contains(t.Name).Equals(false));
+
+            foreach (var template in missing)
+                tasks.Add(Deploy(template, ctx.Privileged));
+
+            await Task.WhenAll(tasks.ToArray());
+        }
+
+        public async Task Deploy(DeploymentContext ctx, bool wait = false)
+        {
+            if (wait)
+                await DeployBatch(ctx);
+            else
+                DeploymentCollection.Add(ctx);
         }
     }
 }
