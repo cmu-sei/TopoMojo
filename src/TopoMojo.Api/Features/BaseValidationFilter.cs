@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Mvc;
@@ -7,18 +7,18 @@ using TopoMojo.Api.Models;
 
 namespace TopoMojo.Api.Controllers;
 
-public class _ValidationFilter : IAsyncActionFilter
+public class BaseValidationFilter : IAsyncActionFilter
 {
-    public _ValidationFilter()
+    public BaseValidationFilter()
     {
-        Problems = new();
+        Problems = [];
     }
 
     protected List<Problem> Problems { get; }
 
     public virtual async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        if (Problems.Any())
+        if (Problems.Count != 0)
         {
             foreach (var problem in Problems)
                 context.ModelState.AddModelError(problem.Key, problem.Value);

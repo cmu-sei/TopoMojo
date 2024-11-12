@@ -1,10 +1,7 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.Linq;
 using System.Net;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
 using TopoMojo.Api;
 
@@ -12,15 +9,17 @@ namespace Microsoft.Extensions.DependencyInjection
 {
     public static class ForwardingStartupExtensions
     {
+        private static readonly char[] separator = [' ', ','];
 
         public static IServiceCollection ConfigureForwarding(
             this IServiceCollection services,
             ForwardHeaderOptions options
         )
         {
-            services.Configure<ForwardedHeadersOptions>(config => {
+            services.Configure<ForwardedHeadersOptions>(config =>
+            {
 
-                if (Enum.TryParse<ForwardedHeaders>(
+                if (Enum.TryParse(
                     options.TargetHeaders ?? "None",
                     true,
                     out ForwardedHeaders targets)
@@ -40,7 +39,7 @@ namespace Microsoft.Extensions.DependencyInjection
                 {
                     foreach (string item in options.KnownNetworks
                         .Split(
-                            new char[] { ' ', ','},
+                            separator,
                             StringSplitOptions.RemoveEmptyEntries
                         )
                     )
@@ -48,7 +47,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         string[] net = item.Split('/');
 
                         if (IPAddress.TryParse(net.First(), out IPAddress ipaddr)
-                            && Int32.TryParse(net.Last(), out int prefix)
+                            && int.TryParse(net.Last(), out int prefix)
                         )
                         {
                             config.KnownNetworks.Add(new AspNetCore.HttpOverrides.IPNetwork(ipaddr, prefix));
@@ -60,7 +59,7 @@ namespace Microsoft.Extensions.DependencyInjection
                 {
                     foreach (string ip in options.KnownProxies
                         .Split(
-                            new char[] { ' ', ','},
+                            separator,
                             StringSplitOptions.RemoveEmptyEntries
                         )
                     )

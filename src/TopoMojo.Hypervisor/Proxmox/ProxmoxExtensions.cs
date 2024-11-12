@@ -1,13 +1,12 @@
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
 using System;
 using System.Diagnostics;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading;
 using System.Threading.Tasks;
 using Corsinvest.ProxmoxVE.Api;
 using Corsinvest.ProxmoxVE.Api.Shared.Models.Node;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -35,7 +34,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             else if (content.Parent.StartsWith("../"))
             {
                 // return e.g. 100/base-100-disk0.qcow2
-                return content.Parent.Split(new[] { '/' }, 2)[1];
+                return content.Parent.Split(['/'], 2)[1];
             }
             else
             {
@@ -79,8 +78,8 @@ namespace TopoMojo.Hypervisor.Proxmox
         => !(result != null &&
             !result.ResponseInError &&
             timeout > 0 &&
-            result.ToData() is string &&
-            ((string)result.ToData()).StartsWith("UPID:")) ||
+            result.ToData() is string v &&
+            v.StartsWith("UPID:")) ||
                 await WaitForTaskToFinish(client, result.ToData(), wait, timeout);
 
         /// <summary>

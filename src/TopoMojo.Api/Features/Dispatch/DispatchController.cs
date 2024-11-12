@@ -1,7 +1,7 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Swashbuckle.AspNetCore.Annotations;
@@ -20,7 +20,7 @@ public class DispatchController(
     IHubContext<AppHub, IHubEvent> hub,
     DispatchService dispatchService,
     GamespaceService gamespaceService
-    ) : _Controller(logger, hub)
+    ) : BaseController(logger, hub)
 {
 
     /// <summary>
@@ -130,9 +130,9 @@ public class DispatchController(
     {
         if (!AuthorizeAny(
             () => Actor.IsAdmin,
-            () => model.gs == Actor.Id, // gamespace agent
-            () => gamespaceService.CanManage(model.gs, Actor.Id).Result,
-            () => Actor.IsObserver && gamespaceService.HasValidUserScopeGamespace(model.gs, Actor.Scope).Result
+            () => model.GamespaceId == Actor.Id, // gamespace agent
+            () => gamespaceService.CanManage(model.GamespaceId, Actor.Id).Result,
+            () => Actor.IsObserver && gamespaceService.HasValidUserScopeGamespace(model.GamespaceId, Actor.Scope).Result
         )) return Forbid();
 
         return await dispatchService.List(model, ct);

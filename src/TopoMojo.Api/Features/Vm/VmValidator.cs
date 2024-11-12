@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -13,7 +13,7 @@ public class VmValidator(
     IHypervisorService pod,
     IWorkspaceStore store,
     ILogger<VmValidator> logger
-) : _ValidationFilter
+) : BaseValidationFilter
 {
     public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
@@ -25,12 +25,12 @@ public class VmValidator(
             {
 
                 case VmOperation model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 default:
-                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
-                break;
+                    logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                    break;
 
             }
         }

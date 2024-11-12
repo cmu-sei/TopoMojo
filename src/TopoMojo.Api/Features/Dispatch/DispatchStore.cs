@@ -1,21 +1,13 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using TopoMojo.Api.Data.Abstractions;
 
 namespace TopoMojo.Api.Data
 {
 
-    public class DispatchStore: Store<Dispatch>, IDispatchStore
+    public class DispatchStore(TopoMojoDbContext dbContext) : Store<Dispatch>(dbContext), IDispatchStore
     {
-        public DispatchStore(TopoMojoDbContext dbContext)
-        :base(dbContext)
-        {
-
-        }
 
         // If entity has searchable fields, use this:
         // public override IQueryable<Dispatch> List(string term = null)

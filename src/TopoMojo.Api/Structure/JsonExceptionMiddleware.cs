@@ -1,44 +1,32 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 using TopoMojo.Api;
 using TopoMojo.Api.Exceptions;
 
 namespace TopoMojo.Api
 {
-    public class JsonExceptionMiddleware
-    {
-        public JsonExceptionMiddleware(
-            RequestDelegate next,
-            ILogger<JsonExceptionMiddleware> logger
+    public class JsonExceptionMiddleware(
+        RequestDelegate next,
+        ILogger<JsonExceptionMiddleware> logger
         )
-        {
-            _next = next;
-            _logger = logger;
-        }
-        private readonly RequestDelegate _next;
-        private readonly ILogger _logger;
+    {
 
         public async Task Invoke(HttpContext context, IMemoryCache cache)
         {
-            try {
-                await _next(context);
+            try
+            {
+                await next(context);
             }
             catch (Exception ex)
             {
-                if (!(ex is ResourceNotFound))
+                if (ex is not ResourceNotFound)
                 {
-                    _logger.LogError(ex, "Error");
+                    logger.LogError(ex, "Error");
 
-                    var errorList = cache.Get<List<TimestampedException>>(AppConstants.ErrorListCacheKey) ?? new List<TimestampedException>();
+                    var errorList = cache.Get<List<TimestampedException>>(AppConstants.ErrorListCacheKey) ?? [];
                     errorList.Add(new TimestampedException
                     {
                         Timestamp = DateTimeOffset.UtcNow,
@@ -62,7 +50,8 @@ namespace TopoMojo.Api
                         ex is InvalidOperationException ||
                         ex is ArgumentException ||
                         type.Namespace.StartsWith("TopoMojo")
-                    ) {
+                    )
+                    {
                         context.Response.StatusCode = 400;
 
                         message = type.Name
@@ -74,7 +63,7 @@ namespace TopoMojo.Api
                             message += $" {ex.Message}";
                     }
 
-                    await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = message }));
+                    await context.Response.WriteAsync(JsonSerializer.Serialize(new { message }));
                 }
             }
 
@@ -86,7 +75,7 @@ namespace Microsoft.AspNetCore.Builder
 {
     public static class JsonExceptionStartupExtensions
     {
-        public static IApplicationBuilder UseJsonExceptions (
+        public static IApplicationBuilder UseJsonExceptions(
             this IApplicationBuilder builder
         )
         {

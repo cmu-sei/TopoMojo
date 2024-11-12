@@ -1,4 +1,7 @@
-﻿using System;
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -365,12 +368,12 @@ namespace TopoMojo.Api.Data.Migrations.PostgreSQL.TopoMojoDb
             migrationBuilder.AddPrimaryKey(
                 name: "PK_Workers",
                 table: "Workers",
-                columns: new[] { "SubjectId", "WorkspaceId" });
+                columns: ["SubjectId", "WorkspaceId"]);
 
             migrationBuilder.AddPrimaryKey(
                 name: "PK_Players",
                 table: "Players",
-                columns: new[] { "SubjectId", "GamespaceId" });
+                columns: ["SubjectId", "GamespaceId"]);
 
             migrationBuilder.AddPrimaryKey(
                 name: "PK_ApiKeys",

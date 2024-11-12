@@ -1,23 +1,16 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TopoMojo.Api.Data.Abstractions;
-using TopoMojo.Api.Extensions;
 
 namespace TopoMojo.Api.Data
 {
-    public class WorkspaceStore : Store<Workspace>, IWorkspaceStore
+    public partial class WorkspaceStore(
+        TopoMojoDbContext db
+        ) : Store<Workspace>(db), IWorkspaceStore
     {
-        public WorkspaceStore (
-            TopoMojoDbContext db
-        ) : base(db) { }
-
         public override IQueryable<Workspace> List(string term = null)
         {
             var q = base.List();
@@ -26,6 +19,7 @@ namespace TopoMojo.Api.Data
             {
                 term = term.ToLower();
 
+#pragma warning disable CA1862
                 q = q.Where(t =>
                     t.Name.ToLower().Contains(term) ||
                     t.Tags.ToLower().Contains(term) ||
@@ -44,7 +38,6 @@ namespace TopoMojo.Api.Data
             return await base.Retrieve(id, query => query
                 .Include(t => t.Workers)
                 .Include(t => t.Templates).ThenInclude(p => p.Parent)
-                // .Include(t => t.Templates).ThenInclude(p => p.Source)
             );
         }
 
@@ -82,7 +75,6 @@ namespace TopoMojo.Api.Data
             var entity = await Retrieve(id, q =>
                 q.Include(w => w.Templates)
             );
-                // q.Include(w => w.Templates.Where(t => !t.Children.Any()))
 
             templateAction.Invoke(entity.Templates);
 
@@ -165,10 +157,9 @@ namespace TopoMojo.Api.Data
                 .FirstOrDefaultAsync(w => w.Id == id)
             ;
 
-            // TODO: auto-bump version
             string suffix = "-CLONE";
-            var match = Regex.Match(entity.Name, @"v(\d+)$");
-            if (match.Success && Int32.TryParse(match.Groups[1].ValueSpan, out int version))
+            var match = NameVersionRegex().Match(entity.Name);
+            if (match.Success && int.TryParse(match.Groups[1].ValueSpan, out int version))
             {
                 suffix = $"v{version + 1}";
                 entity.Name = entity.Name[0..match.Index];
@@ -178,7 +169,10 @@ namespace TopoMojo.Api.Data
             entity.Id = Guid.NewGuid().ToString("n");
 
             if (string.IsNullOrEmpty(tenantId).Equals(false))
-                entity.Id = tenantId + entity.Id.Substring(0, entity.Id.Length - tenantId.Length);
+                entity.Id = string.Concat(
+                    tenantId,
+                    entity.Id.AsSpan(0, entity.Id.Length - tenantId.Length)
+                );
 
             foreach (var worker in entity.Workers)
                 worker.WorkspaceId = entity.Id;
@@ -217,11 +211,12 @@ namespace TopoMojo.Api.Data
             return DbContext.Templates
                 .Include(t => t.Workspace)
                 .Where(t =>
-                    // t.ParentId == null &&
-                    // t.IsPublished &&
                     t.Audience != null
                 )
             ;
         }
+
+        [GeneratedRegex(@"v(\d+)$")]
+        private static partial Regex NameVersionRegex();
     }
 }

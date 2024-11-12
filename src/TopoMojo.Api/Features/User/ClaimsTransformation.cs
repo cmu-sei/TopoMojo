@@ -1,9 +1,7 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Caching.Memory;
 using TopoMojo.Api.Exceptions;
@@ -12,19 +10,13 @@ using TopoMojo.Api.Services;
 
 namespace TopoMojo.Api
 {
-    public class UserClaimsTransformation: IClaimsTransformation
+    public class UserClaimsTransformation(
+        IMemoryCache cache,
+        UserService svc
+        ) : IClaimsTransformation
     {
-        private readonly IMemoryCache _cache;
-        private readonly UserService _svc;
-
-        public UserClaimsTransformation(
-            IMemoryCache cache,
-            UserService svc
-        )
-        {
-            _cache = cache;
-            _svc = svc;
-        }
+        private readonly IMemoryCache _cache = cache;
+        private readonly UserService _svc = svc;
 
         public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
         {
@@ -32,7 +24,7 @@ namespace TopoMojo.Api
             string subject = principal.Subject()
                 ?? throw new ArgumentException("ClaimsPrincipal requires 'sub' claim");
 
-            if (! _cache.TryGetValue<User>(subject, out User user))
+            if (!_cache.TryGetValue<User>(subject, out User user))
             {
                 user = await _svc.Load(subject) ?? new Models.User
                 {
@@ -50,14 +42,14 @@ namespace TopoMojo.Api
 
             var claims = new Claim[]
             {
-                new Claim(AppConstants.SubjectClaimName, user.Id),
-                new Claim(AppConstants.NameClaimName, user.Name ?? ""),
-                new Claim(AppConstants.UserScopeClaim, user.Scope ?? ""),
-                new Claim(AppConstants.UserWorkspaceLimitClaim, user.WorkspaceLimit.ToString()),
-                new Claim(AppConstants.UserGamespaceLimitClaim, user.GamespaceLimit.ToString()),
-                new Claim(AppConstants.UserGamespaceMaxMinutesClaim, user.GamespaceMaxMinutes.ToString()),
-                new Claim(AppConstants.UserGamespaceCleanupGraceMinutesClaim, user.GamespaceCleanupGraceMinutes.ToString()),
-                new Claim(AppConstants.RoleClaimName, user.Role.ToString()),
+                new(AppConstants.SubjectClaimName, user.Id),
+                new(AppConstants.NameClaimName, user.Name ?? ""),
+                new(AppConstants.UserScopeClaim, user.Scope ?? ""),
+                new(AppConstants.UserWorkspaceLimitClaim, user.WorkspaceLimit.ToString()),
+                new(AppConstants.UserGamespaceLimitClaim, user.GamespaceLimit.ToString()),
+                new(AppConstants.UserGamespaceMaxMinutesClaim, user.GamespaceMaxMinutes.ToString()),
+                new(AppConstants.UserGamespaceCleanupGraceMinutesClaim, user.GamespaceCleanupGraceMinutes.ToString()),
+                new(AppConstants.RoleClaimName, user.Role.ToString()),
             };
 
             return new ClaimsPrincipal(

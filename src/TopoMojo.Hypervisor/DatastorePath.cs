@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -18,7 +18,7 @@ namespace TopoMojo.Hypervisor
         private string _ds;
         public string Datastore
         {
-            get { return _ds;}
+            get { return _ds; }
             set { _ds = value; }
         }
 
@@ -38,10 +38,9 @@ namespace TopoMojo.Hypervisor
         public string TopLevelFolder
         {
             get { return _folder.Split('/').First(); }
-            set {
-                var list = new List<string>();
-                list.Add(value);
-                list.AddRange(_folder.Split('/').Skip(1));
+            set
+            {
+                List<string> list = [value, .. _folder.Split('/').Skip(1)];
                 _folder = string.Join("/", list);
             }
         }
@@ -49,8 +48,8 @@ namespace TopoMojo.Hypervisor
         private string _file;
         public string File
         {
-            get { return _file;}
-            set { _file = value;}
+            get { return _file; }
+            set { _file = value; }
         }
 
         /// <summary>
@@ -66,26 +65,23 @@ namespace TopoMojo.Hypervisor
         {
             if (!path.HasValue())
                 return;
+            string ds = "";
+            string folder = path.Replace("\\", "/");
 
-            string file = "", ds = "", folder = "";
-
-            folder = path.Replace("\\", "/");
-
-            int x = folder.IndexOf("[");
-            int y = folder.IndexOf("]");
+            int x = folder.IndexOf('[');
+            int y = folder.IndexOf(']');
 
             if (x >= 0 && y > x)
             {
-                ds = folder.Substring(x+1, y-x-1);
-                folder = folder.Substring(y+1).Trim();
+                ds = folder.Substring(x + 1, y - x - 1);
+                folder = folder[(y + 1)..].Trim();
             }
 
             x = folder.LastIndexOf('/');
 
-            file = folder.Substring(x+1);
-
+            string file = folder[(x + 1)..];
             folder = x >= 0
-                ? folder.Substring(0, x)
+                ? folder[..x]
                 : "";
 
             if (Folder.HasValue() && folder.HasValue())
@@ -101,7 +97,7 @@ namespace TopoMojo.Hypervisor
 
         public override string ToString()
         {
-            string separator = FolderPath.EndsWith("]") ? " " : "/";
+            string separator = FolderPath.EndsWith(']') ? " " : "/";
 
             return String.Format("{0}{1}{2}", FolderPath, separator, File);
         }

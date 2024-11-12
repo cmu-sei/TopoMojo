@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -12,9 +12,10 @@ namespace TopoMojo.Hypervisor.vSphere
     public class VlanManager
     {
 
-        public VlanManager (
+        public VlanManager(
             VlanConfiguration options
-        ) {
+        )
+        {
             _options = options;
             InitVlans();
         }
@@ -33,7 +34,7 @@ namespace TopoMojo.Hypervisor.vSphere
             }
 
             //set admin reservations
-            _vlans = new Dictionary<string,Vlan>();
+            _vlans = [];
             foreach (Vlan vlan in _options.Reservations)
             {
                 _vlans.Add(vlan.Name, vlan);
@@ -48,15 +49,14 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public void Activate(Vlan[] vlans)
         {
-            lock(_vlanMap)
+            lock (_vlanMap)
             {
                 foreach (Vlan vlan in vlans)
                 {
                     if (vlan.OnUplink)
                         _vlanMap[vlan.Id] = true;
 
-                    if (!_vlans.ContainsKey(vlan.Name))
-                        _vlans.Add(vlan.Name, vlan);
+                    _vlans.TryAdd(vlan.Name, vlan);
                 }
             }
         }
@@ -64,15 +64,15 @@ namespace TopoMojo.Hypervisor.vSphere
         public void Deactivate(string net)
         {
             //only deallocate tagged nets
-            if (!net.Contains("#"))
+            if (!net.Contains('#'))
                 return;
 
-            lock(_vlanMap)
+            lock (_vlanMap)
             {
-                if (_vlans.ContainsKey(net))
+                if (_vlans.TryGetValue(net, out Vlan value))
                 {
-                    if (_vlans[net].OnUplink)
-                        _vlanMap[_vlans[net].Id] = false;
+                    if (value.OnUplink)
+                        _vlanMap[value.Id] = false;
                     _vlans.Remove(net);
                 }
             }
@@ -85,9 +85,9 @@ namespace TopoMojo.Hypervisor.vSphere
                 foreach (VmNet eth in template.Eth)
                 {
                     //if net already reserved, use reserved vlan
-                    if (_vlans.ContainsKey(eth.Net))
+                    if (_vlans.TryGetValue(eth.Net, out Vlan value))
                     {
-                        eth.Vlan = _vlans[eth.Net].Id;
+                        eth.Vlan = value.Id;
                     }
                     else
                     {
@@ -104,14 +104,15 @@ namespace TopoMojo.Hypervisor.vSphere
                             {
                                 eth.Vlan = id;
                                 _vlanMap[id] = true;
-                                _vlans.Add(eth.Net, new Vlan { Name  = eth.Net, Id = id, OnUplink = true });
+                                _vlans.Add(eth.Net, new Vlan { Name = eth.Net, Id = id, OnUplink = true });
                             }
                             else
                             {
                                 throw new Exception("Unable to reserve a vlan for " + eth.Net);
                             }
                         }
-                        else {
+                        else
+                        {
                             //get highest vlan in this isolation group
                             id = 100;
                             foreach (string key in _vlans.Keys.Where(k => k.EndsWith(template.IsolationTag)))
@@ -128,11 +129,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public string[] FindNetworks(string tag)
         {
-            List<string> nets = new List<string>();
-            nets.AddRange(_vlans.Keys.Where(x => !x.Contains("#")));
+            List<string> nets = [];
+            nets.AddRange(_vlans.Keys.Where(x => !x.Contains('#')));
             nets.AddRange(_vlans.Keys.Where(x => x.Contains(tag)));
             nets.Sort();
-            return nets.ToArray();
+            return [.. nets];
         }
 
     }

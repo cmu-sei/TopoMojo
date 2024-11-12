@@ -1,33 +1,19 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
-    public class CrossSiteRequestMiddleware
-    {
-        public CrossSiteRequestMiddleware(
-            RequestDelegate next
+    public class CrossSiteRequestMiddleware(
+        RequestDelegate next
         )
-        {
-            _next = next;
-            _random = new Random();
-            _hash = SHA256.Create();
-
-        }
-
+    {
         private const string XSRFCOOKIE = "XSRF-TOKEN";
         private const string AUTHCOOKIE = "Authorization";
         private const string METHODS = "POST PUT DELETE";
-        private readonly RequestDelegate _next;
-        private Random _random;
-        private HashAlgorithm _hash;
+        private readonly HashAlgorithm _hash = SHA256.Create();
 
         public async Task Invoke(HttpContext context)
         {
@@ -40,7 +26,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
                 if (!string.IsNullOrWhiteSpace(challenge))
                 {
-                    valid = response is string && (response.Equals(challenge) || response == "jam.dev");
+                    valid = response is not null && (response.Equals(challenge) || response == "jam.dev");
                 }
 
                 if (valid)
@@ -49,9 +35,9 @@ namespace Microsoft.Extensions.DependencyInjection
 
                     byte[] token = Encoding.UTF8.GetBytes(context.Request.Headers[AUTHCOOKIE]);
 
-                    byte[] hash = _hash.ComputeHash(salt.Concat(token).ToArray());
+                    byte[] hash = _hash.ComputeHash([.. salt, .. token]);
 
-                    string result = $"{Convert.ToBase64String(salt)}.{BitConverter.ToString(hash).Replace("-","").ToLower()}";
+                    string result = $"{Convert.ToBase64String(salt)}.{BitConverter.ToString(hash).Replace("-", "").ToLower()}";
 
                     valid = result.Equals(challenge) || response.Equals("jam.dev");
                 }
@@ -64,7 +50,7 @@ namespace Microsoft.Extensions.DependencyInjection
                 }
             }
 
-            await _next(context);
+            await next(context);
 
         }
     }

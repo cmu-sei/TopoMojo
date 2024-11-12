@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Authorization;
@@ -21,7 +21,7 @@ public class GamespaceController(
     CoreOptions options,
     GamespaceService gamespaceService,
     IDistributedCache distributedCache
-    ) : _Controller(logger, hub)
+    ) : BaseController(logger, hub)
 {
     private readonly DistributedCacheEntryOptions _cacheOpts = new()
     {
@@ -102,7 +102,7 @@ public class GamespaceController(
         )) return Forbid();
 
         return Ok(
-            await gamespaceService.LoadChallenge(id, Actor.IsAdmin)
+            await gamespaceService.LoadChallenge(id)
         );
     }
 

@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.Text.Json;
@@ -12,39 +12,32 @@ using TopoMojo.Hypervisor;
 
 namespace TopoMojo.Api.Services
 {
-    public class WorkspaceService : _Service
+    public class WorkspaceService(
+        IWorkspaceStore workspaceStore,
+        IGamespaceStore gamespaceStore,
+        IHypervisorService podService,
+        ILogger<WorkspaceService> logger,
+        IMapper mapper,
+        CoreOptions options
+        ) : BaseService(logger, mapper, options)
     {
-        public WorkspaceService(
-            IWorkspaceStore workspaceStore,
-            IGamespaceStore gamespaceStore,
-            IHypervisorService podService,
-            ILogger<WorkspaceService> logger,
-            IMapper mapper,
-            CoreOptions options
-        ) : base(logger, mapper, options)
-        {
-            _store = workspaceStore;
-            _gamespaceStore = gamespaceStore;
-            _pod = podService;
-        }
-
-        private readonly IWorkspaceStore _store;
-        private readonly IGamespaceStore _gamespaceStore;
-        private readonly IHypervisorService _pod;
+        private readonly IWorkspaceStore _store = workspaceStore;
+        private readonly IGamespaceStore _gamespaceStore = gamespaceStore;
+        private readonly IHypervisorService _pod = podService;
 
         /// <summary>
         /// List workspace summaries.
         /// </summary>
         /// <returns>Array of WorkspaceSummary</returns>
-        public async Task<WorkspaceSummary[]> List(WorkspaceSearch search, string subjectId, bool sudo, CancellationToken ct = default(CancellationToken))
+        public async Task<WorkspaceSummary[]> List(WorkspaceSearch search, string subjectId, bool sudo, CancellationToken ct = default)
         {
             WorkspaceSummary[] result;
 
             // refine to just requested audience
             if (search.WantsAudience)
-                search.scope = search.aud;
+                search.Scope = search.Audience;
             else
-                search.scope += " " + _options.DefaultUserScope;
+                search.Scope += " " + CoreOptions.DefaultUserScope;
 
             var q = _store.List(search.Term);
 
@@ -80,7 +73,7 @@ namespace TopoMojo.Api.Services
                     await q.ToArrayAsync(ct)
                 );
 
-                var tmp = result.AsQueryable().Where(w => w.Audience.HasAnyToken(search.scope));
+                var tmp = result.AsQueryable().Where(w => w.Audience.HasAnyToken(search.Scope));
 
                 tmp = search.Sort == "age"
                     ? tmp.OrderByDescending(w => w.WhenCreated)
@@ -93,7 +86,7 @@ namespace TopoMojo.Api.Services
                 if (search.Take > 0)
                     tmp = tmp.Take(search.Take);
 
-                result = tmp.ToArray();
+                result = [.. tmp];
             }
 
             // fill document text if requested
@@ -109,7 +102,7 @@ namespace TopoMojo.Api.Services
         /// Lists workspaces with template detail.  This should only be exposed to priviledged users.
         /// </summary>
         /// <returns>Array of Workspaces</returns>
-        public async Task<Workspace[]> ListDetail(Search search, CancellationToken ct = default(CancellationToken))
+        public async Task<Workspace[]> ListDetail(Search search, CancellationToken ct = default)
         {
             var q = _store.List(search.Term);
 
@@ -132,7 +125,7 @@ namespace TopoMojo.Api.Services
             );
         }
 
-        public async Task<Boolean> CheckWorkspaceLimit(string id)
+        public async Task<bool> CheckWorkspaceLimit(string id)
         {
             return await _store.CheckUserWorkspaceLimit(id);
         }
@@ -158,13 +151,13 @@ namespace TopoMojo.Api.Services
 
             if (!sudo)
             {
-                workspace.TemplateLimit = _options.DefaultTemplateLimit;
+                workspace.TemplateLimit = CoreOptions.DefaultTemplateLimit;
                 workspace.TemplateScope = "";
             }
 
             workspace.Id = string.Concat(
-                _options.Tenant,
-                Guid.NewGuid().ToString("n").AsSpan(_options.Tenant.Length)
+                CoreOptions.Tenant,
+                Guid.NewGuid().ToString("n").AsSpan(CoreOptions.Tenant.Length)
             );
             workspace.WhenCreated = DateTimeOffset.UtcNow;
             workspace.LastActivity = DateTimeOffset.UtcNow;
@@ -173,7 +166,7 @@ namespace TopoMojo.Api.Services
                 workspace.Name = "Workspace Title";
 
             if (workspace.TemplateLimit == 0)
-                workspace.TemplateLimit = _options.DefaultTemplateLimit;
+                workspace.TemplateLimit = CoreOptions.DefaultTemplateLimit;
 
             workspace.Workers.Add(new Data.Worker
             {
@@ -192,7 +185,7 @@ namespace TopoMojo.Api.Services
         public async Task<Workspace> Clone(string id)
         {
             return Mapper.Map<Workspace>(
-                await _store.Clone(id, _options.Tenant)
+                await _store.Clone(id, CoreOptions.Tenant)
             );
         }
 
@@ -205,10 +198,7 @@ namespace TopoMojo.Api.Services
         {
             var entity = await _store.Retrieve(model.Id);
 
-            Mapper.Map<RestrictedChangedWorkspace, Data.Workspace>(
-                model,
-                entity
-            );
+            Mapper.Map(model, entity);
 
             await _store.Update(entity);
 
@@ -224,10 +214,7 @@ namespace TopoMojo.Api.Services
         {
             var entity = await _store.Retrieve(model.Id);
 
-            Mapper.Map<ChangedWorkspace, Data.Workspace>(
-                model,
-                entity
-            );
+            Mapper.Map(model, entity);
 
             await _store.Update(entity);
 
@@ -240,7 +227,7 @@ namespace TopoMojo.Api.Services
 
             ChallengeSpec spec = string.IsNullOrEmpty(entity.Challenge)
                 ? new()
-                : JsonSerializer.Deserialize<ChallengeSpec>(entity.Challenge, jsonOptions)
+                : JsonSerializer.Deserialize<ChallengeSpec>(entity.Challenge, JsonOptions)
             ;
 
             return spec;
@@ -248,14 +235,14 @@ namespace TopoMojo.Api.Services
 
         private async Task<string> LoadMarkdown(string id, bool aboveCut)
         {
-            string path = System.IO.Path.Combine(
-                _options.DocPath,
+            string path = Path.Combine(
+                CoreOptions.DocPath,
                 id
             ) + ".md";
 
-            string text = id.NotEmpty() && System.IO.File.Exists(path)
-                ? await System.IO.File.ReadAllTextAsync(path)
-                : String.Empty
+            string text = id.NotEmpty() && File.Exists(path)
+                ? await File.ReadAllTextAsync(path)
+                : string.Empty
             ;
 
             return aboveCut
@@ -282,7 +269,7 @@ namespace TopoMojo.Api.Services
                 }
             }
 
-            entity.Challenge = JsonSerializer.Serialize<ChallengeSpec>(spec, jsonOptions);
+            entity.Challenge = JsonSerializer.Serialize(spec, JsonOptions);
             await _store.Update(entity);
         }
 
@@ -357,7 +344,7 @@ namespace TopoMojo.Api.Services
             string scope = $"{workspace.TemplateScope} {actor_scope}";
 
             if (scope.IsEmpty())
-                return new TemplateSummary[] { };
+                return [];
 
             var templates = (await _store.ListScopedTemplates().ToArrayAsync())
                 .Where(t => t.Audience.HasAnyToken(scope))
@@ -377,10 +364,8 @@ namespace TopoMojo.Api.Services
         /// <returns></returns>
         public async Task<WorkspaceSummary> Enlist(string code, string subjectId, string subjectName)
         {
-            var workspace = await _store.LoadFromInvitation(code);
-
-            if (workspace == null)
-                throw new ResourceNotFound();
+            var workspace = await _store.LoadFromInvitation(code)
+                ?? throw new ResourceNotFound();
 
             if (!workspace.Workers.Where(m => m.SubjectId == subjectId).Any())
             {

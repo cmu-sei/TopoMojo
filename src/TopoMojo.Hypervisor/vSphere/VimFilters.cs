@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -9,54 +9,63 @@ namespace TopoMojo.Hypervisor.vSphere
 {
     public static class FilterFactory
     {
+        private static readonly char[] separator = [' ', ','];
 
         public static PropertyFilterSpec[] VmFilter(ManagedObjectReference mor, string props = "summary layout")
         {
             props += " resourcePool";
-            PropertySpec prop = new PropertySpec {
+            PropertySpec prop = new()
+            {
                 type = "VirtualMachine",
-                pathSet = props.Split(new char[] {' ', ','}, StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray()
+                pathSet = props.Split(separator, StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray()
             };
 
-            ObjectSpec objectspec = new ObjectSpec {
+            ObjectSpec objectspec = new()
+            {
                 obj = mor, //_vms or vm-mor
-                selectSet = new SelectionSpec[] {
-                    new TraversalSpec {
+                selectSet = [
+                    new TraversalSpec
+                    {
                         type = "Folder",
                         path = "childEntity"
                     },
-                    new TraversalSpec {
+                    new TraversalSpec
+                    {
                         type = "ResourcePool",
                         path = "vm"
                     }
-                }
+                ]
             };
 
-            return new PropertyFilterSpec[] {
-                new PropertyFilterSpec {
-                    propSet = new PropertySpec[] { prop },
-                    objectSet = new ObjectSpec[] { objectspec }
+            return [
+                new()
+                {
+                    propSet = [prop],
+                    objectSet = [objectspec]
                 }
-            };
+            ];
         }
 
         public static PropertyFilterSpec[] TaskFilter(ManagedObjectReference mor)
         {
-            PropertySpec prop = new PropertySpec {
+            PropertySpec prop = new()
+            {
                 type = "Task",
-                pathSet = new string[] {"info"}
+                pathSet = ["info"]
             };
 
-            ObjectSpec objectspec = new ObjectSpec {
+            ObjectSpec objectspec = new()
+            {
                 obj = mor, //task-mor
             };
 
-            return new PropertyFilterSpec[] {
-                new PropertyFilterSpec {
-                    propSet = new PropertySpec[] { prop },
-                    objectSet = new ObjectSpec[] { objectspec }
+            return [
+                new()
+                {
+                    propSet = [prop],
+                    objectSet = [objectspec]
                 }
-            };
+            ];
         }
 
         public static PropertyFilterSpec[] NetworkFilter(ManagedObjectReference mor)
@@ -65,117 +74,135 @@ namespace TopoMojo.Hypervisor.vSphere
         }
         public static PropertyFilterSpec[] NetworkFilter(ManagedObjectReference mor, string props)
         {
-            PropertySpec prop = new PropertySpec {
+            PropertySpec prop = new()
+            {
                 type = "HostNetworkSystem",
-                pathSet = props.Split(new char[] {' ', ','}, StringSplitOptions.RemoveEmptyEntries)
+                pathSet = props.Split(separator, StringSplitOptions.RemoveEmptyEntries)
             };
 
-            ObjectSpec objectspec = new ObjectSpec {
+            ObjectSpec objectspec = new()
+            {
                 obj = mor, //_net
             };
 
-            return new PropertyFilterSpec[] {
-                new PropertyFilterSpec {
-                    propSet = new PropertySpec[] { prop },
-                    objectSet = new ObjectSpec[] { objectspec }
+            return [
+                new()
+                {
+                    propSet = [prop],
+                    objectSet = [objectspec]
                 }
-            };
+            ];
         }
 
         public static PropertyFilterSpec[] DatastoreFilter(ManagedObjectReference mor)
         {
-            PropertySpec prop = new PropertySpec {
+            PropertySpec prop = new()
+            {
                 type = "Datastore",
-                pathSet = new string[] { "browser", "capability", "summary" }
+                pathSet = ["browser", "capability", "summary"]
             };
 
-            ObjectSpec objectspec = new ObjectSpec {
+            ObjectSpec objectspec = new()
+            {
                 obj = mor, //_res
-                selectSet = new SelectionSpec[] {
-                    new TraversalSpec {
+                selectSet = [
+                    new TraversalSpec
+                    {
                         type = "ComputeResource",
                         path = "datastore"
                     }
-                }
+                ]
             };
 
-            return new PropertyFilterSpec[] {
-                new PropertyFilterSpec {
-                    propSet = new PropertySpec[] { prop },
-                    objectSet = new ObjectSpec[] { objectspec }
+            return [
+                new()
+                {
+                    propSet = [prop],
+                    objectSet = [objectspec]
                 }
-            };
+            ];
         }
 
         public static PropertyFilterSpec[] ResourceFilter(ManagedObjectReference mor)
         {
-            PropertySpec prop = new PropertySpec {
+            PropertySpec prop = new()
+            {
                 type = "ResourcePool",
-                pathSet = new string[] {"runtime"}
+                pathSet = ["runtime"]
             };
 
-            ObjectSpec objectspec = new ObjectSpec {
+            ObjectSpec objectspec = new()
+            {
                 obj = mor, //_pool
             };
 
-            return new PropertyFilterSpec[] {
-                new PropertyFilterSpec {
-                    propSet = new PropertySpec[] { prop },
-                    objectSet = new ObjectSpec[] { objectspec }
+            return [
+                new()
+                {
+                    propSet = [prop],
+                    objectSet = [objectspec]
                 }
-            };
+            ];
         }
 
         public static PropertyFilterSpec[] DistributedPortgroupFilter(ManagedObjectReference mor)
         {
-            PropertySpec prop = new PropertySpec {
+            PropertySpec prop = new()
+            {
                 type = "DistributedVirtualPortgroup",
-                pathSet = new string[] { "name", "parent", "config" }
+                pathSet = ["name", "parent", "config"]
             };
 
-            ObjectSpec objectspec = new ObjectSpec {
+            ObjectSpec objectspec = new()
+            {
                 obj = mor, //_pool
-                selectSet = new SelectionSpec[]
-                {
-                    new TraversalSpec {
+                selectSet =
+                [
+                    new TraversalSpec
+                    {
                         type = "ComputeResource",
                         path = "network",
                     }
-                }
+                ]
             };
 
-            return new PropertyFilterSpec[] {
-                new PropertyFilterSpec {
-                    propSet = new PropertySpec[] { prop },
-                    objectSet = new ObjectSpec[] { objectspec }
+            return [
+                new()
+                {
+                    propSet = [prop],
+                    objectSet = [objectspec]
                 }
-            };
+            ];
         }
 
         public static PropertyFilterSpec[] OpaqueNetworkFilter(ManagedObjectReference mor)
         {
-            PropertySpec prop = new PropertySpec {
+            PropertySpec prop = new()
+            {
                 type = "OpaqueNetwork",
-                pathSet = new string[] { "summary" }
+                pathSet = ["summary"]
             };
 
-            ObjectSpec objectspec = new ObjectSpec {
+            ObjectSpec objectspec = new()
+            {
                 obj = mor, //_pool
-                selectSet = new SelectionSpec[]
-                {
-                    new TraversalSpec {
+                selectSet =
+                [
+                    new TraversalSpec
+                    {
                         type = "ComputeResource",
                         path = "network",
                     }
-                }
+                ]
             };
 
-            return new PropertyFilterSpec[] {
-                new PropertyFilterSpec {
-                    propSet = new PropertySpec[] { prop },
-                    objectSet = new ObjectSpec[] { objectspec }
+            return [
+                new()
+                {
+                    propSet = [prop],
+                    objectSet = [objectspec]
                 }
-            };
+            ];
         }
 
         public static PropertyFilterSpec[] InitFilter(ManagedObjectReference rootMOR)
@@ -185,42 +212,44 @@ namespace TopoMojo.Hypervisor.vSphere
                 name = "FolderTraverseSpec",
                 type = "Folder",
                 path = "childEntity",
-                selectSet = new SelectionSpec[] {
+                selectSet = [
 
                     new TraversalSpec()
                     {
                         type = "Datacenter",
                         path = "hostFolder",
-                        selectSet = new SelectionSpec[] {
-                            new SelectionSpec {
+                        selectSet = [
+                            new SelectionSpec
+                            {
                                 name = "FolderTraverseSpec"
                             }
-                        }
+                        ]
                     },
 
                     new TraversalSpec()
                     {
                         type = "Datacenter",
                         path = "networkFolder",
-                        selectSet = new SelectionSpec[] {
-                            new SelectionSpec {
+                        selectSet = [
+                            new()
+                            {
                                 name = "FolderTraverseSpec"
                             }
-                        }
+                        ]
                     },
 
                     new TraversalSpec()
                     {
                         type = "ComputeResource",
                         path = "resourcePool",
-                        selectSet = new SelectionSpec[]
-                        {
+                        selectSet =
+                        [
                             new TraversalSpec
                             {
-                                type="ResourcePool",
-                                path="resourcePool"
+                                type = "ResourcePool",
+                                path = "resourcePool"
                             }
-                        }
+                        ]
                     },
 
                     new TraversalSpec()
@@ -228,58 +257,56 @@ namespace TopoMojo.Hypervisor.vSphere
                         type = "ComputeResource",
                         path = "host"
                     }
-                }
+                ]
             };
 
             var props = new PropertySpec[]
             {
-                new PropertySpec
-                {
+                new() {
                     type = "Datacenter",
-                    pathSet = new string[] { "name", "parent", "vmFolder" }
+                    pathSet = ["name", "parent", "vmFolder"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "ComputeResource",
-                    pathSet = new string[] { "name", "parent", "resourcePool", "host" }
+                    pathSet = ["name", "parent", "resourcePool", "host"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "HostSystem",
-                    pathSet = new string[] { "configManager" }
+                    pathSet = ["configManager"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "ResourcePool",
-                    pathSet = new string[] { "name", "parent", "resourcePool" }
+                    pathSet = ["name", "parent", "resourcePool"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "DistributedVirtualSwitch",
-                    pathSet = new string[] { "name", "parent", "uuid" }
+                    pathSet = ["name", "parent", "uuid"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "DistributedVirtualPortgroup",
-                    pathSet = new string[] { "name", "parent", "config" }
+                    pathSet = ["name", "parent", "config"]
                 }
 
             };
 
-            ObjectSpec objectspec = new ObjectSpec();
-            objectspec.obj = rootMOR;
-            objectspec.selectSet = new SelectionSpec[] { plan };
+            ObjectSpec objectspec = new()
+            {
+                obj = rootMOR,
+                selectSet = [plan]
+            };
 
-            PropertyFilterSpec filter = new PropertyFilterSpec();
-            filter.propSet = props;
-            filter.objectSet = new ObjectSpec[] { objectspec };
+            PropertyFilterSpec filter = new()
+            {
+                propSet = props,
+                objectSet = [objectspec]
+            };
 
-            return new PropertyFilterSpec[] { filter };
+            return [filter];
         }
     }
 }

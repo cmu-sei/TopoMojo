@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -15,7 +15,7 @@ using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
-    public class VimClient
+    public partial class VimClient
     {
         public VimClient(
             HypervisorServiceConfiguration options,
@@ -26,38 +26,33 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             _logger = logger;
             _config = options;
-            _logger.LogDebug($"Constructing Client { _config.Host }");
-            _tasks = new Dictionary<string, VimHostTask>();
+            _logger.LogDebug("Constructing, Client {host}", _config.Host);
+            _tasks = [];
             _vmCache = vmCache;
-            _pgAllocation = new Dictionary<string, PortGroupAllocation>();
             _vlanman = networkManager;
             _hostPrefix = _config.Host.Split('.').FirstOrDefault();
-            Task sessionMonitorTask = MonitorSession();
-            Task taskMonitorTask = MonitorTasks();
-
-            if (_config.Tenant == null)
-                _config.Tenant = "";
+            _ = MonitorSession();
+            _ = MonitorTasks();
+            _config.Tenant ??= "";
         }
 
         private readonly VlanManager _vlanman;
         private readonly ILogger<VimClient> _logger;
-        Dictionary<string, VimHostTask> _tasks;
-        private ConcurrentDictionary<string, Vm> _vmCache;
-        private Dictionary<string, PortGroupAllocation> _pgAllocation;
-        Dictionary<string, TaskInfo> _taskMap = new Dictionary<string, TaskInfo>();
-        ConcurrentDictionary<string, string> _dsnsMap = new ConcurrentDictionary<string, string>();
+        readonly Dictionary<string, VimHostTask> _tasks;
+        private readonly ConcurrentDictionary<string, Vm> _vmCache;
+        readonly Dictionary<string, TaskInfo> _taskMap = [];
+        readonly ConcurrentDictionary<string, string> _dsnsMap = new();
         private INetworkManager _netman;
-        HypervisorServiceConfiguration _config = null;
+        readonly HypervisorServiceConfiguration _config = null;
         VimPortTypeClient _vim = null;
         ServiceContent _sic = null;
-        UserSession _session = null;
         ManagedObjectReference _props, _vdm, _file;
-        ManagedObjectReference _datacenter, _dsns, _vms, _res, _pool, _dvs;
+        ManagedObjectReference _datacenter, _dsns, _vms, _res, _pool;
         string _dvsuuid = "";
-        int _pollInterval = 1000;
-        int _syncInterval = 30000;
-        int _taskMonitorInterval = 3000;
-        string _hostPrefix = "";
+        readonly int _pollInterval = 1000;
+        readonly int _syncInterval = 30000;
+        readonly int _taskMonitorInterval = 3000;
+        readonly string _hostPrefix = "";
         DateTimeOffset _lastAction;
 
         public string Name
@@ -83,12 +78,12 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await Connect();
             Vm vm = _vmCache[id];
-            _logger.LogDebug($"Starting vm {vm.Name}");
+            _logger.LogDebug("Starting vm {name}", vm.Name);
             if (vm.State != VmPowerState.Running)
             {
                 ManagedObjectReference task = await _vim.PowerOnVM_TaskAsync(vm.AsVim(), null);
                 TaskInfo info = await WaitForVimTask(task);
-                if (info.state == TaskInfoState.success || (info.error?.localizedMessage.ToLower().Contains("powered on") ?? false))
+                if (info.state == TaskInfoState.success || (info.error?.localizedMessage.Contains("powered on", StringComparison.CurrentCultureIgnoreCase) ?? false))
                     vm.State = VmPowerState.Running;
                 else
                     throw new Exception(info.error.localizedMessage);
@@ -108,7 +103,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             Vm vm = _vmCache[id];
 
-            _logger.LogDebug($"Stopping vm {vm.Name}");
+            _logger.LogDebug("Stopping vm {name}", vm.Name);
 
             if (vm.State == VmPowerState.Running)
             {
@@ -116,7 +111,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 TaskInfo info = await WaitForVimTask(task);
 
-                if (info.state == TaskInfoState.success || (info.error?.localizedMessage.ToLower().Contains("powered off") ?? false))
+                if (info.state == TaskInfoState.success || (info.error?.localizedMessage.Contains("powered off", StringComparison.CurrentCultureIgnoreCase) ?? false))
                     vm.State = VmPowerState.Off;
                 else
                     throw new Exception(info.error.localizedMessage);
@@ -137,36 +132,32 @@ namespace TopoMojo.Hypervisor.vSphere
             if (vm.Name.Tag().HasValue() && !vm.DiskPath.Contains(vm.Name.Tag()))
                 throw new InvalidOperationException("External templates must be cloned into local templates in order to be saved.");
 
-            _logger.LogDebug($"Save: get current snap for vm {vm.Name}");
-
-            //Get the current snapshot mor
-            ManagedObjectReference mor = null;
+            _logger.LogDebug("Save: get current snap for vm {name}", vm.Name);
             RetrievePropertiesResponse response = await _vim.RetrievePropertiesAsync(
                 _props,
                 FilterFactory.VmFilter(vm.AsVim(), "snapshot"));
             ObjectContent[] oc = response.returnval;
-            mor = ((VirtualMachineSnapshotInfo)oc.First().GetProperty("snapshot")).currentSnapshot as ManagedObjectReference;
-            // if (oc.Length > 0 && oc[0].propSet.Length > 0 && oc[0].propSet[0].val != null)
-            //     mor = ((VirtualMachineSnapshotInfo)oc[0].propSet[0].val).currentSnapshot;
+            //Get the current snapshot mor
+            ManagedObjectReference mor = ((VirtualMachineSnapshotInfo)oc.First().GetProperty("snapshot")).currentSnapshot;
 
             //add new snapshot
-            _logger.LogDebug($"Save: add new snap for vm {vm.Name}");
+            _logger.LogDebug("Save: add new snap for vm {name}", vm.Name);
             ManagedObjectReference task = await _vim.CreateSnapshot_TaskAsync(
                 vm.AsVim(),
                 "Root Snap",
                 "Created by TopoMojo Save at " + DateTimeOffset.UtcNow.ToString("s") + "Z",
                 false, false);
-            TaskInfo info = await WaitForVimTask(task);
+            await WaitForVimTask(task);
 
             //remove previous snapshot
             if (mor != null)
             {
-                _logger.LogDebug($"Save: remove previous snap for vm {vm.Name}");
+                _logger.LogDebug("Save: remove previous snap for vm {name}", vm.Name);
                 task = await _vim.RemoveSnapshot_TaskAsync(mor, false, true);
 
                 await Task.Delay(500);
 
-                info = await GetVimTaskInfo(task);
+                TaskInfo info = await GetVimTaskInfo(task);
                 if (info.state == TaskInfoState.error)
                     throw new Exception(info.error.localizedMessage);
 
@@ -185,10 +176,10 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await Connect();
             Vm vm = _vmCache[id];
-            _logger.LogDebug($"Stopping vm {vm.Name}");
+            _logger.LogDebug("Stopping vm {name}", vm.Name);
             ManagedObjectReference task = await _vim.RevertToCurrentSnapshot_TaskAsync(
                 vm.AsVim(), null, false);
-            TaskInfo info = await WaitForVimTask(task);
+            await WaitForVimTask(task);
             if (vm.State == VmPowerState.Running)
                 await Start(id);
             _vmCache.TryUpdate(vm.Id, vm, vm);
@@ -205,15 +196,15 @@ namespace TopoMojo.Hypervisor.vSphere
             Vm vm = _vmCache[id];
             // string tag = vm.Name.Tag();
 
-            _logger.LogDebug($"Delete: stopping vm {vm.Name}");
+            _logger.LogDebug("Delete: stopping vm {name}", vm.Name);
             await Stop(id);
 
-            _logger.LogDebug($"Delete: unregistering vm {vm.Name}");
+            _logger.LogDebug("Delete: unregistering vm {name}", vm.Name);
             await _netman.Unprovision(vm.AsVim());
             await _vim.UnregisterVMAsync(vm.AsVim());
 
-            string folder = vm.Path.Substring(0, vm.Path.LastIndexOf('/'));
-            _logger.LogDebug($"Delete: deleting vm folder {folder}");
+            string folder = vm.Path[..vm.Path.LastIndexOf('/')];
+            _logger.LogDebug("Delete: deleting vm folder {folder}", folder);
             await _vim.DeleteDatastoreFile_TaskAsync(_sic.fileManager, folder, _datacenter);
 
             _vmCache.TryRemove(vm.Id, out vm);
@@ -226,7 +217,7 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await Connect();
             Vm vm = _vmCache[id];
-            _logger.LogDebug($"Aquiring mks ticket for vm {vm.Name}");
+            _logger.LogDebug("Aquiring mks ticket for vm {name}", vm.Name);
             var ticket = await _vim.AcquireTicketAsync(vm.AsVim(), "webmks");
             string port = (ticket.portSpecified && ticket.port != 443) ? $":{ticket.port}" : "";
             return $"wss://{ticket.host ?? _config.Host}{port}/ticket/{ticket.ticket}";
@@ -234,7 +225,6 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public async Task<Vm> Deploy(VmTemplate template)
         {
-            Vm vm = null;
             await Connect();
 
             _logger.LogDebug("deploy: validate portgroups...");
@@ -251,6 +241,7 @@ namespace TopoMojo.Hypervisor.vSphere
             _logger.LogDebug("deploy: create vm...");
             ManagedObjectReference task = await _vim.CreateVM_TaskAsync(_vms, vmcs, _pool, null);
             TaskInfo info = await WaitForVimTask(task);
+            Vm vm;
             if (info.state == TaskInfoState.success)
             {
                 _logger.LogDebug("deploy: load vm...");
@@ -295,21 +286,13 @@ namespace TopoMojo.Hypervisor.vSphere
                 clusterRuleSpec.operation = ArrayUpdateOperation.add;
                 clusterRuleSpec.info = affinityRuleSpec;
 
-                configSpec.rulesSpec = new ClusterRuleSpec[] { clusterRuleSpec };
+                configSpec.rulesSpec = [clusterRuleSpec];
                 _logger.LogDebug("setaffinity: reconfiguring cluster ");
                 await _vim.ReconfigureCluster_TaskAsync(_res, configSpec, true);
             }
 
             if (start)
-            {
-                List<Task<Vm>> tasks = new List<Task<Vm>>();
-                foreach (Vm vm in vms)
-                {
-                    tasks.Add(Start(vm.Id));
-                }
-
-                await Task.WhenAll(tasks.ToArray());
-            }
+                await Task.WhenAll(vms.Select(vm => Start(vm.Id)));
         }
 
         public async Task<Vm> Change(string id, VmKeyValue change)
@@ -328,9 +311,7 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await Connect();
 
-            int index = 0;
-
-            if (int.TryParse(label, out index))
+            if (int.TryParse(label, out int index))
                 label = "";
 
             Vm vm = _vmCache[id];
@@ -340,12 +321,12 @@ namespace TopoMojo.Hypervisor.vSphere
             ObjectContent[] oc = response.returnval;
 
             VirtualMachineConfigInfo config = (VirtualMachineConfigInfo)oc[0].GetProperty("config");
-            VirtualMachineConfigSpec vmcs = new VirtualMachineConfigSpec();
+            VirtualMachineConfigSpec vmcs = new();
 
             switch (feature)
             {
                 case "iso":
-                    VirtualCdrom cdrom = (VirtualCdrom)((label.HasValue())
+                    VirtualCdrom cdrom = (VirtualCdrom)(label.HasValue()
                         ? config.hardware.device.Where(o => o.deviceInfo.label == label).SingleOrDefault()
                         : config.hardware.device.OfType<VirtualCdrom>().ToArray()[index]);
 
@@ -361,19 +342,20 @@ namespace TopoMojo.Hypervisor.vSphere
                             startConnected = true
                         };
 
-                        vmcs.deviceChange = new VirtualDeviceConfigSpec[] {
-                            new VirtualDeviceConfigSpec {
+                        vmcs.deviceChange = [
+                            new VirtualDeviceConfigSpec
+                            {
                                 device = cdrom,
                                 operation = VirtualDeviceConfigSpecOperation.edit,
                                 operationSpecified = true
                             }
-                        };
+                        ];
                     }
                     break;
 
                 case "net":
                 case "eth":
-                    VirtualEthernetCard card = (VirtualEthernetCard)((label.HasValue())
+                    VirtualEthernetCard card = (VirtualEthernetCard)(label.HasValue()
                         ? config.hardware.device.Where(o => o.deviceInfo.label == label).SingleOrDefault()
                         : config.hardware.device.OfType<VirtualEthernetCard>().ToArray()[index]);
 
@@ -393,28 +375,29 @@ namespace TopoMojo.Hypervisor.vSphere
                             card.connectable.connected = true;
                         }
 
-                        vmcs.deviceChange = new VirtualDeviceConfigSpec[] {
-                            new VirtualDeviceConfigSpec {
+                        vmcs.deviceChange = [
+                            new VirtualDeviceConfigSpec
+                            {
                                 device = card,
                                 operation = VirtualDeviceConfigSpecOperation.edit,
                                 operationSpecified = true
                             }
-                        };
+                        ];
                     }
                     break;
 
                 case "boot":
                     int delay = 0;
-                    if (Int32.TryParse(newvalue, out delay))
+                    if (int.TryParse(newvalue, out delay))
                         vmcs.AddBootOption(delay);
                     break;
 
                 case "guest":
-                    if (newvalue.HasValue() && !newvalue.EndsWith("\n"))
-                        newvalue += "\n";
+                    if (newvalue.HasValue() && !newvalue.EndsWith('\n'))
+                        newvalue += '\n';
                     vmcs.annotation = config.annotation + newvalue;
                     if (vm.State == VmPowerState.Running && vmcs.annotation.HasValue())
-                        vmcs.AddGuestInfo(Regex.Split(vmcs.annotation, "\r\n|\r|\n"));
+                        vmcs.AddGuestInfo(EndOfLineRegex().Split(vmcs.annotation));
                     break;
 
                 default:
@@ -461,15 +444,15 @@ namespace TopoMojo.Hypervisor.vSphere
                             _taskMap[id].description.message,
                             _taskMap[id].error.localizedMessage
                         );
-                    break;
+                        break;
 
                     case TaskInfoState.success:
                         progress = 100;
-                    break;
+                        break;
 
                     default:
                         progress = _taskMap[id].progress;
-                    break;
+                        break;
                 }
             }
             catch
@@ -482,7 +465,13 @@ namespace TopoMojo.Hypervisor.vSphere
                     _taskMap.Remove(id);
             }
 
-            _logger.LogDebug($"TaskProgress: {id} {state} {taskprogress}% resolved:{progress}% {msg}");
+            _logger.LogDebug("TaskProgress: {id} {state} {taskprogress}% resolved:{progress}% {msg}",
+                id,
+                state,
+                taskprogress,
+                progress,
+                msg
+            );
 
             return progress;
         }
@@ -502,8 +491,8 @@ namespace TopoMojo.Hypervisor.vSphere
         public async Task<string[]> GetFiles(string path, bool recursive)
         {
             await Connect();
-            List<string> list = new List<string>();
-            DatastorePath dsPath = new DatastorePath(path);
+            List<string> list = [];
+            DatastorePath dsPath = new(path);
             string oldRoot = "";
             string pattern = dsPath.File ?? "*";
 
@@ -554,7 +543,7 @@ namespace TopoMojo.Hypervisor.vSphere
                             recursive = true;
                             pattern = "*" + Path.GetExtension(dsPath.File);
 
-                            _logger.LogDebug("mapped datastore namespace: " + dsPath.ToString());
+                            _logger.LogDebug("mapped datastore namespace: {path}", dsPath);
                         }
                         catch (Exception ex)
                         {
@@ -567,17 +556,18 @@ namespace TopoMojo.Hypervisor.vSphere
 
                     var spec = new HostDatastoreBrowserSearchSpec
                     {
-                        matchPattern = new string[] { pattern },
+                        matchPattern = [pattern],
                     };
 
                     var results = new List<HostDatastoreBrowserSearchResults>();
 
                     if (recursive)
                     {
-                        try {
+                        try
+                        {
 
                             if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {pattern}");
+                                _logger.LogDebug("searching recursive {path} for {pattern}", dsPath.FolderPath, pattern);
 
                             task = await _vim.SearchDatastoreSubFolders_TaskAsync(
                                 dsBrowser, dsPath.FolderPath, spec
@@ -586,7 +576,11 @@ namespace TopoMojo.Hypervisor.vSphere
                             info = await WaitForVimTask(task);
 
                             if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching recursive {dsPath.FolderPath} for {pattern}; found [{((HostDatastoreBrowserSearchResults[])info.result)?.Length}]");
+                                _logger.LogDebug("searching recursive {path} for {pattern}; found [{count}]",
+                                    dsPath.FolderPath,
+                                    pattern,
+                                    ((HostDatastoreBrowserSearchResults[])info.result)?.Length ?? 0
+                                );
 
                             if (info.result != null)
                                 results.AddRange((HostDatastoreBrowserSearchResults[])info.result);
@@ -600,7 +594,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     else
                     {
                         if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching {dsPath.FolderPath} for {pattern}");
+                            _logger.LogDebug("searching {path} for {pattern}", dsPath.FolderPath, pattern);
 
                         task = await _vim.SearchDatastore_TaskAsync(
                             dsBrowser, dsPath.FolderPath, spec
@@ -609,11 +603,14 @@ namespace TopoMojo.Hypervisor.vSphere
                         info = await WaitForVimTask(task);
 
                         if (_config.DebugVerbose)
-                                _logger.LogDebug($"searching {dsPath.FolderPath} for {pattern}; found [{((HostDatastoreBrowserSearchResults)info.result).file?.Length ?? 0}]");
+                            _logger.LogDebug("searching {path} for {pattern}; found [{count}]",
+                                dsPath.FolderPath,
+                                pattern,
+                                ((HostDatastoreBrowserSearchResults[])info.result)?.Length ?? 0
+                            );
 
                         if (info.result != null)
                             results.Add((HostDatastoreBrowserSearchResults)info.result);
-
                     }
 
                     try
@@ -627,7 +624,7 @@ namespace TopoMojo.Hypervisor.vSphere
                                 if (oldRoot.HasValue())
                                     fp = fp.Replace(dsPath.TopLevelFolder, oldRoot);
 
-                                if (!fp.EndsWith("/"))
+                                if (!fp.EndsWith('/'))
                                     fp += "/";
 
                                 list.AddRange(result.file.Select(o => fp + o.path));
@@ -635,9 +632,7 @@ namespace TopoMojo.Hypervisor.vSphere
                                 if (_config.DebugVerbose)
                                 {
                                     foreach (var s in list)
-                                    {
-                                        _logger.LogDebug($"added file result {s}");
-                                    }
+                                        _logger.LogDebug("added file result {s}", s);
                                 }
                             }
                         }
@@ -650,14 +645,13 @@ namespace TopoMojo.Hypervisor.vSphere
             }
 
             if (_config.DebugVerbose)
-                _logger.LogDebug($"search datastore found [{list.Count}] results.");
+                _logger.LogDebug("search datastore found [{count}] results.", list.Count);
 
-            return list.ToArray();
+            return [.. list];
         }
 
         public async Task CloneDisk(string source, string dest)
         {
-            ManagedObjectReference task = null;
             string pattern = @"blank-(\d+)([^\.]+)";
 
             await Connect();
@@ -669,27 +663,28 @@ namespace TopoMojo.Hypervisor.vSphere
 
             Match match = Regex.Match(source, pattern);
 
+            ManagedObjectReference task;
             if (match.Success)
             {
                 //create virtual disk
-                int size = 0;
-                Int32.TryParse(match.Groups[1].Value, out size);
+                if (!int.TryParse(match.Groups[1].Value, out int size))
+                    size = 0;
                 string[] parts = match.Groups[2].Value.Split('-');
                 string adapter = (parts.Length > 1) ? parts[1] : "lsiLogic";
-                FileBackedVirtualDiskSpec spec = new FileBackedVirtualDiskSpec
+                FileBackedVirtualDiskSpec spec = new()
                 {
                     diskType = "thin",
                     adapterType = adapter.Replace("lsilogic", "lsiLogic").Replace("buslogic", "busLogic"),
                     capacityKb = size * 1024 * 1024
                 };
-                _logger.LogDebug("creating new blank disk " + dest);
+                _logger.LogDebug("creating new blank disk {dest}", dest);
                 task = await _vim.CreateVirtualDisk_TaskAsync(
                     _vdm, dest, _datacenter, spec);
             }
             else
             {
                 //copy virtual disk
-                _logger.LogDebug("cloning new disk " + source + " -> " + dest);
+                _logger.LogDebug("cloning new disk {source} -> {dest}", source, dest);
                 task = await _vim.CopyVirtualDisk_TaskAsync(
                     _vdm, source, _datacenter, dest, _datacenter, null, false);
             }
@@ -703,7 +698,7 @@ namespace TopoMojo.Hypervisor.vSphere
         public async Task CreateDisk(string name, string type, string adapter, int size)
         {
             await Connect();
-            Task task = _vim.CreateVirtualDisk_TaskAsync(
+            _ = _vim.CreateVirtualDisk_TaskAsync(
                 _vdm,
                 name,
                 _datacenter,
@@ -722,7 +717,7 @@ namespace TopoMojo.Hypervisor.vSphere
             await Connect();
             await MakeDirectories(disk.Path);
 
-            string adapter = (disk.Controller.HasValue())
+            string adapter = disk.Controller.HasValue()
                 ? disk.Controller.Replace("lsilogic", "lsiLogic").Replace("buslogic", "busLogic")
                 : "lsiLogic";
             var task = await _vim.CreateVirtualDisk_TaskAsync(
@@ -743,10 +738,10 @@ namespace TopoMojo.Hypervisor.vSphere
         public async Task DeleteDisk(string path)
         {
             await Connect();
-            Task task = _vim.DeleteVirtualDisk_TaskAsync(_vdm, path, null);
+            _ = _vim.DeleteVirtualDisk_TaskAsync(_vdm, path, null);
         }
 
-        public async Task<string[]> GetGuestIds(string term)
+        public static async Task<string[]> GetGuestIds()
         {
             await Task.Delay(0);
             return Transform.OsMap;
@@ -770,7 +765,7 @@ namespace TopoMojo.Hypervisor.vSphere
             }
             catch (Exception ex)
             {
-                _logger.LogDebug("MakeDirectories: " + path + " " + ex.Message);
+                _logger.LogDebug("MakeDirectories: {path} {msg}", path, ex.Message);
             }
         }
 
@@ -778,7 +773,7 @@ namespace TopoMojo.Hypervisor.vSphere
         private async Task<TaskInfo> WaitForVimTask(ManagedObjectReference task)
         {
             int i = 0;
-            TaskInfo info = new TaskInfo();
+            TaskInfo info;
 
             //iterate the search until complete or timeout occurs
             do
@@ -793,10 +788,10 @@ namespace TopoMojo.Hypervisor.vSphere
                 //_idle = 0;
 
                 if (_config.DebugVerbose)
-                    _logger.LogDebug($"waiting for vim task ({task.Value})...state = {info.state}");
+                    _logger.LogDebug("waiting for vim task ({value})...state = {state}", task.Value, info.state);
 
                 //check for status updates until the task is complete
-            } while ((info.state == TaskInfoState.running || info.state == TaskInfoState.queued));
+            } while (info.state == TaskInfoState.running || info.state == TaskInfoState.queued);
 
             //return the task info
             return info;
@@ -806,7 +801,7 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await Connect();
 
-            TaskInfo info = new TaskInfo();
+            TaskInfo info;
 
             try
             {
@@ -821,9 +816,10 @@ namespace TopoMojo.Hypervisor.vSphere
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to get TaskInfo for {0}", task.Value);
+                _logger.LogError(ex, "Failed to get TaskInfo for {value}", task.Value);
 
-                info = new TaskInfo {
+                info = new TaskInfo
+                {
                     task = task,
                     state = TaskInfoState.error
                 };
@@ -845,7 +841,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 if (_vim != null && _vim.State == CommunicationState.Faulted)
                 {
-                    _logger.LogDebug($"{_config.Url} CommunicationState is Faulted.");
+                    _logger.LogDebug("{url} CommunicationState is Faulted.", _config.Url);
                     Disconnect().Wait();
                 }
 
@@ -854,8 +850,8 @@ namespace TopoMojo.Hypervisor.vSphere
                     try
                     {
                         DateTimeOffset sp = DateTimeOffset.Now;
-                        _logger.LogDebug($"Instantiating client {_config.Host}...");
-                        VimPortTypeClient client = new VimPortTypeClient(VimPortTypeClient.EndpointConfiguration.VimPort, _config.Url);
+                        _logger.LogDebug("Instantiating client {host}...", _config.Host);
+                        VimPortTypeClient client = new(VimPortTypeClient.EndpointConfiguration.VimPort, _config.Url);
 
                         if (_config.IgnoreCertificateErrors)
                         {
@@ -868,11 +864,11 @@ namespace TopoMojo.Hypervisor.vSphere
                             ;
                         }
 
-                        _logger.LogDebug($"client: [{client}]");
-                        _logger.LogDebug($"Instantiated {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds} seconds");
+                        _logger.LogDebug("client: [{client}]", client);
+                        _logger.LogDebug("Instantiated {host} in {time}s", _config.Host, DateTimeOffset.Now.Subtract(sp).TotalSeconds);
 
                         sp = DateTimeOffset.Now;
-                        _logger.LogInformation($"Connecting to {_config.Url}...");
+                        _logger.LogInformation("Connecting to {url}...", _config.Url);
                         _sic = client.RetrieveServiceContentAsync(new ManagedObjectReference { type = "ServiceInstance", Value = "ServiceInstance" }).Result;
 
                         if (_sic is null)
@@ -884,30 +880,30 @@ namespace TopoMojo.Hypervisor.vSphere
                         _file = _sic.fileManager;
                         _dsns = _sic.datastoreNamespaceManager;
 
-                        _logger.LogDebug($"Connected {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds}s");
+                        _logger.LogDebug("Connected {host} in {time}s", _config.Host, DateTimeOffset.Now.Subtract(sp).TotalSeconds);
 
                         sp = DateTimeOffset.Now;
-                        _logger.LogInformation($"Authenticating {_config.Host}...[{_config.User}]");
-                        _session = client.LoginAsync(_sic.sessionManager, _config.User, _config.Password, null).Result;
-                        _logger.LogDebug($"Authenticated {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds}s");
+                        _logger.LogInformation("Authenticating {host} {user}", _config.Host, _config.User);
+                        _ = client.LoginAsync(_sic.sessionManager, _config.User, _config.Password, null).Result;
+                        _logger.LogDebug("Authenticated {host} in {time}s", _config.Host, DateTimeOffset.Now.Subtract(sp).TotalSeconds);
 
                         sp = DateTimeOffset.Now;
-                        _logger.LogDebug($"Initializing {_config.Host}...");
+                        _logger.LogDebug("Initializing {host}...", _config.Host);
                         InitReferences(client).Wait();
-                        _logger.LogDebug($"Initialized {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds}s");
+                        _logger.LogDebug("Initialized {host} in {time}s", _config.Host, DateTimeOffset.Now.Subtract(sp).TotalSeconds);
 
                         _vim = client;
 
                         sp = DateTimeOffset.Now;
-                        _logger.LogDebug($"Loading {_config.Host}...");
+                        _logger.LogDebug("Loading {host}...", _config.Host);
                         ReloadVmCache().Wait();
                         _netman.Clean().Wait();
-                        _logger.LogDebug($"Loaded {_config.Host} in {DateTimeOffset.Now.Subtract(sp).TotalSeconds}s");
+                        _logger.LogDebug("Loaded {host} in {time}s", _config.Host, DateTimeOffset.Now.Subtract(sp).TotalSeconds);
 
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(0, ex, $"Failed to connect with " + _config.Url);
+                        _logger.LogError(0, ex, "Failed to connect with {url}", _config.Url);
                     }
                 }
             }
@@ -917,12 +913,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public async Task Disconnect()
         {
-            _logger.LogDebug($"Disconnecting from {this.Name}");
+            _logger.LogDebug("Disconnecting from {name}", Name);
             await Task.Delay(500);
             _vim.Dispose();
             _vim = null;
             _sic = null;
-            _session = null;
         }
 
         private async Task<ObjectContent[]> LoadReferenceTree(VimPortTypeClient client)
@@ -932,42 +927,44 @@ namespace TopoMojo.Hypervisor.vSphere
                 name = "FolderTraverseSpec",
                 type = "Folder",
                 path = "childEntity",
-                selectSet = new SelectionSpec[] {
+                selectSet = [
 
                     new TraversalSpec()
                     {
                         type = "Datacenter",
                         path = "hostFolder",
-                        selectSet = new SelectionSpec[] {
-                            new SelectionSpec {
+                        selectSet = [
+                            new SelectionSpec
+                            {
                                 name = "FolderTraverseSpec"
                             }
-                        }
+                        ]
                     },
 
                     new TraversalSpec()
                     {
                         type = "Datacenter",
                         path = "networkFolder",
-                        selectSet = new SelectionSpec[] {
-                            new SelectionSpec {
+                        selectSet = [
+                            new SelectionSpec
+                            {
                                 name = "FolderTraverseSpec"
                             }
-                        }
+                        ]
                     },
 
                     new TraversalSpec()
                     {
                         type = "ComputeResource",
                         path = "resourcePool",
-                        selectSet = new SelectionSpec[]
-                        {
+                        selectSet =
+                        [
                             new TraversalSpec
                             {
-                                type="ResourcePool",
-                                path="resourcePool"
+                                type = "ResourcePool",
+                                path = "resourcePool"
                             }
-                        }
+                        ]
                     },
 
                     new TraversalSpec()
@@ -981,58 +978,56 @@ namespace TopoMojo.Hypervisor.vSphere
                         type = "Folder",
                         path = "childEntity"
                     }
-                }
+                ]
             };
 
             var props = new PropertySpec[]
             {
-                new PropertySpec
-                {
+                new() {
                     type = "Datacenter",
-                    pathSet = new string[] { "name", "parent", "vmFolder" }
+                    pathSet = ["name", "parent", "vmFolder"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "ComputeResource",
-                    pathSet = new string[] { "name", "parent", "resourcePool", "host" }
+                    pathSet = ["name", "parent", "resourcePool", "host"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "HostSystem",
-                    pathSet = new string[] { "configManager" }
+                    pathSet = ["configManager"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "ResourcePool",
-                    pathSet = new string[] { "name", "parent", "resourcePool" }
+                    pathSet = ["name", "parent", "resourcePool"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "DistributedVirtualSwitch",
-                    pathSet = new string[] { "name", "parent", "uuid" }
+                    pathSet = ["name", "parent", "uuid"]
                 },
 
-                new PropertySpec
-                {
+                new() {
                     type = "DistributedVirtualPortgroup",
-                    pathSet = new string[] { "name", "parent", "config" }
+                    pathSet = ["name", "parent", "config"]
                 }
 
             };
 
-            ObjectSpec objectspec = new ObjectSpec();
-            objectspec.obj = _sic.rootFolder;
-            objectspec.selectSet = new SelectionSpec[] { plan };
+            ObjectSpec objectspec = new()
+            {
+                obj = _sic.rootFolder,
+                selectSet = [plan]
+            };
 
-            PropertyFilterSpec filter = new PropertyFilterSpec();
-            filter.propSet = props;
-            filter.objectSet = new ObjectSpec[] { objectspec };
+            PropertyFilterSpec filter = new()
+            {
+                propSet = props,
+                objectSet = [objectspec]
+            };
 
-            PropertyFilterSpec[] filters = new PropertyFilterSpec[] { filter };
+            PropertyFilterSpec[] filters = [filter];
             RetrievePropertiesResponse response = await client.RetrievePropertiesAsync(_props, filters);
 
             return response.returnval;
@@ -1044,12 +1039,12 @@ namespace TopoMojo.Hypervisor.vSphere
             if (clunkyTree.Length == 0)
                 throw new InvalidOperationException();
 
-            string[] path = _config.PoolPath.ToLower().Split(new char[] { '/', '\\' });
+            string[] path = _config.PoolPath.ToLower().Split(['/', '\\']);
             string datacenter = (path.Length > 0) ? path[0] : "";
             string cluster = (path.Length > 1) ? path[1] : "";
             string pool = (path.Length > 2) ? path[2] : "";
 
-            var dcContent = (clunkyTree.FindTypeByName("Datacenter", datacenter) ?? clunkyTree.First("Datacenter"));
+            var dcContent = clunkyTree.FindTypeByName("Datacenter", datacenter) ?? clunkyTree.First("Datacenter");
             _datacenter = dcContent.obj;
             _vms = (ManagedObjectReference)dcContent.GetProperty("vmFolder");
 
@@ -1064,11 +1059,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
             var netSettings = new VimReferences
             {
-                vim = client,
-                cluster = _res,
-                props = _props,
-                pool = _pool,
-                vmFolder = _vms,
+                Vim = client,
+                Cluster = _res,
+                Props = _props,
+                Pool = _pool,
+                VmFolder = _vms,
                 UplinkSwitch = _config.Uplink,
                 ExcludeNetworkMask = _config.ExcludeNetworkMask,
                 TenantId = _config.Tenant
@@ -1076,14 +1071,12 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (_config.IsVCenter)
             {
-                ManagedObjectReference[] subpools = poolContent.GetProperty("resourcePool") as ManagedObjectReference[];
-                if (subpools != null && subpools.Length > 0)
+                if (poolContent.GetProperty("resourcePool") is ManagedObjectReference[] subpools && subpools.Length > 0)
                     _pool = subpools.First();
 
                 var dvs = clunkyTree.FindTypeByName("DistributedVirtualSwitch", _config.Uplink.ToLower()) ?? clunkyTree.First("DistributedVirtualSwitch");
-                _dvs = dvs?.obj;
                 _dvsuuid = dvs?.GetProperty("uuid").ToString();
-                netSettings.dvs = dvs?.obj;
+                netSettings.Dvs = dvs?.obj;
                 netSettings.DvsUuid = _dvsuuid;
 
                 if (_config.IsNsxNetwork || _config.Uplink.StartsWith("nsx."))
@@ -1112,7 +1105,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 if (hostContent != null)
                 {
                     var hostConfig = hostContent.GetProperty("configManager") as HostConfigManager;
-                    netSettings.net = hostConfig?.networkSystem;
+                    netSettings.Net = hostConfig?.networkSystem;
                 }
 
                 _netman = new HostNetworkManager(
@@ -1134,7 +1127,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 .Select(o => o.Id)
                 .ToList();
 
-            List<Vm> list = new List<Vm>();
+            List<Vm> list = [];
 
             //retrieve the properties specificied
             RetrievePropertiesResponse response = await _vim.RetrievePropertiesAsync(
@@ -1147,33 +1140,30 @@ namespace TopoMojo.Hypervisor.vSphere
             foreach (ObjectContent obj in oc)
             {
                 Vm vm = LoadVm(obj);
-
                 if (vm != null)
-                {
                     list.Add(vm);
-                }
             }
 
             List<string> active = list.Select(o => o.Id).ToList();
-            _logger.LogDebug($"refreshing cache [{_config.Host}] existing: {existing.Count} active: {active.Count}");
+            _logger.LogDebug("refreshing cache [{host}] existing: {existing} active: {active}", _config.Host, existing.Count, active.Count);
 
             foreach (string key in existing.Except(active))
             {
                 if (_vmCache.TryRemove(key, out Vm stale))
                 {
-                    _logger.LogDebug($"removing stale cache entry [{_config.Host}] {stale.Name}");
+                    _logger.LogDebug("removing stale cache entry [{host}] {stale}", _config.Host, stale.Name);
                 }
             }
 
             //return an array of vm's
-            return list.ToArray();
+            return [.. list];
         }
 
         private Vm LoadVm(ObjectContent obj)
         {
 
             //create a new vm object
-            Vm vm = new Vm();
+            Vm vm = new();
 
             //iterate through the retrieved properties and set values for the appropriate types
             foreach (DynamicProperty dp in obj.propSet)
@@ -1216,31 +1206,31 @@ namespace TopoMojo.Hypervisor.vSphere
 
                         //vm.IsPoweredOn = (summary.runtime.powerState == VirtualMachinePowerState.poweredOn);
                         vm.Reference = summary.vm.AsString(); //summary.vm.type + "|" + summary.vm.Value;
-                        vm.Stats = String.Format("{0} | mem-{1}% cpu-{2}%", summary.overallStatus,
-                            Math.Round(((float)summary.quickStats.guestMemoryUsage / (float)summary.runtime.maxMemoryUsage) * 100, 0),
-                            Math.Round(((float)summary.quickStats.overallCpuUsage / (float)summary.runtime.maxCpuUsage) * 100, 0));
+                        vm.Stats = string.Format("{0} | mem-{1}% cpu-{2}%", summary.overallStatus,
+                            Math.Round(summary.quickStats.guestMemoryUsage / (float)summary.runtime.maxMemoryUsage * 100, 0),
+                            Math.Round(summary.quickStats.overallCpuUsage / (float)summary.runtime.maxCpuUsage * 100, 0));
                         //vm.Annotations = summary.config.annotation.Lines();
                         //vm.ContextNumbers = vm.Annotations.FindOne("context").Value();
                         //vm.ContextNames = vm.Annotations.FindOne("display").Value();
                         //vm.HasGuestAgent = (vm.Annotations.FindOne("guestagent").Value() == "true");
                         vm.Question = GetQuestion(summary.runtime.question);
                         vm.Status = "deployed";
-                        if (_tasks.ContainsKey(vm.Id))
+                        if (_tasks.TryGetValue(vm.Id, out VimHostTask value))
                         {
-                            var t = _tasks[vm.Id];
+                            var t = value;
                             vm.Task = new VmTask { Name = t.Action, WhenCreated = t.WhenCreated, Progress = t.Progress };
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogDebug(ex.Message);
-                        if (!String.IsNullOrEmpty(vm.Name))
+                        _logger.LogDebug("{msg}", ex.Message);
+                        if (!string.IsNullOrEmpty(vm.Name))
                         {
-                            _logger.LogDebug(String.Format("Error refreshing VirtualMachine {0} on host {1}", vm.Name, _config.Host));
+                            _logger.LogDebug("Error refreshing VirtualMachine {name} on host {hostt}", vm.Name, _config.Host);
                         }
                         else
                         {
-                            _logger.LogDebug(String.Format("Error refreshing host {0}", _config.Host));
+                            _logger.LogDebug("Error refreshing host {host}", _config.Host);
                         }
 
                         return null;
@@ -1250,19 +1240,19 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (!vm.Id.HasValue())
             {
-                _logger.LogWarning($"{this.Name} found a vm without an Id");
+                _logger.LogWarning("{name} found a vm without an Id", Name);
                 return null;
             }
 
-            if (vm.Name.Contains("#").Equals(false) || vm.Name.ToTenant() != _config.Tenant)
+            if (vm.Name.Contains('#').Equals(false) || vm.Name.ToTenant() != _config.Tenant)
                 return null;
 
-            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
+            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
 
             return vm;
         }
 
-        private VmQuestion GetQuestion(VirtualMachineQuestionInfo question)
+        private static VmQuestion GetQuestion(VirtualMachineQuestionInfo question)
         {
             if (question == null)
                 return null;
@@ -1293,7 +1283,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private async Task MonitorSession()
         {
-            _logger.LogDebug($"{_config.Host}: starting cache loop");
+            _logger.LogDebug("{host}: starting cache loop", _config.Host);
             await Connect();
             int step = 0;
 
@@ -1309,14 +1299,15 @@ namespace TopoMojo.Hypervisor.vSphere
                     if (_vim != null && _vim.State == CommunicationState.Opened)
                     {
                         await ReloadVmCache();
-                        if (step == 0) {
+                        if (step == 0)
+                        {
                             await _netman.Clean();
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(0, ex, $"Failed to refresh cache for {_config.Host}");
+                    _logger.LogError(0, ex, "Failed to refresh cache for {host}", _config.Host);
 
                     if (ex.GetType().Name.Contains("ServerTooBusy"))
                         await Disconnect();
@@ -1329,14 +1320,13 @@ namespace TopoMojo.Hypervisor.vSphere
                         await Connect();
                 }
 
-                step = (step+1)%2;
+                step = (step + 1) % 2;
             }
-            // _logger.LogDebug("sessionMonitor ended.");
         }
 
         private async Task MonitorTasks()
         {
-            _logger.LogDebug($"{_config.Host}: starting task monitor");
+            _logger.LogDebug("{host}: starting task monitor", _config.Host);
             while (true)
             {
                 try
@@ -1364,11 +1354,10 @@ namespace TopoMojo.Hypervisor.vSphere
                                 t.Progress = info.progress;
                                 break;
                         }
-                        if (_vmCache.ContainsKey(key))
+                        if (_vmCache.TryGetValue(key, out Vm value))
                         {
-                            Vm vm = _vmCache[key];
-                            if (vm.Task == null)
-                                vm.Task = new VmTask();
+                            Vm vm = value;
+                            vm.Task ??= new VmTask();
                             vm.Task.Progress = t.Progress;
                             vm.Task.Name = t.Action;
                             _vmCache.TryUpdate(key, vm, vm);
@@ -1377,20 +1366,22 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(0, ex, $"Error in task monitor of {_config.Host}");
+                    _logger.LogError(0, ex, "Error in task monitor of {host}", _config.Host);
                 }
                 finally
                 {
                     await Task.Delay(_taskMonitorInterval);
                 }
             }
-            // _logger.LogDebug("taskMonitor ended.");
         }
 
         internal async Task PreDeployNets(VmNet[] eths, bool useUplinkSwitch)
         {
             await _netman.ProvisionAll(eths, useUplinkSwitch);
         }
+
+        [GeneratedRegex("\r\n|\r|\n")]
+        private static partial Regex EndOfLineRegex();
     }
 
 }

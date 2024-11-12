@@ -1,11 +1,6 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.IO;
-using System.Linq;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
 using TopoMojo.Api.Extensions;
 
 namespace TopoMojo.Api
@@ -57,22 +52,22 @@ namespace TopoMojo.Api
                 {
                     if (
                         line.Equals(string.Empty)
-                        || line.Trim().StartsWith("#")
-                        || !line.Contains("=")
+                        || line.Trim().StartsWith('#')
+                        || !line.Contains('=')
                     )
                     {
                         continue;
                     }
 
-                    int x = line.IndexOf("=");
+                    int x = line.IndexOf('=');
 
                     Environment.SetEnvironmentVariable(
-                        line.Substring(0, x).Trim(),
-                        line.Substring(x + 1).Trim()
+                        line[..x].Trim(),
+                        line[(x + 1)..].Trim()
                     );
                 }
             }
-            catch {}
+            catch { }
         }
     }
 }

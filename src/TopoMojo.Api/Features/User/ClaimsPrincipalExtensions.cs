@@ -1,10 +1,7 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.Linq;
 using System.Security.Claims;
-using System.Security.Principal;
 using TopoMojo.Api.Models;
 
 namespace TopoMojo.Api
@@ -12,20 +9,20 @@ namespace TopoMojo.Api
     public static class ClaimsPrincipalExtensions
     {
 
-        public static Models.User ToModel(this ClaimsPrincipal principal)
+        public static User ToModel(this ClaimsPrincipal principal)
         {
             string sub = principal.Subject();
 
             // support anonymous endpoints
             if (string.IsNullOrEmpty(sub))
             {
-                return new Models.User
+                return new User
                 {
                     Role = UserRole.User
                 };
             }
 
-            return new Models.User
+            return new User
             {
                 Id = principal.Subject(),
 

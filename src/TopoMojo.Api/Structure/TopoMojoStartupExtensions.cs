@@ -1,5 +1,5 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
 using System;
 using System.Linq;
@@ -20,7 +20,8 @@ namespace Microsoft.Extensions.DependencyInjection
         public static IServiceCollection AddTopoMojo(
             this IServiceCollection services,
             CoreOptions options
-        ) {
+        )
+        {
 
             services.AddSingleton<CoreOptions>(_ => options);
 
@@ -81,25 +82,25 @@ namespace Microsoft.Extensions.DependencyInjection
             {
 
                 case "sqlserver":
-                // builder.Services.AddEntityFrameworkSqlServer();
-                services.AddDbContext<TopoMojoDbContext, TopoMojoDbContextSqlServer>(
-                    db => db.UseSqlServer(connstr, options => options.MigrationsAssembly(migrationAssembly))
-                );
-                break;
+                    // builder.Services.AddEntityFrameworkSqlServer();
+                    services.AddDbContext<TopoMojoDbContext, TopoMojoDbContextSqlServer>(
+                        db => db.UseSqlServer(connstr, options => options.MigrationsAssembly(migrationAssembly))
+                    );
+                    break;
 
                 case "postgresql":
-                // services.AddEntityFrameworkNpgsql();
-                services.AddDbContext<TopoMojoDbContext, TopoMojoDbContextPostgreSQL>(
-                    db => db.UseNpgsql(connstr, options => options.MigrationsAssembly(migrationAssembly))
-                );
-                break;
+                    // services.AddEntityFrameworkNpgsql();
+                    services.AddDbContext<TopoMojoDbContext, TopoMojoDbContextPostgreSQL>(
+                        db => db.UseNpgsql(connstr, options => options.MigrationsAssembly(migrationAssembly))
+                    );
+                    break;
 
                 default:
-                // services.AddEntityFrameworkInMemoryDatabase();
-                services.AddDbContext<TopoMojoDbContext, TopoMojoDbContextInMemory>(
-                    db => db.UseInMemoryDatabase(connstr)
-                );
-                break;
+                    // services.AddEntityFrameworkInMemoryDatabase();
+                    services.AddDbContext<TopoMojoDbContext, TopoMojoDbContextInMemory>(
+                        db => db.UseInMemoryDatabase(connstr)
+                    );
+                    break;
 
             }
 
@@ -143,7 +144,7 @@ namespace Microsoft.Extensions.DependencyInjection
                 }
                 else
                 {
-                    services.AddSingleton<IHypervisorService, TopoMojo.Hypervisor.vSphere.vSphereHypervisorService>();
+                    services.AddSingleton<IHypervisorService, TopoMojo.Hypervisor.vSphere.VSphereHypervisorService>();
                 }
             }
 

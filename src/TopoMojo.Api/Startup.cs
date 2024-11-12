@@ -1,15 +1,9 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using TopoMojo.HostedServices;
 
 namespace TopoMojo.Api
@@ -84,7 +78,7 @@ namespace TopoMojo.Api
                 .AddTopoMojo(Settings.Core)
                 .AddTopoMojoData(Settings.Database.Provider, Settings.Database.ConnectionString)
                 .AddTopoMojoHypervisor(() => Settings.Pod)
-                .AddSingleton<AutoMapper.IMapper>(
+                .AddSingleton(
                     new AutoMapper.MapperConfiguration(cfg =>
                     {
                         cfg.AddTopoMojoMaps();

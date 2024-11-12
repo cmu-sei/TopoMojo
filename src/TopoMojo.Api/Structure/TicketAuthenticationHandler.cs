@@ -1,5 +1,5 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
 using System;
 using System.Security.Claims;
@@ -29,20 +29,14 @@ namespace TopoMojo.Api
         }
 
     }
-    public class TicketAuthenticationHandler : AuthenticationHandler<TicketAuthenticationOptions>
+    public class TicketAuthenticationHandler(
+        IOptionsMonitor<TicketAuthenticationOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder,
+        IDistributedCache cache
+        ) : AuthenticationHandler<TicketAuthenticationOptions>(options, logger, encoder)
     {
-        public TicketAuthenticationHandler(
-            IOptionsMonitor<TicketAuthenticationOptions> options,
-            ILoggerFactory logger,
-            UrlEncoder encoder,
-            IDistributedCache cache
-        )
-            : base(options, logger, encoder)
-        {
-            _cache = cache;
-        }
-
-        private readonly IDistributedCache _cache;
+        private readonly IDistributedCache _cache = cache;
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
         {
@@ -60,7 +54,8 @@ namespace TopoMojo.Api
                 if (authHeader.Length > 1
                     && (scheme.Equals(TicketAuthentication.AuthenticationScheme, StringComparison.OrdinalIgnoreCase)
                     || scheme.Equals(TicketAuthentication.AltSchemeName, StringComparison.OrdinalIgnoreCase))
-                ) {
+                )
+                {
                     key = authHeader[1];
                 }
             }
@@ -85,8 +80,8 @@ namespace TopoMojo.Api
             var principal = new ClaimsPrincipal(
                 new ClaimsIdentity(
                     new Claim[] {
-                        new Claim(TicketAuthentication.ClaimNames.Subject, subject),
-                        new Claim(TicketAuthentication.ClaimNames.Name, name)
+                        new(TicketAuthentication.ClaimNames.Subject, subject),
+                        new(TicketAuthentication.ClaimNames.Name, name)
                     },
                     Scheme.Name
                 )
