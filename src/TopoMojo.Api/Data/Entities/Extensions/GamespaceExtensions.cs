@@ -1,8 +1,6 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Linq;
 using TopoMojo.Api.Extensions;
 
 namespace TopoMojo.Api.Data.Extensions
@@ -20,31 +18,22 @@ namespace TopoMojo.Api.Data.Extensions
             // check full name
             var tmpl = gamespace.Workspace.Templates
                 .Where(t => t.Name == name)
-                .FirstOrDefault();
-
-            // check with variant suffix
-            if (tmpl == null)
-            {
-                tmpl = gamespace.Workspace.Templates
+                .FirstOrDefault()
+                ?? gamespace.Workspace.Templates
                     .Where(t => t.Name == $"{name}_v{gamespace.Variant + 1}")
                     .FirstOrDefault();
-            }
 
             // check without replica suffix
             if (tmpl == null)
             {
-                name = name.Substring(0, name.LastIndexOf('_'));
+                name = name[..name.LastIndexOf('_')];
 
                 tmpl = gamespace.Workspace.Templates
                 .Where(t => t.Name == name)
-                .FirstOrDefault();
-
-                if (tmpl == null)
-                {
-                    tmpl = gamespace.Workspace.Templates
-                        .Where(t => t.Name == $"{name}_v{gamespace.Variant + 1}")
-                        .FirstOrDefault();
-                }
+                .FirstOrDefault()
+                ?? gamespace.Workspace.Templates
+                    .Where(t => t.Name == $"{name}_v{gamespace.Variant + 1}")
+                    .FirstOrDefault();
             }
 
             return (!tmpl?.IsHidden) ?? false;

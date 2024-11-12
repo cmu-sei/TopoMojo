@@ -1,14 +1,9 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace TopoMojo.Api
@@ -27,21 +22,13 @@ namespace TopoMojo.Api
         }
 
     }
-    public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthenticationOptions>
+    public class ApiKeyAuthenticationHandler(
+        IOptionsMonitor<ApiKeyAuthenticationOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder,
+        IApiKeyAuthenticationService svc
+        ) : AuthenticationHandler<ApiKeyAuthenticationOptions>(options, logger, encoder)
     {
-        private readonly IApiKeyAuthenticationService _svc;
-
-        public ApiKeyAuthenticationHandler(
-            IOptionsMonitor<ApiKeyAuthenticationOptions> options,
-            ILoggerFactory logger,
-            UrlEncoder encoder,
-            IApiKeyAuthenticationService svc
-        )
-            : base(options, logger, encoder)
-        {
-            _svc = svc;
-        }
-
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
         {
             await Task.Delay(0);
@@ -55,7 +42,7 @@ namespace TopoMojo.Api
                     .ToString()
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-                if (authHeader?.Any() == true)
+                if (authHeader?.Length > 0)
                 {
                     string scheme = authHeader[0];
 
@@ -70,7 +57,7 @@ namespace TopoMojo.Api
                 }
             }
 
-            var subject = await _svc.ResolveApiKey(key);
+            var subject = await svc.ResolveApiKey(key);
 
             if (subject is null)
                 return AuthenticateResult.NoResult();
@@ -78,8 +65,8 @@ namespace TopoMojo.Api
             var principal = new ClaimsPrincipal(
                 new ClaimsIdentity(
                     new Claim[] {
-                        new Claim(ApiKeyAuthentication.ClaimNames.Subject, subject.Id),
-                        new Claim(ApiKeyAuthentication.ClaimNames.Name, name ?? subject.Name)
+                        new(ApiKeyAuthentication.ClaimNames.Subject, subject.Id),
+                        new(ApiKeyAuthentication.ClaimNames.Name, name ?? subject.Name)
                     },
                     Scheme.Name
                 )

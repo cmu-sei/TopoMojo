@@ -1,28 +1,17 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Memory;
 using TopoMojo.Api.Data.Abstractions;
-using TopoMojo.Api.Data.Extensions;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Api.Models;
 
 namespace TopoMojo.Api.Data
 {
-    public class UserStore : Store<User>, IUserStore
+    public class UserStore(
+        TopoMojoDbContext db
+        ) : Store<User>(db), IUserStore
     {
-        public UserStore (
-            TopoMojoDbContext db
-        ) : base(db)
-        {
-
-        }
-
         public override async Task<User> Create(User user)
         {
             string name = user.Name.ExtractBefore("@");
@@ -35,7 +24,7 @@ namespace TopoMojo.Api.Data
 
             user.WhenCreated = DateTimeOffset.UtcNow;
 
-            if (!(await DbSet.AnyAsync()))
+            if (!await DbSet.AnyAsync())
                 user.Role = UserRole.Administrator;
 
             return await base.Create(user);
@@ -117,14 +106,14 @@ namespace TopoMojo.Api.Data
                 u.ApiKeys.Any(k => k.Hash == hash)
             );
 
-            if (user is User)
+            if (user is not null)
                 return user;
 
             var gs = await DbContext.Gamespaces.FirstOrDefaultAsync(
                 g => g.GraderKey == hash
             );
 
-            return (gs is Gamespace)
+            return (gs is not null)
                 ? new User { Id = gs.Id, Name = "Gamespace Agent" }
                 : null
             ;

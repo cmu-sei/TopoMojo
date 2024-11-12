@@ -1,10 +1,6 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -14,23 +10,23 @@ namespace TopoMojo.Api.Extensions
     {
         public static bool IsEmpty(this string s)
         {
-            return (String.IsNullOrEmpty(s));
+            return string.IsNullOrEmpty(s);
         }
 
         public static bool NotEmpty(this string s)
         {
-            return (!String.IsNullOrWhiteSpace(s));
+            return !string.IsNullOrWhiteSpace(s);
         }
 
         //check for presence of array values
         public static bool IsEmpty(this object[] o)
         {
-            return (o == null || o.Length == 0);
+            return o == null || o.Length == 0;
         }
 
         public static bool IsNotEmpty(this object[] o)
         {
-            return (o != null && o.Length > 0);
+            return o != null && o.Length > 0;
         }
 
         //expands a range string (i.e. [1-3,5,7,10-12]) into an int list
@@ -38,18 +34,17 @@ namespace TopoMojo.Api.Extensions
         {
             s = s.Inner();
 
-            List<int> list = new List<int>();
+            List<int> list = [];
             string[] sections = s.Split(',');
             foreach (string section in sections)
             {
-                //Console.WriteLine(section);
                 string[] token = section.Split('-');
-                int x = 0, y = 0;
-                if (Int32.TryParse(token[0], out x))
+                if (int.TryParse(token[0], out int x))
                 {
+                    int y;
                     if (token.Length > 1)
                     {
-                        if (!Int32.TryParse(token[1], out y))
+                        if (!int.TryParse(token[1], out y))
                             y = x;
                     }
                     else
@@ -58,19 +53,17 @@ namespace TopoMojo.Api.Extensions
                     }
                     for (int i = x; i <= y; i++)
                     {
-                        //Console.WriteLine(i);
                         list.Add(i);
                     }
                 }
             }
-            return list.ToArray();
+            return [.. list];
         }
 
         //extracts string from brackets [].
         public static string Inner(this string s)
         {
-            if (s == null)
-                s = "";
+            s ??= "";
 
             int x = s.IndexOf('[');
             if (x > -1)
@@ -87,9 +80,9 @@ namespace TopoMojo.Api.Extensions
         {
             if (s.NotEmpty())
             {
-                int x = s.IndexOf("#");
+                int x = s.IndexOf('#');
                 if (x >= 0)
-                    return s.Substring(x+1).Split(' ').First();
+                    return s[(x + 1)..].Split(' ').First();
             }
             return "";
         }
@@ -99,9 +92,9 @@ namespace TopoMojo.Api.Extensions
         {
             if (s.NotEmpty())
             {
-                int x = s.IndexOf("#");
+                int x = s.IndexOf('#');
                 if (x >= 0)
-                    return s.Substring(0, x);
+                    return s[..x];
             }
             return s;
         }
@@ -110,14 +103,14 @@ namespace TopoMojo.Api.Extensions
         {
             int x = s.IndexOf(target);
             return (x>-1)
-                ? s.Substring(0, x)
+                ? s[..x]
                 : s;
         }
         public static string ExtractAfter(this string s, string target)
         {
             int x = s.IndexOf(target);
             return (x>-1)
-                ? s.Substring(x+1)
+                ? s[(x + 1)..]
                 : s;
         }
 
@@ -133,13 +126,13 @@ namespace TopoMojo.Api.Extensions
         //Note: this assumes a guid string (length > 16)
         public static string ToSwitchName(this string s)
         {
-            return String.Format("sw#{0}..{1}", s.Substring(0,8), s.Substring(s.Length-8));
+            return string.Format("sw#{0}..{1}", s[..8], s[^8..]);
         }
 
         public static string ToAbbreviatedHex(this string s)
         {
             return (s.Length > 8)
-                ? String.Format("{0}..{1}", s.Substring(0, 4), s.Substring(s.Length - 4))
+                ? String.Format("{0}..{1}", s[..4], s[^4..])
                 : s;
         }
 
@@ -167,7 +160,7 @@ namespace TopoMojo.Api.Extensions
             }
 
             if (result.EndsWith('-'))
-                result = result.Substring(0, result.Length - 1);
+                result = result[..^1];
 
             return result.ToLower();
         }
@@ -195,8 +188,7 @@ namespace TopoMojo.Api.Extensions
         {
             if (string.IsNullOrEmpty(ts))
                 return false;
-
-            if (int.TryParse(ts[..^1], out int value))
+            if (int.TryParse(ts[..^1], out _))
             {
                 string type = ts[^1..];
                 return "ywdms".Contains(type);
@@ -209,11 +201,7 @@ namespace TopoMojo.Api.Extensions
         {
             return DateTimeOffset.UtcNow
                 .Subtract(
-                    new TimeSpan(
-                        0,
-                        0,
-                        ts.ToSeconds()
-                    )
+                    new TimeSpan( 0, 0, ts.ToSeconds())
                 );
         }
 
@@ -240,13 +228,9 @@ namespace TopoMojo.Api.Extensions
 
         public static string ToSha256(this string input)
         {
-            using (SHA256 alg = SHA256.Create())
-            {
-                return BitConverter.ToString(alg
-                    .ComputeHash(Encoding.UTF8.GetBytes(input)))
-                    .Replace("-", "")
-                    .ToLower();
-            }
+            return BitConverter.ToString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(input))
+            ).Replace("-", "").ToLower();
         }
 
         public static bool HasAnyToken(this string a, string b)
@@ -254,14 +238,12 @@ namespace TopoMojo.Api.Extensions
             if (a.IsEmpty() || b.IsEmpty())
                 return false;
 
-            var delims = new char[] { ' ', ',', ';' };
-
             var A = a.ToLower()
-                .Split(delims, StringSplitOptions.RemoveEmptyEntries)
+                .Split(token_separators, StringSplitOptions.RemoveEmptyEntries)
             ;
 
             var B = b.ToLower()
-                .Split(delims, StringSplitOptions.RemoveEmptyEntries)
+                .Split(token_separators, StringSplitOptions.RemoveEmptyEntries)
             ;
 
             return A.Intersect(B).Any();
@@ -269,14 +251,12 @@ namespace TopoMojo.Api.Extensions
 
         public static bool HasAllTokens(this string a, string b)
         {
-            var delims = new char[] { ' ', ',', ';' };
-
             var A = a.ToLower()
-                .Split(delims, StringSplitOptions.RemoveEmptyEntries)
+                .Split(token_separators, StringSplitOptions.RemoveEmptyEntries)
             ;
 
             var B = b.ToLower()
-                .Split(delims, StringSplitOptions.RemoveEmptyEntries)
+                .Split(token_separators, StringSplitOptions.RemoveEmptyEntries)
             ;
 
             return A.Intersect(B).Count() == B.Length;
@@ -300,7 +280,7 @@ namespace TopoMojo.Api.Extensions
                 uint mask = 0xFFFFFFFF << (32 - int.Parse(net.Last()));
                 if (~mask > 0)
                 {
-                    uint host = (uint) new Random().Next(1,((int)~mask));
+                    uint host = (uint) new Random().Next(1,(int)~mask);
                     addr |= host;
                 }
 
@@ -311,7 +291,8 @@ namespace TopoMojo.Api.Extensions
             return result;
         }
 
-        private static readonly char[] hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+        private static readonly char[] token_separators = [' ', ',', ';'];
+        private static readonly char[] hex_chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
         public static string ExtractTenant(this string s)
         {
@@ -319,7 +300,7 @@ namespace TopoMojo.Api.Extensions
             char[] c = s.ToLower().ToCharArray();
             for (int i = 0; i < c.Length; i++)
             {
-                if (hex.Contains(c[i]))
+                if (hex_chars.Contains(c[i]))
                     break;
                 else
                     r += c[i];

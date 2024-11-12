@@ -1,10 +1,9 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using VimClient;
 using TopoMojo.Hypervisor.Extensions;
@@ -12,18 +11,13 @@ using Microsoft.Extensions.Logging;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
-    public class DistributedNetworkManager : NetworkManager
+    public class DistributedNetworkManager(
+        ILogger logger,
+        VimReferences settings,
+        ConcurrentDictionary<string, Vm> vmCache,
+        VlanManager vlanManager
+        ) : NetworkManager(logger, settings, vmCache, vlanManager)
     {
-        public DistributedNetworkManager(
-            ILogger logger,
-            VimReferences settings,
-            ConcurrentDictionary<string, Vm> vmCache,
-            VlanManager vlanManager
-        ) : base(logger, settings, vmCache, vlanManager)
-        {
-
-        }
-
         public override async Task<PortGroupAllocation> AddPortGroup(string sw, VmNet eth)
         {
             var mor = new ManagedObjectReference();
@@ -65,7 +59,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     }
                 };
 
-                var task = await _client.vim.CreateDVPortgroup_TaskAsync(_client.dvs, spec);
+                var task = await _client.Vim.CreateDVPortgroup_TaskAsync(_client.Dvs, spec);
                 var info = await WaitForVimTask(task);
                 mor = info.result as ManagedObjectReference;
             }
@@ -87,8 +81,8 @@ namespace TopoMojo.Hypervisor.vSphere
         public override async Task<VmNetwork[]> GetVmNetworks(ManagedObjectReference mor)
         {
             var result = new List<VmNetwork>();
-            RetrievePropertiesResponse response = await _client.vim.RetrievePropertiesAsync(
-                _client.props,
+            RetrievePropertiesResponse response = await _client.Vim.RetrievePropertiesAsync(
+                _client.Props,
                 FilterFactory.VmFilter(mor, "name config"));
             ObjectContent[] oc = response.returnval;
 
@@ -117,22 +111,22 @@ namespace TopoMojo.Hypervisor.vSphere
 
             }
 
-            return result.ToArray();
+            return [.. result];
         }
 
         public override async Task<PortGroupAllocation[]> LoadPortGroups()
         {
             var list = new List<PortGroupAllocation>();
 
-            RetrievePropertiesResponse response = await _client.vim.RetrievePropertiesAsync(
-                _client.props,
-                FilterFactory.DistributedPortgroupFilter(_client.cluster));
+            RetrievePropertiesResponse response = await _client.Vim.RetrievePropertiesAsync(
+                _client.Props,
+                FilterFactory.DistributedPortgroupFilter(_client.Cluster));
 
             ObjectContent[] clunkyTree = response.returnval;
             foreach (var dvpg in clunkyTree.FindType("DistributedVirtualPortgroup"))
             {
                 var config = (DVPortgroupConfigInfo)dvpg.GetProperty("config");
-                if (config.distributedVirtualSwitch.Value == _client.dvs.Value)
+                if (config.distributedVirtualSwitch.Value == _client.Dvs.Value)
                 {
                     string net = dvpg.GetProperty("name") as string;
 
@@ -157,14 +151,14 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
             }
 
-            return list.ToArray();
+            return [.. list];
         }
 
         public override async Task<bool> RemovePortgroup(string pgReference)
         {
             try
             {
-                await _client.vim.Destroy_TaskAsync(pgReference.AsReference());
+                await _client.Vim.Destroy_TaskAsync(pgReference.AsReference());
             }
             catch { }
             return true;
@@ -181,7 +175,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 if (card.backing is VirtualEthernetCardDistributedVirtualPortBackingInfo)
                 {
-                    string netMorName = this.Resolve(portgroupName);
+                    string netMorName = Resolve(portgroupName);
 
                     card.backing = new VirtualEthernetCardDistributedVirtualPortBackingInfo
                     {

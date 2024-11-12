@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -24,21 +24,20 @@ namespace TopoMojo.Hypervisor.vMock
             _optPod = podConfiguration;
             _mill = mill;
             _logger = _mill.CreateLogger<MockHypervisorService>();
-            _vms = new Dictionary<string, Vm>();
-            _tasks = new Dictionary<string, VmTask>();
+            _vms = [];
+            _tasks = [];
             _rand = new Random();
-
             NormalizeOptions(_optPod);
-            _ = Task.Run(() => DeploymentHandler());
+            _ = Task.Run(DeploymentHandler);
         }
 
         private readonly HypervisorServiceConfiguration _optPod;
         private readonly ILogger<MockHypervisorService> _logger;
         private readonly ILoggerFactory _mill;
-        private Random _rand;
-        private Dictionary<string, Vm> _vms;
-        private Dictionary<string, VmTask> _tasks;
-        private BlockingCollection<DeploymentContext> DeploymentCollection = [];
+        private readonly Random _rand;
+        private readonly Dictionary<string, Vm> _vms;
+        private readonly Dictionary<string, VmTask> _tasks;
+        private readonly BlockingCollection<DeploymentContext> DeploymentCollection = [];
 
         public HypervisorServiceConfiguration Options { get { return _optPod; } }
 
@@ -54,7 +53,7 @@ namespace TopoMojo.Hypervisor.vMock
 
         public async Task<Vm> Refresh(VmTemplate template)
         {
-            string target = template.Name + "#" + template.IsolationTag;
+            string target = $"{template.Name}#{template.IsolationTag}";
 
             Vm vm = (await Find(target)).FirstOrDefault();
 
@@ -87,11 +86,11 @@ namespace TopoMojo.Hypervisor.vMock
 
         private void IncludeTask(string key, Vm vm)
         {
-            if (_tasks.ContainsKey(key))
+            if (_tasks.TryGetValue(key, out VmTask value))
             {
-                VmTask task = _tasks[key];
+                VmTask task = value;
                 float elapsed = (int)DateTimeOffset.UtcNow.Subtract(task.WhenCreated).TotalSeconds;
-                task.Progress = (int)Math.Min(100, (elapsed / 10) * 100);
+                task.Progress = (int)Math.Min(100, elapsed / 10 * 100);
                 if (task.Progress == 100)
                 {
                     _tasks.Remove(key);
@@ -108,10 +107,10 @@ namespace TopoMojo.Hypervisor.vMock
             //string key = template.IsolationTag + "-" + template.Id;
             Vm vm = null;
 
-            if (_vms.ContainsKey(key))
+            if (_vms.TryGetValue(key, out Vm value))
             {
-                _logger.LogDebug($"vm {vm.Name} already deployed");
-                vm = _vms[key];
+                _logger.LogDebug("vm {name} already deployed", vm.Name);
+                vm = value;
                 vm.Status = "deployed";
                 return vm;
             }
@@ -131,7 +130,7 @@ namespace TopoMojo.Hypervisor.vMock
                 Status = "deployed"
             };
 
-            _logger.LogDebug($"deployed vm {vm.Name}");
+            _logger.LogDebug("deployed vm {name}", vm.Name);
             _vms.Add(vm.Id, vm);
             return vm;
         }
@@ -145,7 +144,7 @@ namespace TopoMojo.Hypervisor.vMock
         {
             Vm vm = TryFind(id);
             int test = _rand.Next(9);
-            if (vm is Vm && test == 0)
+            if (vm is not null && test == 0)
             {
                 vm.Question = new VmQuestion
                 {
@@ -153,10 +152,10 @@ namespace TopoMojo.Hypervisor.vMock
                     Prompt = "This vm has a question you must answer. Would you like to answer it?",
                     DefaultChoice = "yes",
 
-                    Choices = new VmQuestionChoice[] {
+                    Choices = [
                         new VmQuestionChoice { Key="yes", Label="Yes" },
                         new VmQuestionChoice { Key="no", Label="No" }
-                    }
+                    ]
                 };
             }
             await Delay();
@@ -177,7 +176,7 @@ namespace TopoMojo.Hypervisor.vMock
                     break;
 
                 case VmOperationType.Reset:
-                    vm = await Stop(op.Id);
+                    _ = await Stop(op.Id);
                     vm = await Start(op.Id);
                     break;
 
@@ -252,12 +251,12 @@ namespace TopoMojo.Hypervisor.vMock
         public async Task<Vm[]> Find(string term)
         {
             await Task.Delay(0);
-            return (term.HasValue())
+            return term.HasValue()
             ? _vms.Values.Where(o => o.Id.Contains(term) || o.Name.Contains(term)).ToArray()
-            : _vms.Values.ToArray();
+            : [.. _vms.Values];
         }
 
-        List<MockDisk> _disks = new List<MockDisk>();
+        readonly List<MockDisk> _disks = [];
         public async Task<int> CreateDisks(VmTemplate template)
         {
             int[] progress = await VerifyDisks(template);
@@ -294,7 +293,7 @@ namespace TopoMojo.Hypervisor.vMock
         {
             await Delay();
 
-            int[] test = new int[] {};
+            int[] test = [];
             Console.WriteLine(test.Sum());
 
             var result = new int[template.Disks.Length];
@@ -326,7 +325,7 @@ namespace TopoMojo.Hypervisor.vMock
                 MockDisk mock = _disks.FirstOrDefault(o => o.Path == disk.Path);
                 if (mock is null || progress[index] < 100)
                     continue;
-                _logger.LogDebug("disk: deleting " + disk.Path);
+                _logger.LogDebug("disk: deleting {path}", disk.Path);
                 _disks.Remove(mock);
             }
         }
@@ -350,9 +349,10 @@ namespace TopoMojo.Hypervisor.vMock
 
         private Vm TryFind(string id)
         {
-            return _vms.ContainsKey(id)
-                ? _vms[id]
-                : _vms.Values.Where(v => v.Name == id).FirstOrDefault();
+            return _vms.TryGetValue(id, out Vm value)
+                ? value
+                : _vms.Values.Where(v => v.Name == id).FirstOrDefault()
+            ;
         }
         public string Version
         {
@@ -363,7 +363,7 @@ namespace TopoMojo.Hypervisor.vMock
             }
         }
 
-        private void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option)
+        private static void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option)
         {
             if (!template.Iso.HasValue())
             {
@@ -380,14 +380,14 @@ namespace TopoMojo.Hypervisor.vMock
                 if (!disk.Path.StartsWith(option.DiskStore)
                 )
                 {
-                    DatastorePath dspath = new DatastorePath(disk.Path);
+                    DatastorePath dspath = new(disk.Path);
                     dspath.Merge(option.DiskStore);
                     disk.Path = dspath.ToString();
                 }
                 if (disk.Source.HasValue() && !disk.Source.StartsWith(option.DiskStore)
                 )
                 {
-                    DatastorePath dspath = new DatastorePath(disk.Source);
+                    DatastorePath dspath = new(disk.Source);
                     dspath.Merge(option.DiskStore);
                     disk.Source = dspath.ToString();
                 }
@@ -395,47 +395,7 @@ namespace TopoMojo.Hypervisor.vMock
 
             if (template.IsolationTag.HasValue())
             {
-                string tag = "#" + template.IsolationTag;
-                Regex rgx = new Regex("#.*");
-                if (!template.Name.EndsWith(template.IsolationTag))
-                    template.Name = rgx.Replace(template.Name, "") + tag;
-                foreach (VmNet eth in template.Eth)
-                {
-                    // //don't add tag if referencing a global vlan
-                    // if (!_vlanman.Contains(eth.Net))
-                    // {
-                    //     eth.Net = rgx.Replace(eth.Net, "") + tag;
-                    // }
-                }
-            }
-        }
-
-        private void NormalizeTemplateOld(VmTemplate template, HypervisorServiceConfiguration option)
-        {
-            if (template.Iso.HasValue() && !template.Iso.StartsWith(option.IsoStore))
-            {
-                template.Iso = option.IsoStore + template.Iso + ".iso";
-            }
-
-            // if (template.Source.HasValue() && !template.Source.StartsWith(option.StockStore))
-            // {
-            //     template.Source = option.StockStore + template.Source + ".vmdk";
-            // }
-
-            foreach (VmDisk disk in template.Disks)
-            {
-                if (!disk.Path.StartsWith(option.DiskStore))
-                    disk.Path = option.DiskStore + disk.Path + ".vmdk";
-            }
-
-            if (template.IsolationTag.HasValue())
-            {
-                string tag = "#" + template.IsolationTag;
-                Regex rgx = new Regex("#.*");
-                if (!template.Name.EndsWith(template.IsolationTag))
-                    template.Name = rgx.Replace(template.Name, "") + tag;
-                foreach (VmNet eth in template.Eth)
-                    eth.Net = rgx.Replace(eth.Net, "") + tag;
+                template.Name = $"{template.Name.Untagged()}#{template.IsolationTag}";
             }
         }
 
@@ -449,9 +409,9 @@ namespace TopoMojo.Hypervisor.vMock
         public async Task<VmOptions> GetVmIsoOptions(string id)
         {
             await Task.Delay(0);
-            VmOptions opt = new VmOptions()
+            VmOptions opt = new()
             {
-                Iso = new string[] {
+                Iso = [
                     "test1.iso",
                     "test2.iso",
                     "test3.iso",
@@ -471,16 +431,16 @@ namespace TopoMojo.Hypervisor.vMock
                     "test17.iso",
                     "test18.iso",
                     "really-long-iso-name-that-needs-to-wrap-1.0.0.test2.iso"
-                },
+                ],
             };
             return opt;
         }
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
             await Task.Delay(0);
-            VmOptions opt = new VmOptions()
+            VmOptions opt = new()
             {
-                Net = new string[] { "bridge-net", "isp-att", "lan#12345678" }
+                Net = ["bridge-net", "isp-att", "lan#12345678"]
             };
             return opt;
         }
@@ -517,7 +477,7 @@ namespace TopoMojo.Hypervisor.vMock
             throw new NotImplementedException();
         }
 
-        private void NormalizeOptions(HypervisorServiceConfiguration options)
+        private static void NormalizeOptions(HypervisorServiceConfiguration options)
         {
             var regex = new Regex("(]|/)$");
 

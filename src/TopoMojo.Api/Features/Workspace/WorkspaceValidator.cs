@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -12,7 +12,7 @@ namespace TopoMojo.Api.Validators
     public class WorkspaceValidator(
         IWorkspaceStore store,
         ILogger<WorkspaceValidator> logger
-        ) : _ValidationFilter
+        ) : BaseValidationFilter
     {
         public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
@@ -62,7 +62,7 @@ namespace TopoMojo.Api.Validators
             await base.OnActionExecutionAsync(context, next);
         }
 
-        private async Task Exists(string key, string? id)
+        private async Task Exists(string key, string id)
         {
             var entity = await store.Retrieve(id ?? "invalid");
             if (entity is null)

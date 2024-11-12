@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using TopoMojo.Api.Data.Abstractions;
@@ -10,7 +10,7 @@ namespace TopoMojo.Api.Controllers;
 public class GamespaceValidator(
     IGamespaceStore store,
     ILogger<GamespaceValidator> logger
-    ) : _ValidationFilter
+    ) : BaseValidationFilter
 {
     public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
@@ -67,21 +67,21 @@ public class GamespaceValidator(
         await base.OnActionExecutionAsync(context, next);
     }
 
-    private async Task Exists(string key, string? id)
+    private async Task Exists(string key, string id)
     {
         var entity = await store.Retrieve(id ?? "invalid");
         if (entity is null)
             Problems.Add(new Problem(key, Message.ResourceNotFound));
     }
 
-    private async Task WorkspaceExists(string key, string? id)
+    private async Task WorkspaceExists(string key, string id)
     {
         var entity = await store.DbContext.Workspaces.FindAsync(id ?? "invalid");
         if (entity is null)
             Problems.Add(new Problem(key, Message.ResourceNotFound));
     }
 
-    private async Task SpaceExists(string key, string? id)
+    private async Task SpaceExists(string key, string id)
     {
         var gs = await store.Retrieve(id ?? "invalid");
         var ws = await store.DbContext.Workspaces.FindAsync(id ?? "invalid");

@@ -1,11 +1,5 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 
 namespace TopoMojo.Api.Services
 {
@@ -21,18 +15,18 @@ namespace TopoMojo.Api.Services
         public FileUploadMonitor(ILogger<FileUploadMonitor> logger)
         {
             _logger = logger;
-            _monitor = new Dictionary<string, FileProgress>();
-            Task task = CleanupLoop();
+            _monitor = [];
+            _ = CleanupLoop();
         }
         private readonly ILogger<FileUploadMonitor> _logger;
-        private Dictionary<string, FileProgress> _monitor;
+        private readonly Dictionary<string, FileProgress> _monitor;
 
         public void Update(string key, int progress)
         {
-            if (_monitor.ContainsKey(key))
+            if (_monitor.TryGetValue(key, out FileProgress value))
             {
-                _monitor[key].Progress = progress;
-                _monitor[key].Stop = DateTimeOffset.UtcNow;
+                value.Progress = progress;
+                value.Stop = DateTimeOffset.UtcNow;
             }
             else
             {
@@ -47,8 +41,8 @@ namespace TopoMojo.Api.Services
 
         public FileProgress Check(string key)
         {
-            if (_monitor.ContainsKey(key))
-                return _monitor[key];
+            if (_monitor.TryGetValue(key, out FileProgress value))
+                return value;
 
             return new FileProgress { Key = key, Progress = -1 };
         }
@@ -62,7 +56,7 @@ namespace TopoMojo.Api.Services
                 {
                     if (now.CompareTo(item.Stop.AddMinutes(2)) > 0)
                     {
-                        _logger.LogDebug("removed monitor " + item.Key);
+                        _logger.LogDebug("removed monitor {key}", item.Key);
                         _monitor.Remove(item.Key);
                     }
                 }

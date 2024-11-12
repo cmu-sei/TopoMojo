@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -20,7 +20,7 @@ using System.Text;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
-    public class ProxmoxClient
+    public partial class ProxmoxClient
     {
         public ProxmoxClient(
             HypervisorServiceConfiguration options,
@@ -33,13 +33,11 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             _logger = logger;
             _config = options;
-            _logger.LogDebug($"Constructing Client {_config.Url}");
-            _tasks = new Dictionary<string, PveNodeTask>();
+            _logger.LogDebug("Constructing Client {url}", _config.Url);
+            _tasks = [];
             _vmCache = vmCache;
             _random = random;
-
-            if (_config.Tenant == null)
-                _config.Tenant = "";
+            _config.Tenant ??= "";
 
             int port = 443;
             string host = _config.Url;
@@ -59,31 +57,31 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             _nameService = nameService;
             _vlanManager = vnetService;
-            Task sessionMonitorTask = MonitorSession();
-            Task taskMonitorTask = MonitorTasks();
+            _ = MonitorSession();
+            _ = MonitorTasks();
         }
 
         private readonly ILogger<ProxmoxClient> _logger;
-        Dictionary<string, PveNodeTask> _tasks;
-        private ConcurrentDictionary<string, Vm> _vmCache;
+        private readonly Dictionary<string, PveNodeTask> _tasks;
+        private readonly ConcurrentDictionary<string, Vm> _vmCache;
         private readonly IProxmoxNameService _nameService;
         private readonly IProxmoxVlanManager _vlanManager;
         private readonly HypervisorServiceConfiguration _config = null;
         // int _pollInterval = 1000;
-        int _syncInterval = 30000;
-        int _taskMonitorInterval = 3000;
-        string _hostPrefix = "";
+        readonly int _syncInterval = 30000;
+        readonly int _taskMonitorInterval = 3000;
+        readonly string _hostPrefix = "";
         // DateTimeOffset _lastAction;
-        private PveClient _pveClient;
-        private PveClient _rootPveClient;
+        private readonly PveClient _pveClient;
+        private readonly PveClient _rootPveClient;
         private readonly Random _random;
         private readonly bool _enableHA = false;
-        private readonly Object _lock = new object();
+        private readonly object _lock = new();
         private const string deleteTag = "delete"; // tags are always lower-case
 
         public async Task<Vm> Refresh(VmTemplate template)
         {
-            string target = template.Name + "#" + template.IsolationTag;
+            string target = $"{template.Name}#{template.IsolationTag}";
             var resources = await _pveClient.GetResourcesAsync(ClusterResourceType.Vm);
 
             var pveVm = resources.Where(x => x.Name == _nameService.ToPveName(template.Name)).FirstOrDefault();
@@ -121,7 +119,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> CreateTemplate(VmTemplate template)
         {
-            // await this.ReloadVmCache();
+            // await ReloadVmCache();
 
             var vmTemplate = _vmCache
                 .Where(x => x.Value.Name == template.Template)
@@ -136,15 +134,11 @@ namespace TopoMojo.Hypervisor.Proxmox
             var parentTemplate = _vmCache
                 .Where(x => x.Value.Name == template.ParentTemplate)
                 .FirstOrDefault()
-                .Value;
-
-            if (parentTemplate == null)
-            {
-                throw new InvalidOperationException("Parent Template does not exist");
-            }
+                .Value
+                ?? throw new InvalidOperationException("Parent Template does not exist");
 
             var nextId = await GetNextId();
-            var pveId = Int32.Parse(nextId);
+            var pveId = int.Parse(nextId);
             var name = _nameService.ToPveName(template.Template);
 
             // full clone parent template
@@ -166,7 +160,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 throw new Exception(task.ReasonPhrase);
             }
 
-            Vm vm = new Vm()
+            Vm vm = new()
             {
                 Name = name,
                 Id = nextId,
@@ -176,7 +170,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 HypervisorType = HypervisorType.Proxmox
             };
 
-            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => (v = vm));
+            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
 
             return vm;
         }
@@ -195,7 +189,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 .Value;
 
             var nextId = await GetNextId();
-            var pveId = Int32.Parse(nextId);
+            var pveId = int.Parse(nextId);
 
             var cloneTask = _pveClient.Nodes[vmTemplate.Host].Qemu[vmTemplate.Id].Clone.CloneVm(
                 pveId,
@@ -203,9 +197,9 @@ namespace TopoMojo.Hypervisor.Proxmox
                 name: _nameService.ToPveName(template.Name),
                 target: targetNode);
 
-            _logger.LogDebug($"deploy: virtual networks (id {template.Id})...");
+            _logger.LogDebug("deploy: virtual networks (id {tid})...", template.Id);
             var vnetsTask = _vlanManager.Provision(template.Eth.Select(n => n.Net));
-            var isoTask = this.GetIso(template);
+            var isoTask = GetIso(template);
 
             // We can clone vm and provision networks concurrently since we don't set the network until
             // the configure step after the clone is finished. Isos are also not dependent on the other tasks.
@@ -213,11 +207,11 @@ namespace TopoMojo.Hypervisor.Proxmox
             {
                 await Task.WhenAll(cloneTask, vnetsTask, isoTask);
             }
-            catch (Exception ex)
+            catch
             {
                 if (cloneTask.IsFaulted)
                 {
-                    throw ex;
+                    throw;
                 }
             }
 
@@ -225,7 +219,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (!vnetsTask.IsFaulted)
             {
-                _logger.LogDebug($"deploy: {vnetsTask.Result.Count()} networks deployed.");
+                _logger.LogDebug("deploy: {count} networks deployed.", vnetsTask.Result.Count());
             }
 
             await _pveClient.WaitForTaskToFinish(task);
@@ -278,15 +272,15 @@ namespace TopoMojo.Hypervisor.Proxmox
                     _logger.LogDebug("No root password provided. Skipping Guest Settings");
                 }
 
-                var nics = await this.GetNics(template);
-                var memory = this.GetMemory(template);
-                var sockets = this.GetSockets(template);
-                var coresPerSocket = this.GetCoresPerSocket(template);
+                var nics = await GetNics(template);
+                var memory = GetMemory(template);
+                var sockets = GetSockets(template);
+                var coresPerSocket = GetCoresPerSocket(template);
                 string args = null;
 
                 if (setGuestSettings)
                 {
-                    args = this.GetArgs(template);
+                    args = GetArgs(template);
                 }
 
                 task = await client.Nodes[targetNode].Qemu[nextId].Config.UpdateVmAsync(
@@ -300,7 +294,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                 if (!task.IsSuccessStatusCode)
                 {
-                    _logger.LogError($"Error reconfiguring vm {template.Name} ({nextId}) - {task.ReasonPhrase}");
+                    _logger.LogError("Error reconfiguring vm {name} ({nextid}) - {reason}", template.Name, nextId, task.ReasonPhrase);
                     var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
                     await _pveClient.WaitForTaskToFinish(destroyTask);
 
@@ -319,7 +313,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     HypervisorType = HypervisorType.Proxmox
                 };
 
-                if (vm.Name.Contains("#").Equals(false) || vm.Name.ToTenant() != _config.Tenant)
+                if (vm.Name.Contains('#').Equals(false) || vm.Name.ToTenant() != _config.Tenant)
                     return null;
 
                 _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
@@ -488,7 +482,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                         if (template != null)
                         {
                             // Full Clone vm
-                            var nextId = Int32.Parse(await this.GetNextId());
+                            var nextId = int.Parse(await GetNextId());
                             var task = await _pveClient.Nodes[vm.Host].Qemu[vm.Id].Clone.CloneVm(newid: nextId, full: true, target: template.Host, name: template.Name);
 
                             var t = new PveNodeTask { Id = task.Response.data, Action = "saving", WhenCreated = DateTimeOffset.UtcNow };
@@ -525,7 +519,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 }
 
                 // Delete old vm
-                await this.Delete(oldId);
+                await Delete(oldId);
 
                 // Tag old template
                 // Janitor will delete anything with this tag if deletion fails now
@@ -546,7 +540,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 if (!task.IsSuccessStatusCode)
                     throw new Exception($"Delete old template failed: {task.ReasonPhrase}");
 
-                await this.ReloadVmCache();
+                await ReloadVmCache();
             }
             finally
             {
@@ -556,7 +550,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<PveIso[]> GetFiles()
         {
-            var node = await this.GetRandomNode();
+            var node = await GetRandomNode();
 
             var task = await _pveClient
                 .Nodes[node]
@@ -586,8 +580,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             // our proxmox package stuffs NIC info into the ExtensionData property of
             // the config call, so we rely on the fact that (current) proxmox documentation
             // says that NICs start with "net" and are followed by a number
-            var nicDataRegex = new Regex(@"net(\d)+");
-            var nicModelMacRegex = new Regex(@"(?<model>[^=]+)=(?<mac>[0-9A-Fa-f:]{17})");
+            var nicDataRegex = NicDataRegex();
+            var nicModelMacRegex = NicModelMacRegex();
 
             if (vmConfig.ExtensionData.Any(d => nicDataRegex.IsMatch(d.Key)))
             {
@@ -628,7 +622,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<Vm> PushVmConfigUpdate(long vmId, PveVmUpdateConfig update)
         {
             var vm = _vmCache[vmId.ToString()];
-            var currentConfig = await this.GetVmConfig(vm);
+            var currentConfig = await GetVmConfig(vm);
 
             // if there are any net assignment updates, we need to resolve their IDs from the names
             // passed in. We make a new dictionary to hold them rather than mutate the argument.
@@ -658,7 +652,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 .Config
                 .UpdateVmAsync
                 (
-                    netN: vnetAssignmentIds.Any() ? vnetAssignmentIds : null
+                    netN: vnetAssignmentIds.Count != 0 ? vnetAssignmentIds : null
                 );
 
             await _pveClient.WaitForTaskToFinish(updateTask);
@@ -681,7 +675,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             string target = null;
             var nodes = await _pveClient.GetNodesAsync();
 
-            if (nodes.Count() > 0)
+            if (nodes.Any())
             {
                 IClusterResourceNode targetNode;
                 var targetNodes = nodes.Where(x =>
@@ -715,7 +709,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private string GetArgs(VmTemplate template)
         {
-            if (!template.GuestSettings.Any())
+            if (template.GuestSettings.Length == 0)
                 return null;
 
             var args = new StringBuilder();
@@ -742,7 +736,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private async Task<string> GetIso(VmTemplate template)
         {
-            var isos = await this.GetFiles();
+            var isos = await GetFiles();
 
             var iso = isos
                 .Where(x => x.Volid == template.Iso)
@@ -770,7 +764,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (p.Length > 1)
             {
-                if (!Int32.TryParse(p[1], out coresPerSocket))
+                if (!int.TryParse(p[1], out coresPerSocket))
                 {
                     coresPerSocket = 1;
                 }
@@ -782,9 +776,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         private int? GetSockets(VmTemplate template)
         {
             string[] p = template.Cpu.Split('x');
-            var sockets = 1;
-
-            if (!Int32.TryParse(p[0], out sockets))
+            if (!int.TryParse(p[0], out int sockets))
             {
                 sockets = 1;
             }
@@ -813,7 +805,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private async Task<Dictionary<int, string>> GetNics(VmTemplate template)
         {
-            Dictionary<int, string> nics = new Dictionary<int, string>();
+            Dictionary<int, string> nics = [];
 
             if (template.Eth.IsEmpty())
                 return nics;
@@ -844,26 +836,26 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private Vm LoadVm(IClusterResourceVm pveVm)
         {
-            Vm vm = new Vm()
+            Vm vm = new()
             {
                 Name = pveVm.Name == null ? "" : _nameService.FromPveName(pveVm.Name),
                 Id = pveVm.VmId.ToString(),
                 State = pveVm.IsRunning ? VmPowerState.Running : VmPowerState.Off,
                 Status = "deployed",
                 Host = pveVm.Node,
-                Tags = pveVm.Tags == null ? new string[] { } : pveVm.Tags.Split(' '),
+                Tags = pveVm.Tags == null ? [] : pveVm.Tags.Split(' '),
                 HypervisorType = HypervisorType.Proxmox
             };
 
-            if (_tasks.ContainsKey(vm.Id))
+            if (_tasks.TryGetValue(vm.Id, out PveNodeTask value))
             {
-                var t = _tasks[vm.Id];
+                var t = value;
                 vm.Task = new VmTask { Name = t.Action, WhenCreated = t.WhenCreated, Progress = t.Progress };
             }
 
             // Proxmox Vm names are null for a few seconds when first deployed.
             // We still want to add to cache when in this state.
-            if (!pveVm.IsTemplate && !string.IsNullOrEmpty(vm.Name) && vm.Name.Contains("#").Equals(false) ||
+            if (!pveVm.IsTemplate && !string.IsNullOrEmpty(vm.Name) && vm.Name.Contains('#').Equals(false) ||
                 vm.Name.ToTenant() != _config.Tenant)
                 return null;
 
@@ -878,7 +870,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 .Select(o => o.Id)
                 .ToList();
 
-            List<Vm> list = new List<Vm>();
+            List<Vm> list = [];
 
             var pveVms = await _pveClient.GetVmsAsync();
 
@@ -894,23 +886,23 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             List<string> active = list.Select(o => o.Id).ToList();
-            _logger.LogDebug($"refreshing cache [{_config.Host}] existing: {existing.Count} active: {active.Count}");
+            _logger.LogDebug("refreshing cache [{host}] existing: {existing} active: {active}", _config.Host, existing.Count, active.Count);
 
             foreach (string key in existing.Except(active))
             {
                 if (_vmCache.TryRemove(key, out Vm stale))
                 {
-                    _logger.LogDebug($"removing stale cache entry [{_config.Host}] {stale.Name}");
+                    _logger.LogDebug("removing stale cache entry [{host}] {stale}", _config.Host, stale.Name);
                 }
             }
 
             //return an array of vm's
-            return list.ToArray();
+            return [.. list];
         }
 
         private async Task MonitorSession()
         {
-            _logger.LogDebug($"{_config.Host}: starting cache loop");
+            _logger.LogDebug("{host}: starting cache loop", _config.Host);
             await _vlanManager.Initialize();
             int step = 0;
 
@@ -927,7 +919,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(0, ex, $"Failed to refresh cache for {_config.Host}");
+                    _logger.LogError(0, ex, "Failed to refresh cache for {host}", _config.Host);
                 }
                 finally
                 {
@@ -947,8 +939,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             {
                 if (taggedVm.Value.Tags.Contains(deleteTag))
                 {
-                    _logger.LogInformation($"Deleting vm with deleteTag: {taggedVm.Value?.Name} ({taggedVm.Key})");
-                    tasks.Add(this.Delete(taggedVm.Key));
+                    _logger.LogInformation("Deleting vm with deleteTag: {name} ({key})", taggedVm.Value?.Name, taggedVm.Key);
+                    tasks.Add(Delete(taggedVm.Key));
                 }
             }
 
@@ -960,7 +952,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private async Task MonitorTasks()
         {
-            _logger.LogDebug($"{_config.Host}: starting task monitor");
+            _logger.LogDebug("{host}: starting task monitor", _config.Host);
             while (true)
             {
                 try
@@ -999,11 +991,10 @@ namespace TopoMojo.Hypervisor.Proxmox
                                 break;
                         }
 
-                        if (_vmCache.ContainsKey(key))
+                        if (_vmCache.TryGetValue(key, out Vm value))
                         {
-                            Vm vm = _vmCache[key];
-                            if (vm.Task == null)
-                                vm.Task = new VmTask();
+                            Vm vm = value;
+                            vm.Task ??= new VmTask();
                             vm.Task.Progress = t.Progress;
                             vm.Task.Name = t.Action;
                             _vmCache.TryUpdate(key, vm, vm);
@@ -1012,7 +1003,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(0, ex, $"Error in task monitor of {_config.Host}");
+                    _logger.LogError(0, ex, "Error in task monitor of {host}", _config.Host);
                 }
                 finally
                 {
@@ -1021,5 +1012,11 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
             // _logger.LogDebug("taskMonitor ended.");
         }
+
+        [GeneratedRegex(@"net(\d)+")]
+        private static partial Regex NicDataRegex();
+
+        [GeneratedRegex(@"(?<model>[^=]+)=(?<mac>[0-9A-Fa-f:]{17})")]
+        private static partial Regex NicModelMacRegex();
     }
 }

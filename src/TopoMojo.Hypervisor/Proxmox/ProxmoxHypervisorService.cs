@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -25,8 +25,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             _options = options;
             _mill = mill;
             _logger = _mill.CreateLogger<ProxmoxHypervisorService>();
-            // _hostCache = new ConcurrentDictionary<string, VimClient>();
-            // _affinityMap = new Dictionary<string, VimClient>();
             _vlanManager = vlanManager;
             _vmCache = new ConcurrentDictionary<string, Vm>();
 
@@ -40,35 +38,29 @@ namespace TopoMojo.Hypervisor.Proxmox
                 vlanManager,
                 random);
 
-            _ = Task.Run(() => DeploymentHandler());
+            _ = Task.Run(DeploymentHandler);
         }
 
         private readonly HypervisorServiceConfiguration _options;
 
         private readonly ILogger<ProxmoxHypervisorService> _logger;
         private readonly ILoggerFactory _mill;
-        //private ConcurrentDictionary<string, VimClient> _hostCache;
-        private DateTimeOffset _lastCacheUpdate = DateTimeOffset.MinValue;
-        //private Dictionary<string, VimClient> _affinityMap;
         private readonly ConcurrentDictionary<string, Vm> _vmCache;
         private readonly ProxmoxClient _pveClient;
         private readonly IProxmoxVlanManager _vlanManager;
 
         public HypervisorServiceConfiguration Options { get { return _options; } }
-        private BlockingCollection<DeploymentContext> DeploymentCollection = [];
+        private readonly BlockingCollection<DeploymentContext> DeploymentCollection = [];
 
 
         public async Task<Vm> Deploy(VmTemplate template, bool privileged = false)
         {
-            var vm = await LoadVm(template.Name + "#" + template.IsolationTag);
+            var vm = await LoadVm($"{template.Name}#{template.IsolationTag}");
             if (vm != null)
                 return vm;
 
-            _logger.LogDebug("deploy: host " + _options.Host);
             NormalizeTemplate(template, Options, privileged);
-            _logger.LogDebug("deploy: normalized " + template.Name);
-
-            _logger.LogDebug("deploy: " + template.Name + " " + Options.Host);
+            _logger.LogDebug("deploy: {name} {host}", template.Name, Options.Host);
             return await _pveClient.Deploy(template);
         }
 
@@ -86,15 +78,17 @@ namespace TopoMojo.Hypervisor.Proxmox
                 var vm = await LoadVm(template.Name + "#" + template.IsolationTag);
                 if (vm is null)
                 {
-                    _logger.LogDebug("deploy: host " + _options.Host);
                     NormalizeTemplate(template, Options, privileged);
-                    _logger.LogDebug("deploy: normalized " + template.Name);
-
                     undeployedTemplates.Add(template);
                 }
 
-                _logger.LogDebug($"deploy (host: {Options.Host}, templates: {undeployedTemplates.Count}): {string.Join(",", undeployedTemplates.Select(t => t.Name).ToArray())}");
-                _logger.LogDebug("deploy: " + template.Name + " " + Options.Host);
+                _logger.LogDebug("deploy (host: {host}, templates: {count}): {templates}",
+                    Options.Host,
+                    undeployedTemplates.Count,
+                    string.Join(",", undeployedTemplates.Select(t => t.Name))
+                );
+                _logger.LogDebug("deploy: {name} {host}", template.Name, Options.Host);
+
                 vms.Add(await _pveClient.Deploy(template));
             }
 
@@ -125,7 +119,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             var isoPath = template.Iso.Replace('/', '#');
-            isoPath = $"{option.IsoStore.Replace("/", String.Empty)}:iso/{isoPath}";
+            isoPath = $"{option.IsoStore.Replace("/", string.Empty)}:iso/{isoPath}";
             template.Iso = isoPath;
 
             foreach (VmDisk disk in template.Disks)
@@ -133,7 +127,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 if (!disk.Path.StartsWith(option.DiskStore)
                 )
                 {
-                    DatastorePath dspath = new DatastorePath(disk.Path);
+                    DatastorePath dspath = new(disk.Path);
                     dspath.Merge(option.DiskStore);
                     disk.Path = dspath.ToString();
                 }
@@ -141,7 +135,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 if (disk.Source.HasValue() && !disk.Source.StartsWith(option.DiskStore)
                 )
                 {
-                    DatastorePath dspath = new DatastorePath(disk.Source);
+                    DatastorePath dspath = new(disk.Source);
                     dspath.Merge(option.DiskStore);
                     disk.Source = dspath.ToString();
                 }
@@ -167,7 +161,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> Delete(string id)
         {
-            _logger.LogDebug("deleting " + id);
+            _logger.LogDebug("deleting {id}", id);
             Vm vm = await LoadVm(id);
             return await _pveClient.Delete(vm.Id);
         }
@@ -199,10 +193,9 @@ namespace TopoMojo.Hypervisor.Proxmox
             return info;
         }
 
-        private string GetId(string id)
+        private static string GetId(string id)
         {
-            var pveId = id.Split('/').Last();
-            return pveId;
+            return id.Split('/').Last();
         }
 
         protected class HostVmCount
@@ -211,7 +204,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             public int Count { get; set; }
         }
 
-        private void NormalizeOptions(HypervisorServiceConfiguration options)
+        private static void NormalizeOptions(HypervisorServiceConfiguration options)
         {
             var regex = new Regex("(]|/)$");
 
@@ -288,48 +281,38 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task StartAll(string target)
         {
-            _logger.LogDebug("starting all matching " + target);
+            _logger.LogDebug("starting all matching {target}", target);
             var tasks = new List<Task>();
             foreach (var vm in await Find(target))
             {
                 tasks.Add(Start(vm.Id));
             }
 
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks.ToArray());
-            }
+            await Task.WhenAll([.. tasks]);
         }
 
         public async Task StopAll(string target)
         {
-            _logger.LogDebug("stopping all matching " + target);
+            _logger.LogDebug("stopping all matching {target}", target);
             var tasks = new List<Task>();
             foreach (var vm in await Find(target))
             {
                 tasks.Add(Stop(vm.Id));
             }
-
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks.ToArray());
-            }
+            await Task.WhenAll([.. tasks]);
         }
 
         public async Task DeleteAll(string target)
         {
-            _logger.LogDebug("deleting all matching " + target);
+            _logger.LogDebug("deleting all matching {target}", target);
             var tasks = new List<Task>();
 
             foreach (var vm in await Find(target))
             {
-                tasks.Add(this.Delete(vm.Id));
+                tasks.Add(Delete(vm.Id));
             }
 
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks);
-            }
+            await Task.WhenAll(tasks);
         }
 
         public async Task<Vm> ChangeState(VmOperation op)
@@ -343,7 +326,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     break;
 
                 case VmOperationType.Reset:
-                    vm = await Stop(op.Id);
+                    _ = await Stop(op.Id);
                     vm = await Start(op.Id);
                     break;
 
@@ -411,7 +394,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> Refresh(VmTemplate template)
         {
-            string target = template.Name + "#" + template.IsolationTag;
+            string target = $"{template.Name}#{template.IsolationTag}";
             var vm = await LoadVm(target);
 
             if (vm == null)

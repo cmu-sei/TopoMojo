@@ -1,8 +1,6 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Linq;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -41,8 +39,8 @@ namespace TopoMojo.Api.Models
 
     public class DispatchSearch : Search
     {
-        public string gs { get; set; }
-        public string since { get; set; }
+        [BindProperty(Name = "gs")] public string GamespaceId { get; set; }
+        [BindProperty(Name = "since")] public string Since { get; set; }
 
         public const string FilterPending = "pending";
         [SwaggerIgnore][JsonIgnore] public bool WantsPending => Filter.Contains(FilterPending);

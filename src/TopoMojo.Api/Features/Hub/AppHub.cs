@@ -1,16 +1,12 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Models;
-using TopoMojo.Api.Services;
 
 namespace TopoMojo.Api.Hubs
 {
@@ -37,27 +33,25 @@ namespace TopoMojo.Api.Hubs
     }
 
     [Authorize(AppConstants.TicketOnlyPolicy)]
-    public class AppHub : Hub<IHubEvent>, IHubAction
+    public class AppHub(
+        ILogger<AppHub> logger,
+        IUserStore userStore,
+        HubCache cache
+        ) : Hub<IHubEvent>, IHubAction
     {
-        public AppHub (
-            ILogger<AppHub> logger,
-            IUserStore userStore,
-            HubCache cache
-        ) {
-            _logger = logger;
-            _cache = cache;
-            _store = userStore;
-        }
-
-        private readonly ILogger<AppHub> _logger;
-        private readonly HubCache _cache;
-        private readonly IUserStore _store;
+        private readonly ILogger<AppHub> _logger = logger;
+        private readonly HubCache _cache = cache;
+        private readonly IUserStore _store = userStore;
 
         public async override Task OnConnectedAsync()
         {
             await base.OnConnectedAsync();
 
-            _logger.LogDebug($"connected {Context.User.FindFirstValue("name")} {Context.UserIdentifier} {Context.ConnectionId}");
+            _logger.LogDebug("connected {name} {uid} {cid}",
+                Context.User.FindFirstValue("name"),
+                Context.UserIdentifier,
+                Context.ConnectionId
+            );
         }
 
         public override async Task OnDisconnectedAsync(Exception ex)
@@ -68,8 +62,7 @@ namespace TopoMojo.Api.Hubs
 
             if (!string.IsNullOrEmpty(channelId))
                 await Leave(channelId);
-
-            _cache.Connections.TryRemove(Context.ConnectionId, out CachedConnection cc);
+            _cache.Connections.TryRemove(Context.ConnectionId, out _);
         }
 
         public Task Listen(string channelId)
@@ -78,7 +71,7 @@ namespace TopoMojo.Api.Hubs
 
             // a gamespace apikey yields a user.id == gamespace.id
             if (
-                !actor.IsAdmin && 
+                !actor.IsAdmin &&
                 Context.UserIdentifier != channelId &&
                 !_store.CanInteract(Context.UserIdentifier, channelId).Result
             ) {
@@ -105,13 +98,17 @@ namespace TopoMojo.Api.Hubs
 
         public Task Leave(string channelId)
         {
-            _logger.LogDebug($"leave {channelId} {Context.User?.Identity.Name} {Context.ConnectionId}");
+            _logger.LogDebug("leave {channelId} {name} {cid}",
+                channelId,
+                Context.User?.Identity.Name,
+                Context.ConnectionId
+            );
 
             Groups.RemoveFromGroupAsync(Context.ConnectionId, channelId);
 
             Context.Items.Remove("channelId");
 
-            _cache.Connections.TryRemove(Context.ConnectionId, out CachedConnection cc);
+            _cache.Connections.TryRemove(Context.ConnectionId, out CachedConnection _);
 
             return Clients.OthersInGroup(channelId).PresenceEvent(new BroadcastEvent(Context.User, "PRESENCE.DEPARTED"));
         }

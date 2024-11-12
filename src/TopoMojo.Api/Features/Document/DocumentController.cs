@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Authorization;
@@ -19,7 +19,7 @@ public class DocumentController(
     IHubContext<AppHub, IHubEvent> hub,
     WorkspaceService workspaceService,
     FileUploadOptions uploadOptions
-    ) : _Controller(logger, hub)
+    ) : BaseController(logger, hub)
 {
 
     /// <summary>
@@ -103,7 +103,7 @@ public class DocumentController(
         string path = Path.Combine(uploadOptions.DocRoot, id);
 
         if (!Directory.Exists(path))
-            return Ok(new ImageFile[]{});
+            return Ok(Array.Empty<ImageFile>());
 
         return Ok(
             Directory.GetFiles(path)
@@ -156,7 +156,7 @@ public class DocumentController(
         string filename = file.FileName.SanitizeFilename();
 
         if (filename.Length > 50)
-            filename = filename.Substring(0, 50);
+            filename = filename[..50];
 
         string ext = Path.GetExtension(filename);
 
@@ -177,13 +177,9 @@ public class DocumentController(
 
     private string BuildPath(params string[] segments)
     {
-        string path = uploadOptions.DocRoot;
+        string path = Path.Combine([uploadOptions.DocRoot, ..segments]);
 
-        foreach (string s in segments)
-            path = System.IO.Path.Combine(path, s);
-
-        if (!System.IO.Directory.Exists(path) && !System.IO.File.Exists(path))
-            System.IO.Directory.CreateDirectory(path);
+        Directory.CreateDirectory(path);
 
         return path;
     }
@@ -198,7 +194,7 @@ public class DocumentController(
                     "DOCUMENT." + action.ToUpper(),
                     new Document {
                         Text = text,
-                        Timestamp = (long)DateTimeOffset.UtcNow.Subtract(DateTimeOffset.UnixEpoch).TotalMilliseconds // DateTimeOffset.UtcNow.ToString("ss.ffff")
+                        Timestamp = (long)DateTimeOffset.UtcNow.Subtract(DateTimeOffset.UnixEpoch).TotalMilliseconds
                     }
                 )
             );

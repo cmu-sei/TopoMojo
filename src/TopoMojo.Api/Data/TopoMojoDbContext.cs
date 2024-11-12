@@ -1,17 +1,13 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
 
 namespace TopoMojo.Api.Data
 {
-    public class TopoMojoDbContext : DbContext
+    public class TopoMojoDbContext(DbContextOptions options) : DbContext(options)
     {
         private const int KEYLENGTH = 36;
-        public TopoMojoDbContext(DbContextOptions options)
-            : base(options)
-        {
-        }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -95,18 +91,15 @@ namespace TopoMojo.Api.Data
 
     }
 
-    public class TopoMojoDbContextPostgreSQL: TopoMojoDbContext
+    public class TopoMojoDbContextPostgreSQL(DbContextOptions<TopoMojoDbContextPostgreSQL> options) : TopoMojoDbContext(options)
     {
-        public TopoMojoDbContextPostgreSQL(DbContextOptions<TopoMojoDbContextPostgreSQL> options) : base(options) {}
     }
 
-    public class TopoMojoDbContextSqlServer: TopoMojoDbContext
+    public class TopoMojoDbContextSqlServer(DbContextOptions<TopoMojoDbContextSqlServer> options) : TopoMojoDbContext(options)
     {
-        public TopoMojoDbContextSqlServer(DbContextOptions<TopoMojoDbContextSqlServer> options) : base(options) {}
     }
 
-    public class TopoMojoDbContextInMemory: TopoMojoDbContext
+    public class TopoMojoDbContextInMemory(DbContextOptions<TopoMojoDbContextInMemory> options) : TopoMojoDbContext(options)
     {
-        public TopoMojoDbContextInMemory(DbContextOptions<TopoMojoDbContextInMemory> options) : base(options) {}
     }
 }

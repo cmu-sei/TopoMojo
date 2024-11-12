@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -65,7 +65,7 @@ namespace TopoMojo.Api.Services
                 await Store.Update(entity);
             }
             else if (string.IsNullOrEmpty(entity.TargetName))
-            {   
+            {
                 // no target specified, so add new for each response that self identifies its target name
                 var replica = Mapper.Map<Data.Dispatch>(entity);
                 model.Id = null;
@@ -91,16 +91,16 @@ namespace TopoMojo.Api.Services
         {
             var q = Store.List();
 
-            q = q.Where(d => d.TargetGroup == filter.gs);
+            q = q.Where(d => d.TargetGroup == filter.GamespaceId);
 
-            if (DateTimeOffset.TryParse(filter.since, out DateTimeOffset ts))
+            if (DateTimeOffset.TryParse(filter.Since, out DateTimeOffset ts))
                 q = q.Where(d => d.WhenCreated > ts || d.WhenUpdated > ts);
 
             if (filter.WantsPending)
                 q = q.Where(d => d.WhenUpdated <= DateTimeOffset.MinValue);
 
             q = q.OrderBy(d => d.WhenCreated);
-            
+
             q = q.Skip(filter.Skip);
 
             if (filter.Take > 0)

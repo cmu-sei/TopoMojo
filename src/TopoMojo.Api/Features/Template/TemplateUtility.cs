@@ -1,30 +1,24 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Hypervisor;
-using TopoMojo.Api.Models;
 
 namespace TopoMojo.Api.Services
 {
-    public class TemplateUtility
+    public partial class TemplateUtility
     {
         public TemplateUtility(string detail, string diskname = "placeholder")
         {
             if (detail.NotEmpty())
             {
-                _template = JsonSerializer.Deserialize<VmTemplate>(detail, new JsonSerializerOptions {
-                    PropertyNameCaseInsensitive = true
-                });
+                _template = JsonSerializer.Deserialize<VmTemplate>(detail, JsonDeserializerOption);
             }
             else
             {
-                diskname = Regex.Replace(diskname, @"[^\w\d]", "-").Replace("--", "-").Trim('-').ToLower();
+                diskname = MyRegex().Replace(diskname, "-").Replace("--", "-").Trim('-').ToLower();
 
                 _template = new VmTemplate
                 {
@@ -32,20 +26,24 @@ namespace TopoMojo.Api.Services
                     VideoRam = 0,
                     Cpu = "1x2",
                     Adapters = 1,
-                    Eth = new VmNet[] { new VmNet { Net = "lan", Type="e1000" }},
-                    Disks = new VmDisk[] { new VmDisk
+                    Eth = [new VmNet { Net = "lan", Type="e1000" }],
+                    Disks = [ new VmDisk
                     {
-                        Path = $"[ds] {Guid.Empty.ToString()}/{diskname}.vmdk",
+                        Path = $"[ds] {Guid.Empty}/{diskname}.vmdk",
                         Source = "",
                         Controller = "lsilogic",
                         Size = 10
-                    }}
+                    }]
                 };
             }
         }
 
         private VmTemplate _template = null;
-        private JsonSerializerOptions jsonOptions => new JsonSerializerOptions
+        private JsonSerializerOptions JsonDeserializerOption => new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+        private JsonSerializerOptions JsonOptions => new()
         {
             WriteIndented = true,
         };
@@ -70,20 +68,20 @@ namespace TopoMojo.Api.Services
 
         public string Networks
         {
-            get { return String.Join(", ", _template.Eth.Select(e => e.Net)); }
+            get { return string.Join(", ", _template.Eth.Select(e => e.Net)); }
 
             set
             {
-                List<VmNet> nics = _template.Eth.ToList();
+                List<VmNet> nics = [.. _template.Eth];
 
                 if (nics.Count == 0 || !value.NotEmpty())
                     return;
 
                 VmNet proto = nics.First();
 
-                string[] nets = value.Split(new char[] { ' ', ',', '\t', '|', ':'}, StringSplitOptions.RemoveEmptyEntries);
+                string[] nets = value.Split(AppConstants.StringTokenSeparators, StringSplitOptions.RemoveEmptyEntries);
 
-                if (nets.Length == 0) nets = new string[]{ "lan" };
+                if (nets.Length == 0) nets = ["lan"];
 
                 for (int i = nics.Count; i > nets.Length; i--)
                     nics.RemoveAt(i-1);
@@ -100,7 +98,7 @@ namespace TopoMojo.Api.Services
                     nics[i].Net = nets[i];
                 }
 
-                _template.Eth = nics.ToArray();
+                _template.Eth = [.. nics];
             }
         }
 
@@ -130,9 +128,9 @@ namespace TopoMojo.Api.Services
                 result.AddRange(_template.GuestSettings);
 
             var lines = guestinfo?.Split(
-                new char[] {';', '\n', '\r'},
+                AppConstants.StringLineSeparators,
                 StringSplitOptions.RemoveEmptyEntries
-            ) ?? Array.Empty<string>();
+            ) ?? [];
 
             foreach (var line in lines)
             {
@@ -140,9 +138,9 @@ namespace TopoMojo.Api.Services
 
                 if (x > 0)
                 {
-                    string key = line.Substring(0, x).Trim();
+                    string key = line[..x].Trim();
 
-                    if (key.StartsWith("#"))
+                    if (key.StartsWith(AppConstants.TagDelimiter))
                         continue;
 
                     if (!key.StartsWith("guestinfo."))
@@ -152,13 +150,13 @@ namespace TopoMojo.Api.Services
                         new VmKeyValue
                         {
                             Key = key,
-                            Value = line.Substring(x + 1).Trim()
+                            Value = line[(x + 1)..].Trim()
                         }
                     );
                 }
             }
 
-            _template.GuestSettings = result.ToArray();
+            _template.GuestSettings = [.. result];
         }
 
         public void LocalizeDiskPaths(string workspaceKey, string templateKey)
@@ -193,12 +191,15 @@ namespace TopoMojo.Api.Services
 
         public override string ToString()
         {
-            return JsonSerializer.Serialize<VmTemplate>(_template, jsonOptions);
+            return JsonSerializer.Serialize(_template, JsonOptions);
         }
 
         public VmTemplate AsTemplate()
         {
             return _template;
         }
+
+        [GeneratedRegex(@"[^\w\d]")]
+        private static partial Regex MyRegex();
     }
 }

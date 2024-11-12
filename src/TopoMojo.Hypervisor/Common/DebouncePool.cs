@@ -1,3 +1,6 @@
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -11,9 +14,9 @@ namespace TopoMojo.Hypervisor.Common
     {
         private string _id;
         private DateTimeOffsetRange _currentDebounce = null;
-        private readonly object _currentDebounceLock = new object();
-        private readonly SemaphoreSlim _semaphoreLock = new SemaphoreSlim(1);
-        private readonly ConcurrentBag<T> _items = new ConcurrentBag<T>();
+        private readonly object _currentDebounceLock = new();
+        private readonly SemaphoreSlim _semaphoreLock = new(1);
+        private readonly ConcurrentBag<T> _items = [];
 
         public DebouncePool()
         {
@@ -108,7 +111,7 @@ namespace TopoMojo.Hypervisor.Common
                     _currentDebounce = null;
 
                     // get a new array that points to the contents of _items for thread safety
-                    itemsThreadSafe = this._items.ToArray();
+                    itemsThreadSafe = [.. this._items];
 
                     // clear the collection (.Clear() isn't supported in .netstandard2.0)
                     foreach (var item in _items)

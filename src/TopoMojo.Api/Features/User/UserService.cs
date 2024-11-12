@@ -1,5 +1,5 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
@@ -10,30 +10,24 @@ using TopoMojo.Api.Models;
 
 namespace TopoMojo.Api.Services
 {
-    public class UserService: _Service, IApiKeyAuthenticationService
+    public class UserService(
+        ILogger<WorkspaceService> logger,
+        IMapper mapper,
+        CoreOptions options,
+        IUserStore userStore,
+        IMemoryCache userCache
+        ) : BaseService(logger, mapper, options), IApiKeyAuthenticationService
     {
+        private readonly IUserStore _store = userStore;
+        private readonly IMemoryCache _cache = userCache;
 
-        public UserService(
-            ILogger<WorkspaceService> logger,
-            IMapper mapper,
-            CoreOptions options,
-            IUserStore userStore,
-            IMemoryCache userCache
-        ) : base (logger, mapper, options)
-        {
-            _store = userStore;
-            _cache = userCache;
-        }
-
-        private readonly IUserStore _store;
-        private readonly IMemoryCache _cache;
-
-        public async Task<User[]> List(UserSearch search, CancellationToken ct = default(CancellationToken))
+        public async Task<User[]> List(UserSearch search, CancellationToken ct = default)
         {
             var q = _store.List();
 
             string term = search.Term?.ToLower();
 
+            #pragma warning disable CA1862
             if (term.NotEmpty())
                 q = q.Where(p =>
                     p.Name.ToLower().Contains(term) ||
@@ -52,8 +46,8 @@ namespace TopoMojo.Api.Services
             if (search.WantsBuilders)
                 q = q.Where(p => p.Role == UserRole.Builder);
 
-            if (search.scope.NotEmpty())
-                q = q.Where(p => p.Scope.Contains(search.scope));
+            if (search.Scope.NotEmpty())
+                q = q.Where(p => p.Scope.Contains(search.Scope));
 
             q = q.OrderBy(p => p.Name);
 
@@ -89,7 +83,7 @@ namespace TopoMojo.Api.Services
                 : null
             ;
 
-            if (entity is Data.User)
+            if (entity is not null)
                 await _store.Update(
                     Mapper.Map(model, entity)
                 );
@@ -107,7 +101,7 @@ namespace TopoMojo.Api.Services
         {
             var entity = await _store.Retrieve(model.Id);
 
-            if (entity is Data.User)
+            if (entity is not null)
             {
                 if (model.Name.NotEmpty() && entity.Name != model.Id)
                 {
@@ -121,11 +115,9 @@ namespace TopoMojo.Api.Services
 
                 entity = Mapper.Map<Data.User>(model);
 
-                entity.WorkspaceLimit = _options.DefaultWorkspaceLimit;
+                entity.WorkspaceLimit = CoreOptions.DefaultWorkspaceLimit;
 
-                entity.GamespaceLimit = _options.DefaultGamespaceLimit;
-
-                // entity.Scope = _options.DefaultUserScope;
+                entity.GamespaceLimit = CoreOptions.DefaultGamespaceLimit;
 
                 await _store.Create(entity);
             }
@@ -153,8 +145,6 @@ namespace TopoMojo.Api.Services
 
         public async Task Delete(string id)
         {
-            var entity = await _store.Retrieve(id);
-
             await _store.Delete(id);
         }
 
@@ -216,7 +206,7 @@ namespace TopoMojo.Api.Services
 
             var entity = await _store.ResolveApiKey(key.ToSha256());
 
-            return (entity is Data.User)
+            return (entity is not null)
                 ? new ApiKeyResolvedUser { Id = entity.Id, Name = entity.Name }
                 : null
             ;

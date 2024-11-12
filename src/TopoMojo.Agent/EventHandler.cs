@@ -1,3 +1,6 @@
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -11,6 +14,8 @@ public class EventHandler
     TopoMojoApiClient Mojo { get; }
     HubConnection Hub { get; }
 
+    private static readonly string[] pending_filter = ["pending"];
+
     public EventHandler(
         EventHandlerConfiguration config
     )
@@ -21,8 +26,10 @@ public class EventHandler
             Config.Url += "/";
 
         // set up api client
-        HttpClient http = new();
-        http.BaseAddress = new Uri(Config.Url);
+        HttpClient http = new()
+        {
+            BaseAddress = new Uri(Config.Url)
+        };
         http.DefaultRequestHeaders.Add("x-api-key", Config.ApiKey);
         Mojo = new(http);
 
@@ -40,7 +47,7 @@ public class EventHandler
             .WithAutomaticReconnect()
             .Build();
 
-        Hub.On<DispatchEvent>("DispatchEvent", async (DispatchEvent message) => await onMessage(message));
+        Hub.On("DispatchEvent", async (DispatchEvent message) => await OnMessage(message));
 
         Hub.Reconnected += async (string? id) =>
         {
@@ -57,7 +64,7 @@ public class EventHandler
 
     }
 
-    private async Task onMessage(DispatchEvent message)
+    private async Task OnMessage(DispatchEvent message)
     {
         switch (message.Action)
         {
@@ -74,11 +81,11 @@ public class EventHandler
         var dispatches = await Mojo.ListDispatchesAsync(
             Config.GroupId,
             since,
-            "", null, null, "", new string[] { "pending" }
+            "", null, null, "", pending_filter
         );
 
         await Task.WhenAll(
-            dispatches.Select(d => ProcessMessage(d))
+            dispatches.Select(ProcessMessage)
         );
     }
 
@@ -87,7 +94,7 @@ public class EventHandler
         // ensure targetname matches configured hostname, if specified
         if (
             !string.IsNullOrEmpty(model.TargetName) &&
-            model?.TargetName.ToLower() != Config.Hostname.ToLower()
+            !model.TargetName.ToLower().Equals(Config.Hostname, StringComparison.CurrentCultureIgnoreCase)
         )
         {
             return;
@@ -120,7 +127,7 @@ public class EventHandler
 
             Process? p = Process.Start(info);
 
-            if (p is Process)
+            if (p is not null)
             {
                 await p.WaitForExitAsync();
                 model.Result = await p.StandardOutput.ReadToEndAsync();
@@ -141,7 +148,7 @@ public class EventHandler
             Log($"{model.TargetName} {model.Error}");
 
         ChangedDispatch? changed = JsonSerializer.Deserialize<ChangedDispatch>(
-            JsonSerializer.Serialize<Dispatch>(model)
+            JsonSerializer.Serialize(model)
         );
 
         await Mojo.UpdateDispatchAsync(changed);
@@ -151,7 +158,7 @@ public class EventHandler
     {
         var result = Mojo.GetOneTimeTicketAsync().Result;
 
-        Console.WriteLine($"Retrieved auth ticket: {result?.Ticket?.Substring(0, 8)}...");
+        Console.WriteLine($"Retrieved auth ticket: {result?.Ticket?[..8]}...");
 
         return Task.FromResult(result?.Ticket ?? "");
     }
@@ -208,12 +215,13 @@ public class EventHandler
         if (string.IsNullOrEmpty(Config.HeartbeatTrigger))
             return;
 
-        NewDispatch model = new();
-
-        model.ReferenceId = "_heartbeat_";
-        model.TargetGroup = Config.GroupId;
-        model.TargetName = Config.Hostname;
-        model.Trigger = Config.HeartbeatTrigger;
+        NewDispatch model = new()
+        {
+            ReferenceId = "_heartbeat_",
+            TargetGroup = Config.GroupId,
+            TargetName = Config.Hostname,
+            Trigger = Config.HeartbeatTrigger
+        };
 
         await Mojo.CreateDispatchAsync(model);
     }

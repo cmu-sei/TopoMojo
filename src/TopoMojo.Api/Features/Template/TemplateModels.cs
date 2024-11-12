@@ -1,8 +1,8 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System.Linq;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Extensions;
 
@@ -121,12 +121,12 @@ namespace TopoMojo.Api.Models
     {
         public const string PublishFilter = "published";
         public const string ParentFilter = "parents";
-        [SwaggerIgnore][JsonIgnore] public bool WantsAudience => aud.NotEmpty();
+        [SwaggerIgnore][JsonIgnore] public bool WantsAudience => Audience.NotEmpty();
         [SwaggerIgnore][JsonIgnore] public bool WantsPublished => Filter.Contains(PublishFilter);
         [SwaggerIgnore][JsonIgnore] public bool WantsParents => Filter.Contains(ParentFilter);
 
-        public string aud { get; set; }
-        public string pid { get; set; }
-        public string sib { get; set; }
+        [BindProperty(Name="aud")] public string Audience { get; set; }
+        [BindProperty(Name="pid")] public string ParentId { get; set; }
+        [BindProperty(Name="sib")] public string Sibling { get; set; }
     }
 }

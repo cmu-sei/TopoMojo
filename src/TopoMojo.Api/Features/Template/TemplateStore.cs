@@ -1,22 +1,16 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Memory;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Extensions;
 
 namespace TopoMojo.Api.Data
 {
-    public class TemplateStore : Store<Template>, ITemplateStore
+    public class TemplateStore(
+        TopoMojoDbContext db
+        ) : Store<Template>(db), ITemplateStore
     {
-        public TemplateStore (
-            TopoMojoDbContext db
-        ) : base(db) { }
-
         public override IQueryable<Template> List(string term = null)
         {
             if (term.IsEmpty())
@@ -24,6 +18,7 @@ namespace TopoMojo.Api.Data
 
             string x = term.ToLower();
 
+            #pragma warning disable CA1862
             return base.List().Where(t =>
                 t.Name.ToLower().Contains(x) ||
                 t.Id.StartsWith(x) ||

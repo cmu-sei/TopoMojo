@@ -1,9 +1,9 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Linq;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Extensions;
 
@@ -93,13 +93,13 @@ namespace TopoMojo.Api.Models
 
     public class WorkspaceSearch : Search
     {
-        public string aud { get; set; }
-        public string scope { get; set; }
-        public int doc { get; set; }
-        [SwaggerIgnore][JsonIgnore] public bool WantsAudience => string.IsNullOrEmpty(aud).Equals(false);
+        [BindProperty(Name="aud")] public string Audience { get; set; }
+        [BindProperty(Name="scope")] public string Scope { get; set; }
+        [BindProperty(Name="doc")] public int Doc { get; set; }
+        [SwaggerIgnore][JsonIgnore] public bool WantsAudience => string.IsNullOrEmpty(Audience).Equals(false);
         [SwaggerIgnore][JsonIgnore] public bool WantsManaged => Filter.Contains("my");
-        [SwaggerIgnore][JsonIgnore] public bool WantsDoc => doc > 0;
-        [SwaggerIgnore][JsonIgnore] public bool WantsPartialDoc => doc == 1;
+        [SwaggerIgnore][JsonIgnore] public bool WantsDoc => Doc > 0;
+        [SwaggerIgnore][JsonIgnore] public bool WantsPartialDoc => Doc == 1;
     }
 
     public class ClientAudience

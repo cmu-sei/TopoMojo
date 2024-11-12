@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Authorization;
@@ -21,7 +21,7 @@ namespace TopoMojo.Api.Controllers
         IHubContext<AppHub, IHubEvent> hub,
         IHypervisorService podService,
         WorkspaceService workspaceService
-        ) : _Controller(logger, hub)
+        ) : BaseController(logger, hub)
     {
         /// <summary>
         /// List workspaces according to search parameters.
@@ -42,7 +42,7 @@ namespace TopoMojo.Api.Controllers
         [SwaggerOperation(OperationId = "ListWorkspaces")]
         public async Task<ActionResult<WorkspaceSummary[]>> ListWorkspaces([FromQuery] WorkspaceSearch search, CancellationToken ct)
         {
-            if (search.WantsAudience && !Actor.HasScope(search.aud))
+            if (search.WantsAudience && !Actor.HasScope(search.Audience))
             {
                 ModelState.AddModelError("search", "ActorLacksAudienceScope");
                 return ValidationProblem();
@@ -50,7 +50,7 @@ namespace TopoMojo.Api.Controllers
 
             if (!AuthorizeAll()) return Forbid();
 
-            search.scope = Actor.Scope;
+            search.Scope = Actor.Scope;
 
             return Ok(
                 await workspaceService.List(search, Actor.Id, Actor.IsAdmin, ct)

@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.Text.Json;
@@ -15,35 +15,25 @@ using System.Text;
 
 namespace TopoMojo.Api.Services
 {
-    public class GamespaceService : _Service
+    public class GamespaceService(
+        ILogger<GamespaceService> logger,
+        IMapper mapper,
+        CoreOptions options,
+        IHypervisorService podService,
+        IGamespaceStore gamespaceStore,
+        IWorkspaceStore workspaceStore,
+        ILockService lockService,
+        IDistributedCache distributedCache
+        ) : BaseService(logger, mapper, options)
     {
-        public GamespaceService(
-            ILogger<GamespaceService> logger,
-            IMapper mapper,
-            CoreOptions options,
-            IHypervisorService podService,
-            IGamespaceStore gamespaceStore,
-            IWorkspaceStore workspaceStore,
-            ILockService lockService,
-            IDistributedCache distributedCache
-        ) : base(logger, mapper, options)
-        {
-            _pod = podService;
-            _store = gamespaceStore;
-            _workspaceStore = workspaceStore;
-            _locker = lockService;
-            _random = new Random();
-            _distCache = distributedCache;
-        }
+        private readonly IHypervisorService _pod = podService;
+        private readonly IGamespaceStore _store = gamespaceStore;
+        private readonly IWorkspaceStore _workspaceStore = workspaceStore;
+        private readonly ILockService _locker = lockService;
+        private readonly Random _random = new();
+        private readonly IDistributedCache _distCache = distributedCache;
 
-        private readonly IHypervisorService _pod;
-        private readonly IGamespaceStore _store;
-        private readonly IWorkspaceStore _workspaceStore;
-        private readonly ILockService _locker;
-        private readonly Random _random;
-        private readonly IDistributedCache _distCache;
-
-        public async Task<Gamespace[]> List(GamespaceSearch search, string subjectId, bool sudo, bool observer, string scope, CancellationToken ct = default(CancellationToken))
+        public async Task<Gamespace[]> List(GamespaceSearch search, string subjectId, bool sudo, bool observer, string scope, CancellationToken ct = default)
         {
 
             var query = (observer && search.WantsAll)
@@ -70,7 +60,7 @@ namespace TopoMojo.Api.Services
 
             query = query.Include(g => g.Workspace);
 
-            var data = await query.ToArrayAsync();
+            var data = await query.ToArrayAsync(cancellationToken: ct);
 
             // filter only when user is observer (but not admin)
             // select gamespaces with matching workspace audience / user scope
@@ -100,16 +90,7 @@ namespace TopoMojo.Api.Services
 
         public async Task<GameState> Register(GamespaceRegistration request, User actor)
         {
-            var gamespace = await _Register(request, actor);
-
-            if (request.StartGamespace)
-                await Deploy(gamespace, actor.IsBuilder);
-
-            return await LoadState(gamespace, request.AllowPreview);
-        }
-
-        private async Task<TopoMojo.Api.Data.Gamespace> _Register(GamespaceRegistration request, User actor)
-        {
+            // var gamespace = await _Register(request, actor);
             string playerId = request.Players.FirstOrDefault()?.SubjectId ?? actor.Id;
 
             var gamespace = await _store.LoadActiveByContext(
@@ -117,47 +98,51 @@ namespace TopoMojo.Api.Services
                 playerId
             );
 
-            if (gamespace is Data.Gamespace)
-                return gamespace;
-
-            if (!await _store.IsBelowGamespaceLimit(actor.Id, actor.GamespaceLimit))
-                throw new ClientGamespaceLimitReached();
-
-            string lockKey = $"{playerId}{request.ResourceId}";
-
-            var ctx = await LoadContext(request);
-
-            if (!await _locker.Lock(lockKey))
-                throw new ResourceIsLocked();
-
-            try
+            if (gamespace is null)
             {
-                await Create(ctx, actor);
-            }
-            finally
-            {
-                await _locker.Unlock(lockKey);
+                if (!await _store.IsBelowGamespaceLimit(actor.Id, actor.GamespaceLimit))
+                    throw new ClientGamespaceLimitReached();
+
+                string lockKey = $"{playerId}{request.ResourceId}";
+
+                var ctx = await LoadContext(request);
+
+                if (!await _locker.Lock(lockKey))
+                    throw new ResourceIsLocked();
+
+                try
+                {
+                    await Create(ctx, actor);
+                    gamespace = ctx.Gamespace;
+                }
+                finally
+                {
+                    await _locker.Unlock(lockKey);
+                }
             }
 
-            return ctx.Gamespace;
+            if (request.StartGamespace)
+                await Deploy(gamespace, actor.IsBuilder);
+
+            return await LoadState(gamespace, request.AllowPreview);
         }
 
         public async Task<GameState> Load(string id, string subjectId)
         {
             var ctx = await LoadContext(id, subjectId);
 
-            return ctx.Gamespace is Data.Gamespace
+            return ctx.Gamespace is not null
                 ? await LoadState(ctx.Gamespace)
                 : await LoadState(ctx.Workspace)
             ;
 
         }
 
-        public async Task<ChallengeSpec> LoadChallenge(string id, bool sudo)
+        public async Task<ChallengeSpec> LoadChallenge(string id)
         {
             var entity = await _store.Retrieve(id);
 
-            var spec = JsonSerializer.Deserialize<ChallengeSpec>(entity.Challenge, jsonOptions);
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(entity.Challenge, JsonOptions);
 
             return spec;
         }
@@ -165,7 +150,7 @@ namespace TopoMojo.Api.Services
         public async Task<ChallengeProgressView> LoadChallengeProgress(string gamespaceId)
         {
             var gamespaceEntity = await _store.Retrieve(gamespaceId);
-            var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespaceEntity.Challenge, jsonOptions);
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespaceEntity.Challenge, JsonOptions);
             if (spec.Challenge is null)
                 return new();
 
@@ -257,7 +242,7 @@ namespace TopoMojo.Api.Services
                 ? actor.GamespaceMaxMinutes
                 : ctx.Workspace.DurationMinutes > 0
                     ? ctx.Workspace.DurationMinutes
-                    : _options.DefaultGamespaceMinutes
+                    : CoreOptions.DefaultGamespaceMinutes
             ;
 
             if (string.IsNullOrEmpty(ctx.Request.GraderKey))
@@ -266,8 +251,8 @@ namespace TopoMojo.Api.Services
             ctx.Gamespace = new Data.Gamespace
             {
                 Id = string.Concat(
-                    _options.Tenant,
-                    Guid.NewGuid().ToString("n").AsSpan(_options.Tenant.Length)
+                    CoreOptions.Tenant,
+                    Guid.NewGuid().ToString("n").AsSpan(CoreOptions.Tenant.Length)
                 ),
                 Name = ctx.Workspace.Name,
                 Workspace = ctx.Workspace,
@@ -277,7 +262,7 @@ namespace TopoMojo.Api.Services
                 CleanupGraceMinutes = actor.GamespaceCleanupGraceMinutes,
                 WhenCreated = ts,
                 ExpirationTime = ctx.Request.ResolveExpiration(ts, duration),
-                PlayerCount = ctx.Request.PlayerCount > 0 ? ctx.Request.PlayerCount : ctx.Request.Players.Count(),
+                PlayerCount = ctx.Request.PlayerCount > 0 ? ctx.Request.PlayerCount : ctx.Request.Players.Length,
                 GraderKey = ctx.Request.GraderKey.ToSha256()
             };
 
@@ -294,11 +279,11 @@ namespace TopoMojo.Api.Services
                 );
             }
 
-            if (gamespace.Players.Any())
+            if (gamespace.Players.Count != 0)
                 gamespace.Players.First().Permission = Permission.Manager;
 
             // clone challenge
-            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", jsonOptions);
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", JsonOptions);
 
             // select variant, adjusting from 1-based to 0-based index
             gamespace.Variant = ctx.Request.Variant > 0
@@ -323,7 +308,7 @@ namespace TopoMojo.Api.Services
             spec.MaxAttempts = ctx.Request.MaxAttempts;
 
             StringBuilder sb = new(
-                JsonSerializer.Serialize(spec, jsonOptions)
+                JsonSerializer.Serialize(spec, JsonOptions)
             );
 
             // apply transforms
@@ -343,7 +328,7 @@ namespace TopoMojo.Api.Services
             {
                 kvp.Value = ResolveRandom(kvp.Value, ctx, index);
 
-                if (kvp.Key.ToLower() == "index" && !Int32.TryParse(kvp.Value, out index))
+                if (kvp.Key.Equals("index", StringComparison.CurrentCultureIgnoreCase) && !int.TryParse(kvp.Value, out index))
                     index = 0;
 
                 // insert `key_index: value` for any multi-token values (i.e. list-resolver)
@@ -368,7 +353,7 @@ namespace TopoMojo.Api.Services
         {
             byte[] buffer;
 
-            List<string> options = new();
+            List<string> options;
 
             string result = "";
 
@@ -437,9 +422,7 @@ namespace TopoMojo.Api.Services
                     if (seg.Length < 3 || !int.TryParse(seg[1], out count))
                         count = 1;
 
-                    options = seg.Last()
-                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                        .ToList();
+                    options = [.. seg.Last().Split(' ', StringSplitOptions.RemoveEmptyEntries)];
 
                     while (count > 0 && options.Count > 0)
                     {
@@ -457,9 +440,7 @@ namespace TopoMojo.Api.Services
                     if (seg.Length > 1 && !int.TryParse(seg[1], out count))
                         count = index;
 
-                    options = seg.Last()
-                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                        .ToList();
+                    options = [.. seg.Last().Split(' ', StringSplitOptions.RemoveEmptyEntries)];
 
                     result = options[Math.Min(count, options.Count - 1)];
                     break;
@@ -477,12 +458,12 @@ namespace TopoMojo.Api.Services
                         string[] range = seg[1].Split('-');
                         if (range.Length > 1)
                         {
-                            int.TryParse(range[0], out min);
-                            int.TryParse(range[1], out max);
+                            if (!int.TryParse(range[0], out min)) min = 0;
+                            if (!int.TryParse(range[1], out max)) max = int.MaxValue;
                         }
                         else
                         {
-                            int.TryParse(range[0], out max);
+                            if (!int.TryParse(range[0], out max)) max = int.MaxValue;
                         }
                     }
                     result = _random.Next(min, max).ToString();
@@ -497,7 +478,7 @@ namespace TopoMojo.Api.Services
         {
             var tasks = new List<Task<Vm>>();
 
-            var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespace.Challenge ?? "{}", jsonOptions);
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespace.Challenge ?? "{}", JsonOptions);
 
             var isoTargets = (spec.Challenge?.Iso?.Targets ?? "")
                 .ToLower()
@@ -512,7 +493,7 @@ namespace TopoMojo.Api.Services
             {
                 // normalize name for variant-specific templates
                 if (template.Variant > 0 && template.Name.EndsWith($"_v{template.Variant}"))
-                    template.Name = template.Name.Substring(0, template.Name.LastIndexOf('_'));
+                    template.Name = template.Name[..template.Name.LastIndexOf('_')];
 
                 // apply template macro substitutions
                 foreach (var kvp in spec.Transforms)
@@ -528,7 +509,7 @@ namespace TopoMojo.Api.Services
                 // expand replicas
                 int replicas = template.Replicas < 0
                     ? gamespace.PlayerCount
-                    : Math.Min(template.Replicas, _options.ReplicaLimit)
+                    : Math.Min(template.Replicas, CoreOptions.ReplicaLimit)
                 ;
 
                 if (replicas > 1)
@@ -612,7 +593,7 @@ namespace TopoMojo.Api.Services
 
             if (preview || gamespace.HasStarted)
             {
-                var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespace.Challenge, jsonOptions);
+                var spec = JsonSerializer.Deserialize<ChallengeSpec>(gamespace.Challenge, JsonOptions);
 
                 if (spec.Challenge == null || spec.Challenge.Sections.Count == 0)
                     return state;
@@ -666,10 +647,10 @@ namespace TopoMojo.Api.Services
 
             if (code.NotEmpty())
             {
-                tasks = new Task[] {
+                tasks = [
                     _distCache.RemoveAsync(code),
                     _distCache.RemoveAsync(codekey)
-                };
+                ];
 
                 await Task.WhenAll(tasks);
             }
@@ -677,10 +658,10 @@ namespace TopoMojo.Api.Services
             // store new code/key
             code = Guid.NewGuid().ToString("n");
 
-            tasks = new Task[] {
+            tasks = [
                 _distCache.SetStringAsync(code, id, opts),
                 _distCache.SetStringAsync(codekey, code, opts)
-            };
+            ];
 
             await Task.WhenAll(tasks);
 
@@ -753,7 +734,7 @@ namespace TopoMojo.Api.Services
 
             foreach (var g in q)
                 results.Add(
-                    (await AuditSubmission(g.Id)).ToArray()
+                    [.. (await AuditSubmission(g.Id))]
                 );
 
             return results.SelectMany(x => x);
@@ -763,7 +744,7 @@ namespace TopoMojo.Api.Services
         {
             var ctx = await LoadContext(id);
 
-            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, jsonOptions);
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, JsonOptions);
 
             return spec.Submissions;
         }
@@ -783,10 +764,10 @@ namespace TopoMojo.Api.Services
 
             var ctx = await LoadContext(id);
 
-            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, jsonOptions);
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, JsonOptions);
 
             // updating working copy from challenge spec
-            var workspaceChallenge = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", jsonOptions);
+            var workspaceChallenge = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Workspace.Challenge ?? "{}", JsonOptions);
 
             var variant = workspaceChallenge.Variants.Skip(ctx.Gamespace.Variant).FirstOrDefault();
 
@@ -812,7 +793,7 @@ namespace TopoMojo.Api.Services
 
             foreach (var submission in spec.Submissions)
             {
-                _Grade(spec, submission);
+                Grade(spec, submission);
 
                 if (spec.Score == 1)
                 {
@@ -821,7 +802,7 @@ namespace TopoMojo.Api.Services
                 }
             }
 
-            ctx.Gamespace.Challenge = JsonSerializer.Serialize(spec, jsonOptions);
+            ctx.Gamespace.Challenge = JsonSerializer.Serialize(spec, JsonOptions);
 
             await _store.Update(ctx.Gamespace);
 
@@ -841,7 +822,7 @@ namespace TopoMojo.Api.Services
 
             var ctx = await LoadContext(id);
 
-            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, jsonOptions);
+            var spec = JsonSerializer.Deserialize<ChallengeSpec>(ctx.Gamespace.Challenge, JsonOptions);
 
             var section = spec.Challenge.Sections.ElementAtOrDefault(submission.SectionIndex);
 
@@ -871,9 +852,9 @@ namespace TopoMojo.Api.Services
             submission.Timestamp = ts;
             spec.Submissions.Add(submission);
 
-            _Grade(spec, submission);
+            Grade(spec, submission);
 
-            ctx.Gamespace.Challenge = JsonSerializer.Serialize(spec, jsonOptions);
+            ctx.Gamespace.Challenge = JsonSerializer.Serialize(spec, JsonOptions);
 
             // handle completion if max attempts reached or full score
             if (
@@ -902,7 +883,7 @@ namespace TopoMojo.Api.Services
             return result;
         }
 
-        private bool IsDuplicateSubmission(ICollection<SectionSubmission> history, SectionSubmission submission)
+        private static bool IsDuplicateSubmission(ICollection<SectionSubmission> history, SectionSubmission submission)
         {
             bool dupe = false;
 
@@ -925,7 +906,7 @@ namespace TopoMojo.Api.Services
             return dupe || incoming.Replace("|", "") == string.Empty;
         }
 
-        private void _Grade(ChallengeSpec spec, SectionSubmission submission)
+        private static void Grade(ChallengeSpec spec, SectionSubmission submission)
         {
             var section = spec.Challenge.Sections.ElementAtOrDefault(submission.SectionIndex);
             var lastScore = spec.Score;
@@ -951,7 +932,7 @@ namespace TopoMojo.Api.Services
                 spec.LastScoreTime = submission.Timestamp;
         }
 
-        private QuestionSetEligibility[] GetQuestionSetEligibility(VariantSpec variant)
+        private static QuestionSetEligibility[] GetQuestionSetEligibility(VariantSpec variant)
         {
             var previousSectionTotal = 0f;
             var retVal = new List<QuestionSetEligibility>();
@@ -1033,12 +1014,13 @@ namespace TopoMojo.Api.Services
 
         private async Task<RegistrationContext> LoadContext(string id, string subjectId = null)
         {
-            var ctx = new RegistrationContext();
+            RegistrationContext ctx = new()
+            {
+                Gamespace = await _store.Load(id)
+            };
 
-            ctx.Gamespace = await _store.Load(id);
-
-            ctx.Workspace = ctx.Gamespace is Data.Gamespace
-                ? ctx.Gamespace?.Workspace
+            ctx.Workspace = ctx.Gamespace is not null
+                ? ctx.Gamespace.Workspace
                 : await _workspaceStore.Load(id)
             ;
 
@@ -1057,7 +1039,7 @@ namespace TopoMojo.Api.Services
         private async Task<string> LoadMarkdown(string id, bool aboveCut)
         {
             string path = System.IO.Path.Combine(
-                _options.DocPath,
+                CoreOptions.DocPath,
                 id
             ) + ".md";
 
@@ -1084,19 +1066,19 @@ namespace TopoMojo.Api.Services
 
         public async Task<bool> HasValidUserScope(string id, string scope, string subjectId)
         {
-            scope += " " + _options.DefaultUserScope;
+            scope += " " + CoreOptions.DefaultUserScope;
 
             return await _store.HasValidUserScope(id, scope, subjectId);
         }
 
         public async Task<bool> HasValidUserScopeGamespace(string id, string scope)
         {
-            scope += " " + _options.DefaultUserScope;
+            scope += " " + CoreOptions.DefaultUserScope;
 
             return await _store.HasValidUserScopeGamespace(id, scope);
         }
 
-        private int WeightToPoints(double weight, double maxPoints)
+        private static int WeightToPoints(double weight, double maxPoints)
             => (int)Math.Round(weight * maxPoints, 0, MidpointRounding.AwayFromZero);
     }
 }

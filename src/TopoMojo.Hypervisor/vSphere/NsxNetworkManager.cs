@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -10,11 +10,11 @@ using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using VimClient;
 using TopoMojo.Hypervisor.Extensions;
+using System.Text.Json.Serialization;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
@@ -37,8 +37,7 @@ namespace TopoMojo.Hypervisor.vSphere
         private HttpClient _sddc;
         private DateTimeOffset authExpiration = DateTimeOffset.MinValue;
         private string _apiUrl;
-        private string _apiSegments;
-        // private string authToken = "";
+        private readonly string _apiSegments;
 
         private async Task InitClient()
         {
@@ -68,7 +67,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private void InitClientWithCertificate()
         {
-            _logger.LogDebug($"NSX auth with certificate {_config.CertificatePath}");
+            _logger.LogDebug("NSX auth with certificate {path}", _config.CertificatePath);
 
             var clientcert = new X509Certificate2(
                 _config.CertificatePath,
@@ -90,7 +89,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private async Task InitClientViaRest()
         {
-            _logger.LogDebug($"NSX auth with rest to {_config.AuthUrl}");
+            _logger.LogDebug("NSX auth with rest to {url}", _config.AuthUrl);
 
             if (DateTimeOffset.UtcNow.CompareTo(authExpiration) < 0)
                 return;
@@ -99,10 +98,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             var content = new FormUrlEncodedContent(
                 new KeyValuePair<string,string>[] {
-                    new KeyValuePair<string,string>(
-                        "refresh_token",
-                        _config.ApiKey
-                    )
+                    new("refresh_token",_config.ApiKey)
                 }
             );
 
@@ -117,9 +113,9 @@ namespace TopoMojo.Hypervisor.vSphere
             string data = await response.Content.ReadAsStringAsync();
             var auth = JsonSerializer.Deserialize<AuthResponse>(data);
 
-            authExpiration = DateTimeOffset.UtcNow.AddSeconds(auth.expires_in);
+            authExpiration = DateTimeOffset.UtcNow.AddSeconds(auth.ExpiresIn);
 
-            _sddc.DefaultRequestHeaders.Add(_config.AuthTokenHeader, auth.access_token);
+            _sddc.DefaultRequestHeaders.Add(_config.AuthTokenHeader, auth.AccessToken);
 
             if (!string.IsNullOrEmpty(_config.MetadataUrl))
             {
@@ -127,7 +123,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 var sddc = JsonSerializer.Deserialize<SddcResponse>(meta);
 
-                _apiUrl = sddc.resource_config.nsx_api_public_endpoint_url;
+                _apiUrl = sddc.ResourceConfig.NsxApiPublicEndpointUrl;
             }
         }
 
@@ -229,8 +225,8 @@ namespace TopoMojo.Hypervisor.vSphere
         public override async Task<VmNetwork[]> GetVmNetworks(ManagedObjectReference mor)
         {
             var result = new List<VmNetwork>();
-            RetrievePropertiesResponse response = await _client.vim.RetrievePropertiesAsync(
-                _client.props,
+            RetrievePropertiesResponse response = await _client.Vim.RetrievePropertiesAsync(
+                _client.Props,
                 FilterFactory.VmFilter(mor, "name config"));
             ObjectContent[] oc = response.returnval;
 
@@ -259,22 +255,22 @@ namespace TopoMojo.Hypervisor.vSphere
 
             }
 
-            return result.ToArray();
+            return [.. result];
         }
 
         public override async Task<PortGroupAllocation[]> LoadPortGroups()
         {
             var list = new List<PortGroupAllocation>();
 
-            RetrievePropertiesResponse response = await _client.vim.RetrievePropertiesAsync(
-                _client.props,
-                FilterFactory.DistributedPortgroupFilter(_client.cluster));
+            RetrievePropertiesResponse response = await _client.Vim.RetrievePropertiesAsync(
+                _client.Props,
+                FilterFactory.DistributedPortgroupFilter(_client.Cluster));
 
             ObjectContent[] clunkyTree = response.returnval;
             foreach (var dvpg in clunkyTree.FindType("DistributedVirtualPortgroup"))
             {
                 var config = (DVPortgroupConfigInfo)dvpg.GetProperty("config");
-                if (config.distributedVirtualSwitch.Value == _client.dvs.Value)
+                if (config.distributedVirtualSwitch.Value == _client.Dvs.Value)
                 {
                     string net = dvpg.GetProperty("name") as string;
 
@@ -298,7 +294,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
             }
 
-            return list.ToArray();
+            return [.. list];
         }
 
         public override async Task<bool> RemovePortgroup(string pgReference)
@@ -307,7 +303,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 var pga = _pgAllocation.Values.FirstOrDefault(v => v.Key == pgReference);
 
-                if (pga == null || !pga.Net.Contains("#"))
+                if (pga == null || !pga.Net.Contains('#'))
                     return false;
 
                 await InitClient();
@@ -318,14 +314,19 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning($"error removing net: {pga.Net} {response.StatusCode} {response.ReasonPhrase} {await response.Content.ReadAsStringAsync()}");
+                    _logger.LogWarning("error removing net: {net} {code} {reason} {content}",
+                        pga.Net,
+                        response.StatusCode,
+                        response.ReasonPhrase,
+                        await response.Content.ReadAsStringAsync()
+                    );
                 }
 
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"error removing net: {ex.Message}");
+                _logger.LogWarning("error removing net: {message}", ex.Message);
             }
             return false;
         }
@@ -363,18 +364,18 @@ namespace TopoMojo.Hypervisor.vSphere
 
         internal class AuthResponse
         {
-            public string access_token { get; set; }
-            public int expires_in { get; set; }
+            [JsonPropertyName("access_token")] public string AccessToken { get; set; }
+            [JsonPropertyName("expires_in")] public int ExpiresIn { get; set; }
         }
 
         internal class SddcResponse
         {
-            public SddcResourceConfig resource_config { get; set; }
+            [JsonPropertyName("resource_config")] public SddcResourceConfig ResourceConfig { get; set; }
         }
 
         internal class SddcResourceConfig
         {
-            public string nsx_api_public_endpoint_url { get; set; }
+            [JsonPropertyName("nsx_api_public_endpoint_url")] public string NsxApiPublicEndpointUrl { get; set; }
         }
     }
 }

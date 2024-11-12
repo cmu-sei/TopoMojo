@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.Collections.Concurrent;
@@ -12,28 +12,19 @@ using System;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
-    public abstract class NetworkManager : INetworkManager
+    public abstract class NetworkManager(
+        ILogger logger,
+        VimReferences settings,
+        ConcurrentDictionary<string, Vm> vmCache,
+        VlanManager vlanManager
+        ) : INetworkManager
     {
-        public NetworkManager(
-            ILogger logger,
-            VimReferences settings,
-            ConcurrentDictionary<string, Vm> vmCache,
-            VlanManager vlanManager
-        ){
-            _logger = logger;
-            _client = settings;
-            _vmCache = vmCache;
-            _vlanManager = vlanManager;
-            _pgAllocation = new Dictionary<string, PortGroupAllocation>();
-            _swAllocation = new Dictionary<string, int>();
-        }
-
-        protected VimReferences _client;
-        protected readonly VlanManager _vlanManager;
-        protected Dictionary<string, PortGroupAllocation> _pgAllocation;
-        protected Dictionary<string, int> _swAllocation;
-        protected ConcurrentDictionary<string, Vm> _vmCache;
-        protected ILogger _logger;
+        protected VimReferences _client = settings;
+        protected readonly VlanManager _vlanManager = vlanManager;
+        protected Dictionary<string, PortGroupAllocation> _pgAllocation = [];
+        protected Dictionary<string, int> _swAllocation = [];
+        protected ConcurrentDictionary<string, Vm> _vmCache = vmCache;
+        protected ILogger _logger = logger;
 
         readonly int _clean_network_buffer_minutes = -2;
 
@@ -61,8 +52,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 if (pg.Switch.HasValue())
                 {
-                    if (!_swAllocation.ContainsKey(pg.Switch))
-                        _swAllocation.Add(pg.Switch, 0);
+                    _swAllocation.TryAdd(pg.Switch, 0);
                     _swAllocation[pg.Switch] += 1;
                 }
             }
@@ -70,12 +60,12 @@ namespace TopoMojo.Hypervisor.vSphere
             //process vm counts
             var map = GetKeyMap();
 
-            var vmnets = await GetVmNetworks(_client.pool);
+            var vmnets = await GetVmNetworks(_client.Pool);
 
             foreach (var vmnet in vmnets)
             {
-                if (map.ContainsKey(vmnet.NetworkMOR))
-                    map[vmnet.NetworkMOR].Counter += 1;
+                if (map.TryGetValue(vmnet.NetworkMOR, out PortGroupAllocation value))
+                    value.Counter += 1;
             }
 
         }
@@ -100,7 +90,7 @@ namespace TopoMojo.Hypervisor.vSphere
             lock (_pgAllocation)
             {
                 string sw = _client.UplinkSwitch;
-                if (_client.dvs == null && _client.net != null && !useUplinkSwitch)
+                if (_client.Dvs == null && _client.Net != null && !useUplinkSwitch)
                 {
                     sw = nets[0].Net.Tag().ToSwitchName();
                     if (_swAllocation.TryAdd(sw, 0))
@@ -149,15 +139,15 @@ namespace TopoMojo.Hypervisor.vSphere
                 var vmnets = GetVmNetworks(vmMOR).Result;
 
                 foreach (var vmnet in vmnets)
-                    if (map.ContainsKey(vmnet.NetworkMOR))
-                        map[vmnet.NetworkMOR].Counter -= 1;
+                    if (map.TryGetValue(vmnet.NetworkMOR, out PortGroupAllocation value))
+                        value.Counter -= 1;
             }
         }
 
         public async Task Clean(string tag = null)
         {
             await Task.Delay(0);
-            _logger.LogDebug($"cleaning nets [{tag}]");
+            _logger.LogDebug("cleaning nets [{tag}]", tag);
 
             lock(_pgAllocation)
             {
@@ -181,7 +171,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     if (_vmCache.Values.Any(v => v.Name.EndsWith(id)))
                         continue;
 
-                    _logger.LogDebug($"try removing net {pg.Net}");
+                    _logger.LogDebug("try removing net {net}", pg.Net);
 
                     if (RemovePortgroup(pg.Key).Result)
                     {
@@ -195,7 +185,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 foreach (var sw in _swAllocation.Keys.ToArray())
                 {
-                    if (_swAllocation[sw] < 1 && sw.Contains("#"))
+                    if (_swAllocation[sw] < 1 && sw.Contains('#'))
                     {
                         RemoveSwitch(sw).Wait();
                         _swAllocation.Remove(sw);
@@ -211,7 +201,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public bool IsTenantNet(string net)
         {
-            return net.Contains("#")
+            return net.Contains('#')
                 ? net.ToTenant() == _client.TenantId
                 : _vlanManager.Contains(net)
             ;
@@ -223,8 +213,7 @@ namespace TopoMojo.Hypervisor.vSphere
             var map = new Dictionary<string, PortGroupAllocation>();
             foreach (var pga in _pgAllocation.Values)
             {
-                if (!map.ContainsKey(pga.Key))
-                    map.Add(pga.Key, pga);
+                map.TryAdd(pga.Key, pga);
             }
             return map;
         }
@@ -256,8 +245,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 //check every so often
                 await Task.Delay(2000);
 
-                RetrievePropertiesResponse response = await _client.vim.RetrievePropertiesAsync(
-                    _client.props,
+                RetrievePropertiesResponse response = await _client.Vim.RetrievePropertiesAsync(
+                    _client.Props,
                     FilterFactory.TaskFilter(task));
 
                 ObjectContent[] oc = response.returnval;

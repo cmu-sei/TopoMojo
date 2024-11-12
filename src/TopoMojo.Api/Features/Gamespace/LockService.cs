@@ -1,8 +1,6 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace TopoMojo.Api.Services
@@ -43,6 +41,7 @@ namespace TopoMojo.Api.Services
             string expected = Guid.NewGuid().ToString("n");
 
             await _cache.SetStringAsync(key, expected, _opts);
+            await Task.Delay(delay);
 
             actual = await _cache.GetStringAsync(key);
 
@@ -53,7 +52,7 @@ namespace TopoMojo.Api.Services
         {
             _cache.RemoveAsync($"{prefix}{key}").Wait();
 
-            if (ex is Exception)
+            if (ex is not null)
                 throw ex;
 
             return Task.CompletedTask;

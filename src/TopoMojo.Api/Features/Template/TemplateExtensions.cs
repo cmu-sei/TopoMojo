@@ -1,5 +1,5 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
 using System;
 using System.Collections.Generic;
@@ -15,22 +15,23 @@ namespace TopoMojo
     {
         public static VmTemplate ToVirtualTemplate(this ConvergedTemplate template, string isolationTag = "")
         {
-            TemplateUtility tu = new TemplateUtility(template.Detail);
+            TemplateUtility tu = new(template.Detail)
+            {
+                Name = template.Name,
 
-            tu.Name = template.Name;
+                Networks = template.Networks,
 
-            tu.Networks = template.Networks;
+                Iso = template.Iso,
 
-            tu.Iso = template.Iso;
+                IsolationTag = isolationTag.NotEmpty()
+                    ? isolationTag
+                    : template.WorkspaceId ?? Guid.Empty.ToString()
+                ,
 
-            tu.IsolationTag = isolationTag.NotEmpty()
-                ? isolationTag
-                : template.WorkspaceId ?? Guid.Empty.ToString()
-            ;
+                Id = template.Id,
 
-            tu.Id = template.Id;
-
-            tu.UseUplinkSwitch = template.WorkspaceUseUplinkSwitch;
+                UseUplinkSwitch = template.WorkspaceUseUplinkSwitch
+            };
 
             tu.AddGuestSettings(template.Guestinfo ?? "");
 
@@ -46,13 +47,6 @@ namespace TopoMojo
 
             return template;
         }
-
-        // public static void AddSettings(this ConvergedTemplate template, KeyValuePair<string,string>[] settings)
-        // {
-        //     TemplateUtility tu = new TemplateUtility(template.Detail);
-        //     tu.GuestSettings = settings;
-        //     template.Detail = tu.ToString();
-        // }
 
         public static T Clone<T>(this T obj)
         {

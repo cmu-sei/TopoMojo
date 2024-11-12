@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using DiscUtils.Iso9660;
@@ -21,7 +21,7 @@ public class FileController(
     IFileUploadMonitor monitor,
     FileUploadOptions uploadOptions,
     WorkspaceService workspaceService
-    ) : _Controller(logger, hub)
+    ) : BaseController(logger, hub)
 {
     private static class Meta
     {
@@ -112,9 +112,11 @@ public class FileController(
 
                 if (!dp.ToLower().EndsWith(Meta.IsoFileExtension) && System.IO.File.Exists(dp))
                 {
-                    CDBuilder builder = new CDBuilder();
-                    builder.UseJoliet = true;
-                    builder.VolumeIdentifier = Meta.IsoVolumeId;
+                    CDBuilder builder = new()
+                    {
+                        UseJoliet = true,
+                        VolumeIdentifier = Meta.IsoVolumeId
+                    };
                     builder.AddFile(Path.GetFileName(dp), dp);
                     builder.Build(dp + Meta.IsoFileExtension);
                     System.IO.File.Delete(dp);
