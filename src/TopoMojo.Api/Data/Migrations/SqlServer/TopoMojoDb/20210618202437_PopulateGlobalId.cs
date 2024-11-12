@@ -1,4 +1,7 @@
-﻿using System;
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
@@ -471,7 +474,7 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
             migrationBuilder.CreateIndex(
                 name: "IX_Players_SubjectId_WorkspaceId",
                 table: "Players",
-                columns: new[] { "SubjectId", "WorkspaceId" });
+                columns: ["SubjectId", "WorkspaceId"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Players_UserId",

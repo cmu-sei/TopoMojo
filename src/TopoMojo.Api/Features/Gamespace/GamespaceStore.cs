@@ -1,22 +1,16 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TopoMojo.Api.Data.Abstractions;
-using TopoMojo.Api.Data.Extensions;
 using TopoMojo.Api.Extensions;
 
 namespace TopoMojo.Api.Data
 {
-    public class GamespaceStore : Store<Gamespace>, IGamespaceStore
+    public class GamespaceStore(
+        TopoMojoDbContext db
+        ) : Store<Gamespace>(db), IGamespaceStore
     {
-        public GamespaceStore (
-            TopoMojoDbContext db
-        ) : base(db) { }
-
         public override IQueryable<Gamespace> List(string term = null)
         {
             if (term.IsEmpty())
@@ -24,6 +18,7 @@ namespace TopoMojo.Api.Data
 
             term = term.ToLower();
 
+#pragma warning disable CA1862
             return base.List()
                 .Where(g =>
                     g.Name.ToLower().Contains(term) ||
@@ -127,7 +122,7 @@ namespace TopoMojo.Api.Data
             return
                 workspace.Audience.HasAnyToken(scope) ||
                 await DbContext.Workers.AnyAsync(
-                    w => w.WorkspaceId ==workspaceId &&
+                    w => w.WorkspaceId == workspaceId &&
                     w.SubjectId == subjectId
                 )
             ;
@@ -137,7 +132,7 @@ namespace TopoMojo.Api.Data
         {
             var gamespace = await DbContext.Gamespaces
                 .Where(g => g.Id == gamespaceId)
-                .Include( g => g.Workspace)
+                .Include(g => g.Workspace)
                 .FirstOrDefaultAsync();
 
             return gamespace.Workspace.Audience.HasAnyToken(scope);
@@ -166,10 +161,9 @@ namespace TopoMojo.Api.Data
         {
             var player = await FindPlayer(id, subjectId);
 
-            if (player is Data.Player)
+            if (player is not null)
             {
                 DbContext.Players.Remove(player);
-
                 await DbContext.SaveChangesAsync();
             }
         }

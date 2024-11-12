@@ -1,3 +1,6 @@
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -53,14 +56,14 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<IEnumerable<PveVnet>> CreateVnets(IEnumerable<CreatePveVnet> createVnets)
         {
-            var existingNets = await this.GetVnets();
+            var existingNets = await GetVnets();
             var deployedNets = new List<PveVnet>();
 
             foreach (var createVnet in createVnets)
             {
                 if (existingNets.Any(n => n.Alias == createVnet.Alias))
                 {
-                    _logger.LogDebug($"Skipped creating vnet {createVnet} - it already exists.");
+                    _logger.LogDebug("Skipped creating vnet {vnet} - it already exists.", createVnet);
                     continue;
                 }
 
@@ -76,7 +79,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     while (existingNets.Any(n => n.Tag == newVnetTag));
                 }
 
-                var vnetId = this.GetRandomVnetId();
+                var vnetId = GetRandomVnetId();
 
                 // check for existence of alias = vnetname--gamespaceid
                 var createTask = await _pveClient.Cluster.Sdn.Vnets.Create
@@ -109,8 +112,8 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<IEnumerable<PveVnet>> DeleteVnets(IEnumerable<string> aliases)
         {
-            _logger.LogDebug($"Deleting vnets: {string.Join(",", aliases)}");
-            var vnets = await this.GetVnets();
+            _logger.LogDebug("Deleting vnets: {aliases}", string.Join(",", aliases));
+            var vnets = await GetVnets();
             var deletedPveNets = new List<PveVnet>();
 
             foreach (var alias in aliases)
@@ -129,7 +132,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 }
                 else
                 {
-                    _logger.LogDebug($"Vnet delete requested for {alias}, but the network doesn't exist.");
+                    _logger.LogDebug("Vnet delete requested for {alias}, but the network doesn't exist.", alias);
                 }
             }
 
@@ -138,7 +141,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<IEnumerable<PveVnet>> DeleteVnetsByTerm(string term)
         {
-            var vnets = await this.GetVnets();
+            var vnets = await GetVnets();
             var deletedPveNets = new List<PveVnet>();
 
             foreach (var vnet in vnets.Where(x => x.Alias.Contains(term)))

@@ -1,11 +1,12 @@
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using System.Xml;
 using Corsinvest.ProxmoxVE.Api;
 
 namespace TopoMojo.Hypervisor.Proxmox.Models
@@ -56,12 +57,12 @@ namespace TopoMojo.Hypervisor.Proxmox.Models
         }
     }
 
-    internal class PveNodeTaskLog
+    internal partial class PveNodeTaskLog
     {
         public PveNodeTaskLog(Result result)
         {
             if (!result.RequestResource.Contains("/tasks/"))
-                throw new ArgumentException();
+                throw new ArgumentException("RequestResource missing tasks");
 
             List<object> data = result.ToData();
             Entries = data.Select(x => new PveNodeTaskLogEntry(x as ExpandoObject)).ToArray();
@@ -82,8 +83,8 @@ namespace TopoMojo.Hypervisor.Proxmox.Models
             double preciseProgress = 0;
             foreach (var entry in Entries.OrderByDescending(x => x.LineNumber))
             {
-                var matches = Regex.Matches(entry.Text, @"(\d+(\.\d+)?%)");
-                foreach (Match match in matches)
+                var matches = TaskProgressRegex().Matches(entry.Text);
+                foreach (Match match in matches.Cast<Match>())
                 {
                     if (double.TryParse(match.Value.TrimEnd('%'), out preciseProgress))
                     {
@@ -93,19 +94,16 @@ namespace TopoMojo.Hypervisor.Proxmox.Models
                 }
             }
         }
+
+        [GeneratedRegex(@"(\d+(\.\d+)?%)")]
+        private static partial Regex TaskProgressRegex();
     }
 
-    internal class PveNodeTaskLogEntry
+    internal class PveNodeTaskLogEntry(ExpandoObject obj)
     {
-        public PveNodeTaskLogEntry(ExpandoObject obj)
-        {
-            LineNumber = ((dynamic)obj).n;
-            Text = ((dynamic)obj).t;
-        }
-
         [JsonPropertyName("n")]
-        public long LineNumber { get; set; }
+        public long LineNumber { get; set; } = ((dynamic)obj).n;
         [JsonPropertyName("t")]
-        public string Text { get; set; }
+        public string Text { get; set; } = ((dynamic)obj).t;
     }
 }

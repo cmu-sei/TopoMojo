@@ -1,30 +1,36 @@
-﻿namespace TopoMojo.Agent;
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
+namespace TopoMojo.Agent;
 
 class Program
 {
+    internal static readonly string[] arg_padding = ["", "", "", "", "", ""];
+
     static async Task Main(string[] args)
     {
-        var argv = args.ToList<string>();
-        argv.AddRange(new string[] { "", "", "", "", "", ""});
+        var argv = args.ToList();
+        argv.AddRange(arg_padding);
 
-        if (argv.Last() == "-h" || argv.Last().Contains("-help"))
+        if (argv.Contains("-h") || argv.Contains("--help"))
         {
             Usage();
             return;
         }
 
-        EventHandlerConfiguration config = new();
-
-        config.Url = !string.IsNullOrEmpty(argv[0]) ? argv[0] : Environment.GetEnvironmentVariable("DISPATCH_URL") ?? "";
-        config.ApiKey = !string.IsNullOrEmpty(argv[1]) ? argv[1] : Environment.GetEnvironmentVariable("DISPATCH_APIKEY") ?? "";
-        config.GroupId = !string.IsNullOrEmpty(argv[2]) ? argv[2] : Environment.GetEnvironmentVariable("DISPATCH_GROUPID") ?? "";
-        config.Hostname = !string.IsNullOrEmpty(argv[3]) ? argv[3] : Environment.GetEnvironmentVariable("HOSTNAME") ?? "";
-        config.HeartbeatTrigger = !string.IsNullOrEmpty(argv[4]) ? argv[4] : Environment.GetEnvironmentVariable("DISPATCH_HEARTBEATTRIGGER") ?? "";
-        config.HeartbeatSeconds = Int32.Parse(
+        EventHandlerConfiguration config = new()
+        {
+            Url = !string.IsNullOrEmpty(argv[0]) ? argv[0] : Environment.GetEnvironmentVariable("DISPATCH_URL") ?? "",
+            ApiKey = !string.IsNullOrEmpty(argv[1]) ? argv[1] : Environment.GetEnvironmentVariable("DISPATCH_APIKEY") ?? "",
+            GroupId = !string.IsNullOrEmpty(argv[2]) ? argv[2] : Environment.GetEnvironmentVariable("DISPATCH_GROUPID") ?? "",
+            Hostname = !string.IsNullOrEmpty(argv[3]) ? argv[3] : Environment.GetEnvironmentVariable("HOSTNAME") ?? "",
+            HeartbeatTrigger = !string.IsNullOrEmpty(argv[4]) ? argv[4] : Environment.GetEnvironmentVariable("DISPATCH_HEARTBEATTRIGGER") ?? "",
+            HeartbeatSeconds = Int32.Parse(
             !string.IsNullOrEmpty(argv[5]) ? argv[5] : Environment.GetEnvironmentVariable("DISPATCH_HEARTBEATSECONDS") ?? "10"
-        );
-        config.QuietLogging = bool.Parse(Environment.GetEnvironmentVariable("DISPATCH_QUIET") ?? "false");
-        
+        ),
+            QuietLogging = bool.Parse(Environment.GetEnvironmentVariable("DISPATCH_QUIET") ?? "false")
+        };
+
         if (!config.IsValid)
         {
             Console.WriteLine("You must specify a valid url, apikey, and target group.");

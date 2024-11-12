@@ -1,9 +1,6 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using TopoMojo.Hypervisor;
 
@@ -110,30 +107,33 @@ namespace TopoMojo.Api
     public class CorsPolicyOptions
     {
         public string Name { get; set; } = "default";
-        public string[] Origins { get; set; } = new string[]{};
-        public string[] Methods { get; set; } = new string[]{};
-        public string[] Headers { get; set; } = new string[]{};
+        public string[] Origins { get; set; } = [];
+        public string[] Methods { get; set; } = [];
+        public string[] Headers { get; set; } = [];
         public bool AllowCredentials { get; set; }
         public bool AllowWildcardSubdomains { get; set; } = true;
         public int PreflightMaxAgeMinutes { get; set; } = 10;
 
         public CorsPolicy Build()
         {
-            CorsPolicyBuilder policy = new CorsPolicyBuilder();
+            CorsPolicyBuilder policy = new();
 
             var origins = Origins.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
-            if (origins.Any()) {
+            if (origins.Length != 0)
+            {
                 if (origins.First() == "*") policy.AllowAnyOrigin(); else policy.WithOrigins(origins);
                 if (AllowCredentials && origins.First() != "*") policy.AllowCredentials(); else policy.DisallowCredentials();
             }
 
             var methods = Methods.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
-            if (methods.Any()) {
+            if (methods.Length != 0)
+            {
                 if (methods.First() == "*") policy.AllowAnyMethod(); else policy.WithMethods(methods);
             }
 
             var headers = Headers.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
-            if (headers.Any()) {
+            if (headers.Length != 0)
+            {
                 if (headers.First() == "*") policy.AllowAnyHeader(); else policy.WithHeaders(headers);
             }
 

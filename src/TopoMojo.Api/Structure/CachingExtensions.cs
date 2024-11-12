@@ -1,8 +1,6 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.IO;
 using Microsoft.AspNetCore.DataProtection;
 using StackExchange.Redis;
 using TopoMojo.Api;
@@ -19,15 +17,16 @@ namespace Microsoft.Extensions.DependencyInjection
 
             services.AddMemoryCache();
 
-            services.AddSingleton<CacheOptions>(_ => options);
+            services.AddSingleton(_ => options);
 
-            if (System.String.IsNullOrWhiteSpace(options?.RedisUrl))
+            if (string.IsNullOrWhiteSpace(options?.RedisUrl))
             {
                 services.AddDistributedMemoryCache();
             }
             else
             {
-                services.AddStackExchangeRedisCache(opt => {
+                services.AddStackExchangeRedisCache(opt =>
+                {
                     opt.Configuration = options.RedisUrl;
                     opt.InstanceName = options.Key;
                 });
@@ -42,7 +41,7 @@ namespace Microsoft.Extensions.DependencyInjection
                 ? configure()
                 : new CacheOptions();
 
-            if (System.String.IsNullOrWhiteSpace(options?.RedisUrl))
+            if (string.IsNullOrWhiteSpace(options?.RedisUrl))
             {
                 builder.PersistKeysToFileSystem(
                     new DirectoryInfo(Path.Combine(options.SharedFolder, options.DataProtectionFolder))

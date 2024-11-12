@@ -1,8 +1,6 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Linq;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Hypervisor;
 
@@ -39,29 +37,14 @@ namespace TopoMojo.Api.Models
             string b = submission.ToLower();
             string c = b.Replace(" ", "");
 
-            switch (question.Grader)
+            question.IsCorrect = question.Grader switch
             {
-
-                case AnswerGrader.MatchAll:
-                    question.IsCorrect = a.Intersect(
-                        b.Split(new char[] { ' ', ',', ';', ':', '|' }, StringSplitOptions.RemoveEmptyEntries)
-                    ).ToArray().Length == a.Length;
-                    break;
-
-                case AnswerGrader.MatchAny:
-                    question.IsCorrect = a.Contains(c);
-                    break;
-
-                case AnswerGrader.MatchAlpha:
-                    question.IsCorrect = a.First().WithoutSymbols().Equals(c.WithoutSymbols());
-                    break;
-
-                case AnswerGrader.Match:
-                default:
-                    question.IsCorrect = a.First().Equals(c);
-                    break;
-            }
-
+                AnswerGrader.MatchAll => a.Intersect(b.Split(AppConstants.StringTokenSeparators, StringSplitOptions.RemoveEmptyEntries))
+                    .ToArray().Length == a.Length,
+                AnswerGrader.MatchAny => a.Contains(c),
+                AnswerGrader.MatchAlpha => a.First().WithoutSymbols().Equals(c.WithoutSymbols()),
+                _ => a.First().Equals(c),
+            };
             question.IsGraded = true;
         }
 
@@ -80,12 +63,12 @@ namespace TopoMojo.Api.Models
                 float total = Math.Max(max, 100);
 
                 foreach (var q in questions)
-                    q.Weight = q.Weight / total;
+                    q.Weight /= total;
 
                 max = questions.Sum(q => q.Weight);
             }
 
-            if (unweighted.Any())
+            if (unweighted.Length != 0)
             {
                 float val = (1 - max) / unweighted.Length;
                 foreach (var q in unweighted.Take(unweighted.Length - 1))

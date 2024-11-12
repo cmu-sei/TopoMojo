@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -34,7 +34,7 @@ namespace TopoMojo.Api.Services
         public static bool IsMultipartContentType(this string header)
         {
             return !string.IsNullOrEmpty(header)
-                   && header.IndexOf("multipart/", StringComparison.OrdinalIgnoreCase) >= 0;
+                   && header.Contains("multipart/", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool HasFormDataContentDisposition(this ContentDispositionHeaderValue contentDisposition)
@@ -58,13 +58,13 @@ namespace TopoMojo.Api.Services
         public static NameValueCollection ParseFormValues(this string querystring)
         {
             string input = HeaderUtilities.RemoveQuotes(querystring).Value;
-            NameValueCollection props = new NameValueCollection();
+            NameValueCollection props = [];
             foreach (string field in input.Split('&'))
             {
                 string[] prop = field.Split('=');
                 string key = prop[0].Trim();
                 string val = (prop.Length > 1) ? prop[1].Trim() : "";
-                if (!String.IsNullOrEmpty(key))
+                if (!string.IsNullOrEmpty(key))
                     props.Add(key, val);
             }
             return props;

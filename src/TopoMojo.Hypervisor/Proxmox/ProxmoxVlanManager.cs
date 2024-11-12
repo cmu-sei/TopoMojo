@@ -1,3 +1,6 @@
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -30,13 +33,13 @@ namespace TopoMojo.Hypervisor.Proxmox
         // this service is currently placed into the DI container as a singleton, but I wanted to support the case that it ever becomes
         // scoped. the static members are important to how the class works across all instances, where the individual ones are either
         // injected or trivial
-        private readonly static Lazy<SemaphoreSlim> _deploySemaphore = new Lazy<SemaphoreSlim>(() => new SemaphoreSlim(1));
+        private readonly static Lazy<SemaphoreSlim> _deploySemaphore = new(() => new SemaphoreSlim(1));
         // defaults to a debounce period of 300ms, but can be changed using the `Pod__Vnet__ResetDebounceDuration`. A maximum
         // debounce can be set using `Pod__VNet__ResetDebounceMaxDuration`.
-        private readonly static Lazy<DebouncePool<PveVnetOperation>> _vnetOpsPool = new Lazy<DebouncePool<PveVnetOperation>>(() => new DebouncePool<PveVnetOperation>());
+        private readonly static Lazy<DebouncePool<PveVnetOperation>> _vnetOpsPool = new(() => new DebouncePool<PveVnetOperation>());
         private readonly static IMemoryCache _recentVnetOpsCache = new MemoryCache(new MemoryCacheOptions { });
-        private readonly static IDictionary<string, int> _reservedVnetIds = new Dictionary<string, int>();
-        private readonly static IMemoryCache _recentVnetCache = new MemoryCache(new MemoryCacheOptions { });
+        private readonly static Dictionary<string, int> _reservedVnetIds = [];
+        private readonly static MemoryCache _recentVnetCache = new(new MemoryCacheOptions { });
 
         private readonly int _cacheDurationMs;
         private readonly int _recentExpirationMinutes = 5;
@@ -65,7 +68,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             _vnetOpsPool.Value.DebouncePeriod = _hypervisorOptions.Vlan.ResetDebounceDuration;
             _vnetOpsPool.Value.MaxTotalDebounce = _hypervisorOptions.Vlan.ResetDebounceMaxDuration;
 
-            // cache this - we need this to remain at least long as the maximum possible debounce (if it's defined). If it is, 
+            // cache this - we need this to remain at least long as the maximum possible debounce (if it's defined). If it is,
             // add a couple seconds for safety. if not, just double the min debounce up to a minimum of two seconds
             _cacheDurationMs = _hypervisorOptions.Vlan.ResetDebounceMaxDuration != null ?
                 _hypervisorOptions.Vlan.ResetDebounceMaxDuration.Value + 2000 :
@@ -83,7 +86,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         /// <returns></returns>
         public async Task<IEnumerable<PveVnet>> DeleteVnets(IEnumerable<string> vnetNames, bool force = false)
         {
-            _logger.LogDebug($"Requested to delete vnets: {string.Join(",", vnetNames)}");
+            _logger.LogDebug("Requested to delete vnets: {names}", string.Join(",", vnetNames));
             vnetNames = vnetNames
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .Distinct();
@@ -91,7 +94,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (!force && !vnetNames.Any())
             {
                 _logger.LogDebug($"No vnet names passed. Cancelling vnet delete.");
-                return Array.Empty<PveVnet>();
+                return [];
             }
 
             // create the nets
@@ -116,7 +119,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     PveVnetOperationType.Delete
                 ));
 
-            var results = await this.DebounceVnetOperations(matchingVnetDeleteOps);
+            var results = await DebounceVnetOperations(matchingVnetDeleteOps);
             return results
                 .Where(r => r.NetName.Contains(term))
                 .Select(r => r.Vnet);
@@ -130,7 +133,8 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<IEnumerable<PveVnet>> Provision(IEnumerable<string> vnetNames)
         {
-            _logger.LogDebug($"Deploying vnets: {string.Join(",", vnetNames)}");
+            _logger.LogDebug("Deploying vnets: {names}", string.Join(",", vnetNames));
+
             var requestedVnetNames = vnetNames
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .Distinct();
@@ -163,14 +167,14 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             foreach (var vnet in vnets)
             {
-                _logger.LogDebug($"Adding to recent vnet cache: {vnet.Alias}");
+                _logger.LogDebug("Adding to recent vnet cache: {alias}", vnet.Alias);
                 AddToRecentCache(vnet);
             }
         }
 
         public async Task Clean(ConcurrentDictionary<string, Vm> vmCache, string tag = null)
         {
-            _logger.LogDebug($"cleaning nets [{tag}]");
+            _logger.LogDebug("cleaning nets [{tag}]", tag);
 
             var vnets = await _vnetsApi.GetVnets();
             var vnetsToDelete = new List<string>();
@@ -209,7 +213,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 });
         }
 
-        private void Reserve(IEnumerable<Vlan> vlans)
+        private static void Reserve(IEnumerable<Vlan> vlans)
         {
             var vlanNames = vlans.Select(v => v.Name).Distinct().ToArray();
 
@@ -236,18 +240,18 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                 // check the cache to see if this debounce batch has already been created.
                 // if so, just bail out and return what we already have
-                _logger.LogDebug($"Looking up id {debouncedOperations.Id}");
+                _logger.LogDebug("Looking up id {did}", debouncedOperations.Id);
                 if (_recentVnetOpsCache.TryGetValue<IEnumerable<PveVnetOperationResult>>(debouncedOperations.Id, out var cachedOperations))
                 {
                     return cachedOperations.Where(o => requestedOperations.Any(req => req.Equals(o)));
                 }
-                _logger.LogDebug($"Cache miss {debouncedOperations.Id}");
+                _logger.LogDebug("Cache miss {did}", debouncedOperations.Id);
 
                 var results = new List<PveVnetOperationResult>();
                 var vnetsToCreate = debouncedOperations.Items.Where(op => op.Type == PveVnetOperationType.Create).ToArray();
                 var vnetsToDelete = debouncedOperations.Items.Where(op => op.Type == PveVnetOperationType.Delete).ToArray();
 
-                if (vnetsToCreate.Any())
+                if (vnetsToCreate.Length != 0)
                 {
                     var vnetNamesToCreate = vnetsToCreate.Select(v => _nameService.ToPveName(v.NetworkName));
                     var deployedVnets = await _vnetsApi.CreateVnets(vnetsToCreate.Select(n => new CreatePveVnet
@@ -271,7 +275,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     }));
                 }
 
-                if (vnetsToDelete.Any())
+                if (vnetsToDelete.Length != 0)
                 {
                     // Only delete vnets that haven't been created recently to avoid accidentally deleting
                     // a vnet that is in use. Also, don't delete a vnet if we created it in this batch
@@ -296,7 +300,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     }
                 }
 
-                _logger.LogDebug($"Batch {debouncedOperations.Id} results: {string.Join(",", results)}");
+                _logger.LogDebug("Batch {did} results: {results}", debouncedOperations.Id, string.Join(",", results));
 
                 if (results.Any(x =>
                     x.Type == PveVnetOperationType.Create) ||
@@ -320,7 +324,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                             }
                         );
 
-                    _logger.LogDebug($"Cached id {debouncedOperations.Id}");
+                    _logger.LogDebug("Cached id {did}", debouncedOperations.Id);
                 }
 
                 return results;

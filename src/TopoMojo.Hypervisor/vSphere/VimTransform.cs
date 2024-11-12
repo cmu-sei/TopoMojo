@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -15,16 +15,16 @@ namespace TopoMojo.Hypervisor.vSphere
         public static VirtualMachineConfigSpec TemplateToVmSpec(VmTemplate template, string datastore, string dvsuuid)
         {
             int key = -101, idekey = 200;
-            VirtualMachineConfigSpec vmcs = new VirtualMachineConfigSpec();
-            List<VirtualDeviceConfigSpec> devices = new List<VirtualDeviceConfigSpec>();
+            VirtualMachineConfigSpec vmcs = new();
+            List<VirtualDeviceConfigSpec> devices = [];
 
             vmcs.name = template.Name;
             vmcs.extraConfig = GetExtraConfig(template);
             vmcs.AddRam(template.Ram);
             vmcs.AddCpu(template.Cpu);
             vmcs.AddBootOption(Math.Max(template.Delay, 10));
-            vmcs.version = (template.Version.HasValue()) ? template.Version : null;
-            vmcs.guestId = (template.Guest.HasValue() ? template.Guest : "other");
+            vmcs.version = template.Version.HasValue() ? template.Version : null;
+            vmcs.guestId = template.Guest.HasValue() ? template.Guest : "other";
             if (!vmcs.guestId.EndsWith("Guest")) vmcs.guestId += "Guest";
             if (datastore.HasValue())
             {
@@ -37,7 +37,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             //can't actually be applied via ExtraConfig
             if (template.GuestSettings.Length > 0
-                && template.GuestSettings.Any(s => s.Key.Contains("vhv.enable") && s.Value.ToLower() == "true"))
+                && template.GuestSettings.Any(s => s.Key.Contains("vhv.enable") && s.Value.Equals("true", StringComparison.CurrentCultureIgnoreCase)))
             {
                 vmcs.nestedHVEnabled = true;
                 vmcs.nestedHVEnabledSpecified = true;
@@ -80,43 +80,45 @@ namespace TopoMojo.Hypervisor.vSphere
 
 
             //iso
-            devices.Add(GetCdrom(ref key, idekey, (template.Iso.HasValue() ? template.Iso : "[iso] null.iso")));
+            devices.Add(GetCdrom(ref key, idekey, template.Iso.HasValue() ? template.Iso : "[iso] null.iso"));
 
             //add all devices to spec
-            vmcs.deviceChange = devices.ToArray();
+            vmcs.deviceChange = [.. devices];
 
             return vmcs;
         }
 
         private static VirtualDeviceConfigSpec GetCdrom(ref int key, int controllerkey, string iso)
         {
-            VirtualDeviceConfigSpec devicespec = new VirtualDeviceConfigSpec();
-
             // CD ROM
-            VirtualCdrom cdrom = new VirtualCdrom();
-            cdrom.key = key--;
+            VirtualCdrom cdrom = new()
+            {
+                key = key--
+            };
 
-            VirtualCdromIsoBackingInfo isobacking = new VirtualCdromIsoBackingInfo();
-            isobacking.fileName = iso;
+            VirtualCdromIsoBackingInfo isobacking = new()
+            {
+                fileName = iso
+            };
             cdrom.backing = isobacking;
 
             cdrom.controllerKey = controllerkey;
             cdrom.controllerKeySpecified = true;
-            cdrom.connectable = new VirtualDeviceConnectInfo();
-            cdrom.connectable.startConnected = true;
+            cdrom.connectable = new()
+            {
+                startConnected = true
+            };
 
-            devicespec = new VirtualDeviceConfigSpec();
-            devicespec.device = cdrom;
-            devicespec.operation = VirtualDeviceConfigSpecOperation.add;
-            devicespec.operationSpecified = true;
-
-            return devicespec;
-
+            return new()
+            {
+                device = cdrom,
+                operation = VirtualDeviceConfigSpecOperation.add,
+                operationSpecified = true
+            };
         }
 
         private static VirtualDeviceConfigSpec GetEthernetAdapter(ref int key, VmNet nic, string dvsuuid)
         {
-            VirtualDeviceConfigSpec devicespec = new VirtualDeviceConfigSpec();
             VirtualEthernetCard eth = new VirtualE1000();
 
             if (nic.Type == "pcnet32")
@@ -138,14 +140,16 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (nic.Net.StartsWith("nsx."))
             {
-                eth.backing = new VirtualEthernetCardOpaqueNetworkBackingInfo {
+                eth.backing = new VirtualEthernetCardOpaqueNetworkBackingInfo
+                {
                     opaqueNetworkId = nic.Key.Tag(),
                     opaqueNetworkType = nic.Key.Untagged()
                 };
             }
             else if (dvsuuid.HasValue())
             {
-                eth.backing = new VirtualEthernetCardDistributedVirtualPortBackingInfo {
+                eth.backing = new VirtualEthernetCardDistributedVirtualPortBackingInfo
+                {
                     port = new DistributedVirtualSwitchPortConnection
                     {
                         switchUuid = dvsuuid,
@@ -158,136 +162,137 @@ namespace TopoMojo.Hypervisor.vSphere
                 eth.backing = new VirtualEthernetCardNetworkBackingInfo { deviceName = nic.Key };
             }
 
-            devicespec = new VirtualDeviceConfigSpec();
-            devicespec.device = eth;
-            devicespec.operation = VirtualDeviceConfigSpecOperation.add;
-            devicespec.operationSpecified = true;
-
-            return devicespec;
+            return new()
+            {
+                device = eth,
+                operation = VirtualDeviceConfigSpecOperation.add,
+                operationSpecified = true
+            };
         }
 
         private static VirtualDeviceConfigSpec GetDisk(ref int key, string path, int controllerKey, int unitnumber)
         {
-            VirtualDeviceConfigSpec devicespec = new VirtualDeviceConfigSpec();
 
-            VirtualDiskFlatVer2BackingInfo diskbacking = new VirtualDiskFlatVer2BackingInfo();
-            diskbacking.fileName = path;
-            diskbacking.diskMode = "persistent";
+            VirtualDiskFlatVer2BackingInfo diskbacking = new()
+            {
+                fileName = path,
+                diskMode = "persistent"
+            };
 
-            VirtualDisk disk = new VirtualDisk();
-            disk.key = key--;
-            disk.backing = diskbacking;
-            disk.controllerKey = controllerKey;
-            disk.controllerKeySpecified = true;
-            disk.connectable = new VirtualDeviceConnectInfo();
+            VirtualDisk disk = new()
+            {
+                key = key--,
+                backing = diskbacking,
+                controllerKey = controllerKey,
+                controllerKeySpecified = true,
+                connectable = new()
+            };
             disk.connectable.connected = true;
             disk.connectable.startConnected = true;
             disk.unitNumber = unitnumber;
             disk.unitNumberSpecified = true;
 
-            devicespec = new VirtualDeviceConfigSpec();
-            devicespec.device = disk;
-            devicespec.operation = VirtualDeviceConfigSpecOperation.add;
-            devicespec.operationSpecified = true;
-
-            return devicespec;
+            return new()
+            {
+                device = disk,
+                operation = VirtualDeviceConfigSpecOperation.add,
+                operationSpecified = true
+            };
         }
-
-        // private static VirtualDeviceConfigSpec GetIDEController(int key)
-        // {
-        //     VirtualDeviceConfigSpec devicespec = new VirtualDeviceConfigSpec();
-        //     devicespec.device = new VirtualIDEController();
-        //     devicespec.device.key = key;
-        //     devicespec.operation = VirtualDeviceConfigSpecOperation.add;
-        //     devicespec.operationSpecified = true;
-        //     return devicespec;
-        // }
 
         private static VirtualDeviceConfigSpec GetSCSIController(ref int key, string type)
         {
-            VirtualDeviceConfigSpec devicespec = new VirtualDeviceConfigSpec();
             VirtualDevice device = null;
 
             // DISK CONTROLLER
             if (type.ToLower().EndsWith("sas"))
             {
-                VirtualLsiLogicSASController sas = new VirtualLsiLogicSASController();
-                sas.busNumber = 0;
-                sas.sharedBus = VirtualSCSISharing.noSharing;
-                sas.key = key--;
-                device = sas;
+                device = new VirtualLsiLogicSASController
+                {
+                    busNumber = 0,
+                    sharedBus = VirtualSCSISharing.noSharing,
+                    key = key--
+                };
             }
 
-            if (type.ToLower() == "lsilogic")
+            if (type.Equals("lsilogic", StringComparison.CurrentCultureIgnoreCase))
             {
-                VirtualLsiLogicController controller = new VirtualLsiLogicController();
-                controller.busNumber = 0;
-                controller.sharedBus = VirtualSCSISharing.noSharing;
-                controller.key = key--;
-                device = controller;
+                device = new VirtualLsiLogicController()
+                {
+                    busNumber = 0,
+                    sharedBus = VirtualSCSISharing.noSharing,
+                    key = key--
+                };
             }
 
-            if (type.ToLower() == "buslogic")
+            if (type.Equals("buslogic", StringComparison.CurrentCultureIgnoreCase))
             {
-                VirtualBusLogicController bus = new VirtualBusLogicController();
-                bus.busNumber = 0;
-                bus.sharedBus = VirtualSCSISharing.noSharing;
-                bus.controllerKey = key--;
-                device = bus;
+                device = new VirtualBusLogicController
+                {
+                    busNumber = 0,
+                    sharedBus = VirtualSCSISharing.noSharing,
+                    controllerKey = key--
+                };
             }
-            
-            if (type.ToLower() == "pvscsi")
+
+            if (type.Equals("pvscsi", StringComparison.CurrentCultureIgnoreCase))
             {
-                ParaVirtualSCSIController bus = new ParaVirtualSCSIController();
-                bus.busNumber = 0;
-                bus.sharedBus = VirtualSCSISharing.noSharing;
-                bus.controllerKey = key--;
-                device = bus;
+                device = new ParaVirtualSCSIController
+                {
+                    busNumber = 0,
+                    sharedBus = VirtualSCSISharing.noSharing,
+                    controllerKey = key--
+                };
             }
 
-            devicespec.device = device;
-            devicespec.operation = VirtualDeviceConfigSpecOperation.add;
-            devicespec.operationSpecified = true;
-
-            return devicespec;
+            return new()
+            {
+                device = device,
+                operation = VirtualDeviceConfigSpecOperation.add,
+                operationSpecified = true
+            };
         }
 
         private static VirtualDeviceConfigSpec GetFloppy(ref int key, string name)
         {
-            VirtualDeviceConfigSpec devicespec = new VirtualDeviceConfigSpec();
 
-            VirtualFloppyImageBackingInfo diskbacking = new VirtualFloppyImageBackingInfo();
-            diskbacking.fileName = name;
+            VirtualFloppyImageBackingInfo diskbacking = new()
+            {
+                fileName = name
+            };
 
-            VirtualFloppy disk = new VirtualFloppy();
-            disk.key = key--;
-            disk.backing = diskbacking;
-
-            disk.connectable = new VirtualDeviceConnectInfo();
+            VirtualFloppy disk = new()
+            {
+                key = key--,
+                backing = diskbacking,
+                connectable = new VirtualDeviceConnectInfo()
+            };
             disk.connectable.connected = true;
             disk.connectable.startConnected = true;
             //disk.unitNumber = unitnumber;
             //disk.unitNumberSpecified = true;
 
-            devicespec = new VirtualDeviceConfigSpec();
-            devicespec.device = disk;
-            devicespec.operation = VirtualDeviceConfigSpecOperation.add;
-            devicespec.operationSpecified = true;
-
-            return devicespec;
+            return new()
+            {
+                device = disk,
+                operation = VirtualDeviceConfigSpecOperation.add,
+                operationSpecified = true
+            };
         }
 
         public static OptionValue[] GetExtraConfig(VmTemplate template)
         {
-            List<OptionValue> options = new List<OptionValue>();
-            options.Add(new OptionValue { key = "snapshot.redoNotWithParent", value = "true" });
-            options.Add(new OptionValue { key = "isolation.tools.setGUIOptions.enable", value = "true" });
-            options.Add(new OptionValue { key = "isolation.tools.copy.disable", value = "false" });
-            options.Add(new OptionValue { key = "isolation.tools.paste.disable", value = "false" });
-            options.Add(new OptionValue { key = "keyboard.typematicMinDelay", value = "2000000" });
-            options.Add(new OptionValue { key = "guestinfo.isolationTag", value = template.IsolationTag });
-            options.Add(new OptionValue { key = "guestinfo.templateSource", value = template.Id });
-            options.Add(new OptionValue { key = "guestinfo.hostname", value = template.Name.Untagged() });
+            List<OptionValue> options =
+            [
+                new() { key = "snapshot.redoNotWithParent", value = "true" },
+                new() { key = "isolation.tools.setGUIOptions.enable", value = "true" },
+                new() { key = "isolation.tools.copy.disable", value = "false" },
+                new() { key = "isolation.tools.paste.disable", value = "false" },
+                new() { key = "keyboard.typematicMinDelay", value = "2000000" },
+                new() { key = "guestinfo.isolationTag", value = template.IsolationTag },
+                new() { key = "guestinfo.templateSource", value = template.Id },
+                new() { key = "guestinfo.hostname", value = template.Name.Untagged() },
+            ];
 
             foreach (var setting in template.GuestSettings)
             {
@@ -304,42 +309,15 @@ namespace TopoMojo.Hypervisor.vSphere
                 options.Add(option);
             }
 
-            return options.ToArray();
+            return [.. options];
         }
-
-        // private static VirtualDeviceConfigSpec GetNetworkSerialPort(ref int key, string name)
-        // {
-        //     VirtualDeviceConfigSpec devicespec = new VirtualDeviceConfigSpec();
-
-        //     VirtualSerialPortURIBackingInfo backing = new VirtualSerialPortURIBackingInfo();
-        //     backing.direction = "server";
-        //     backing.serviceURI = "vSPC.py";
-        //     backing.proxyURI = name;
-
-        //     VirtualSerialPort device = new VirtualSerialPort();
-        //     device.key = key--;
-        //     device.backing = backing;
-
-        //     device.connectable = new VirtualDeviceConnectInfo();
-        //     device.connectable.connected = true;
-        //     device.connectable.startConnected = true;
-        //     //disk.unitNumber = unitnumber;
-        //     //disk.unitNumberSpecified = true;
-
-        //     devicespec = new VirtualDeviceConfigSpec();
-        //     devicespec.device = device;
-        //     devicespec.operation = VirtualDeviceConfigSpecOperation.add;
-        //     devicespec.operationSpecified = true;
-
-        //     return devicespec;
-        // }
 
         private static VirtualDeviceConfigSpec GetVideoController(ref int key, int ramKB)
         {
-            VirtualDeviceConfigSpec devicespec = new VirtualDeviceConfigSpec();
-
-            VirtualMachineVideoCard card = new VirtualMachineVideoCard();
-            card.key = key--;
+            VirtualMachineVideoCard card = new()
+            {
+                key = key--
+            };
             if (ramKB > 0)
             {
                 card.videoRamSizeInKB = ramKB * 1024;
@@ -351,120 +329,74 @@ namespace TopoMojo.Hypervisor.vSphere
                 card.useAutoDetectSpecified = true;
             }
 
-            devicespec = new VirtualDeviceConfigSpec();
-            devicespec.device = card;
-            devicespec.operation = VirtualDeviceConfigSpecOperation.add;
-            devicespec.operationSpecified = true;
-
-            return devicespec;
+            return new()
+            {
+                device = card,
+                operation = VirtualDeviceConfigSpecOperation.add,
+                operationSpecified = true
+            };
         }
-
-        // private static VirtualDeviceConfigSpec GetVMCIAdapter(ref int key, int cid)
-        // {
-        //     VirtualMachineVMCIDevice vmci = new VirtualMachineVMCIDevice();
-        //     vmci.key = 12000;
-        //     vmci.allowUnrestrictedCommunication = true;
-        //     vmci.id = cid;
-        //     vmci.controllerKey = 100;
-        //     vmci.controllerKeySpecified = true;
-
-        //     VirtualDeviceConfigSpec devicespec = new VirtualDeviceConfigSpec();
-        //     devicespec = new VirtualDeviceConfigSpec();
-        //     devicespec.device = vmci;
-        //     devicespec.operation = VirtualDeviceConfigSpecOperation.add;
-        //     devicespec.operationSpecified = true;
-        //     return devicespec;
-        // }
-
-
-        // public static VirtualSwitch VimSwitchtoXnetSwitch(HostVirtualSwitch s)
-        // {
-        //     VirtualSwitch t = new VirtualSwitch();
-        //     t.name = s.name;
-        //     t.ports = s.numPorts;
-        //     if (s.spec.policy.security != null)
-        //         t.promiscuous = (s.spec.policy.security.allowPromiscuous && s.spec.policy.security.allowPromiscuousSpecified) ? 1 : 0;
-        //     else
-        //         t.promiscuous = -1;
-
-        //     if (s.spec.bridge != null)
-        //     {
-        //         Type type = s.spec.bridge.GetType();
-        //         t.bridgetype = type.Name;
-        //         if (type == typeof(HostVirtualSwitchBondBridge))
-        //             t.nic = ((HostVirtualSwitchBondBridge)s.spec.bridge).nicDevice[0];
-        //         if (type == typeof(HostVirtualSwitchSimpleBridge))
-        //             t.nic = ((HostVirtualSwitchSimpleBridge)s.spec.bridge).nicDevice;
-        //     }
-        //     return t;
-        // }
-        // public static VirtualLan VimPortGrouptoXnetLan(HostPortGroup pg)
-        // {
-        //     VirtualLan p = new VirtualLan();
-        //     p.name = pg.spec.name;
-        //     p.vlan = pg.spec.vlanId;
-        //     p.switchname = pg.spec.vswitchName;
-        //     if (pg.spec.policy.security != null)
-        //         p.promiscuous = (pg.spec.policy.security.allowPromiscuous && pg.spec.policy.security.allowPromiscuousSpecified) ? 1 : 0;
-        //     else
-        //         p.promiscuous = -1;
-        //     return p;
-        // }
 
         public static HostNetworkPolicy GetDefaultHostNetworkPolicy()
         {
-            HostNetworkPolicy policy = new HostNetworkPolicy();
-            policy = new HostNetworkPolicy();
-            policy.security = new HostNetworkSecurityPolicy();
-            policy.security.allowPromiscuous = true;
-            policy.security.allowPromiscuousSpecified = true;
-            policy.security.macChanges = true;
-            policy.security.macChangesSpecified = true;
-            policy.security.forgedTransmits = true;
-            policy.security.forgedTransmitsSpecified = true;
+            return new()
+            {
+                security = new HostNetworkSecurityPolicy
+                {
+                    allowPromiscuous = true,
+                    allowPromiscuousSpecified = true,
+                    macChanges = true,
+                    macChangesSpecified = true,
+                    forgedTransmits = true,
+                    forgedTransmitsSpecified = true
+                },
 
-            policy.nicTeaming = new HostNicTeamingPolicy();
-            policy.nicTeaming.policy = "loadbalance_srcid";
-            policy.nicTeaming.reversePolicy = true;
-            policy.nicTeaming.notifySwitches = false;
-            policy.nicTeaming.rollingOrder = false;
-            policy.nicTeaming.reversePolicySpecified = true;
-            policy.nicTeaming.notifySwitchesSpecified = true;
-            policy.nicTeaming.rollingOrderSpecified = true;
+                nicTeaming = new HostNicTeamingPolicy
+                {
+                    policy = "loadbalance_srcid",
+                    reversePolicy = true,
+                    notifySwitches = false,
+                    rollingOrder = false,
+                    reversePolicySpecified = true,
+                    notifySwitchesSpecified = true,
+                    rollingOrderSpecified = true,
+                    failureCriteria = new HostNicFailureCriteria
+                    {
+                        checkBeacon = false,
+                        checkDuplex = false,
+                        checkSpeed = "minimum",
+                        speed = 10,
+                        fullDuplex = false,
+                        checkErrorPercent = false,
+                        percentage = 0,
+                        checkBeaconSpecified = true,
+                        checkDuplexSpecified = true,
+                        speedSpecified = true,
+                        fullDuplexSpecified = true,
+                        checkErrorPercentSpecified = true,
+                        percentageSpecified = true
+                    }
+                },
 
-            policy.nicTeaming.failureCriteria = new HostNicFailureCriteria();
-            policy.nicTeaming.failureCriteria.checkBeacon = false;
-            policy.nicTeaming.failureCriteria.checkDuplex = false;
-            policy.nicTeaming.failureCriteria.checkSpeed = "minimum";
-            policy.nicTeaming.failureCriteria.speed = 10;
-            policy.nicTeaming.failureCriteria.fullDuplex = false;
-            policy.nicTeaming.failureCriteria.checkErrorPercent = false;
-            policy.nicTeaming.failureCriteria.percentage = 0;
+                offloadPolicy = new HostNetOffloadCapabilities
+                {
+                    csumOffload = true,
+                    tcpSegmentation = true,
+                    zeroCopyXmit = true,
+                    csumOffloadSpecified = true,
+                    tcpSegmentationSpecified = true,
+                    zeroCopyXmitSpecified = true
+                },
 
-            policy.nicTeaming.failureCriteria.checkBeaconSpecified = true;
-            policy.nicTeaming.failureCriteria.checkDuplexSpecified = true;
-            policy.nicTeaming.failureCriteria.speedSpecified = true;
-            policy.nicTeaming.failureCriteria.fullDuplexSpecified = true;
-            policy.nicTeaming.failureCriteria.checkErrorPercentSpecified = true;
-            policy.nicTeaming.failureCriteria.percentageSpecified = true;
-
-            policy.offloadPolicy = new HostNetOffloadCapabilities();
-            policy.offloadPolicy.csumOffload = true;
-            policy.offloadPolicy.tcpSegmentation = true;
-            policy.offloadPolicy.zeroCopyXmit = true;
-            policy.offloadPolicy.csumOffloadSpecified = true;
-            policy.offloadPolicy.tcpSegmentationSpecified = true;
-            policy.offloadPolicy.zeroCopyXmitSpecified = true;
-
-            policy.shapingPolicy = new HostNetworkTrafficShapingPolicy();
-            policy.shapingPolicy.enabled = false;
-            policy.shapingPolicy.enabledSpecified = true;
-
-            return policy;
+                shapingPolicy = new HostNetworkTrafficShapingPolicy
+                {
+                    enabled = false,
+                    enabledSpecified = true
+                }
+            };
         }
 
-
-        public static string[] OsMap = new string[] {
+        internal static string[] OsMap = [
             "rhel6_64",
             "rhel6",
             "rhel7_64",
@@ -483,8 +415,7 @@ namespace TopoMojo.Hypervisor.vSphere
             "windows9_64",
             "windows9Server64",
             "windowsHyperV",
-        };
-
+        ];
 
     }
 }

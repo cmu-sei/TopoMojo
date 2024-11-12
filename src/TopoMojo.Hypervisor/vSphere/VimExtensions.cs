@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -29,7 +29,7 @@ namespace TopoMojo.Hypervisor.vSphere
         public static ManagedObjectReference AsVim(this Vm vm)
         {
             string[] mor = vm.Reference.Split('|');
-            return new ManagedObjectReference { type = mor[0], Value=mor[1]};
+            return new ManagedObjectReference { type = mor[0], Value = mor[1] };
         }
 
         public static void AddRam(this VirtualMachineConfigSpec vmcs, int ram)
@@ -41,18 +41,14 @@ namespace TopoMojo.Hypervisor.vSphere
         public static void AddCpu(this VirtualMachineConfigSpec vmcs, string cpu)
         {
             string[] p = cpu.Split('x');
-            int sockets = 1, coresPerSocket = 1;
-            if (!Int32.TryParse(p[0], out sockets))
+            if (!int.TryParse(p[0], out int sockets))
             {
                 sockets = 1;
             }
 
-            if (p.Length > 1)
+            if (p.Length <= 1 || !int.TryParse(p[1], out int coresPerSocket))
             {
-                if (!Int32.TryParse(p[1], out coresPerSocket))
-                {
-                    coresPerSocket = 1;
-                }
+                coresPerSocket = 1;
             }
 
             vmcs.numCPUs = sockets * coresPerSocket;
@@ -81,29 +77,21 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public static void AddGuestInfo(this VirtualMachineConfigSpec vmcs, string[] list)
         {
-            List<OptionValue> options = new List<OptionValue>();
+            List<OptionValue> options = [];
             foreach (string item in list)
             {
-                OptionValue option = new OptionValue();
+                OptionValue option = new();
                 int x = item.IndexOf('=');
                 if (x > 0)
                 {
-                    option.key = item.Substring(0, x).Replace(" " , "").Trim();
+                    option.key = item[..x].Replace(" ", "").Trim();
                     if (!option.key.StartsWith("guestinfo."))
                         option.key = "guestinfo." + option.key;
-                    option.value = item.Substring(x + 1).Trim();
+                    option.value = item[(x + 1)..].Trim();
                     options.Add(option);
                 }
             }
-            vmcs.extraConfig = options.ToArray();
-        }
-
-        public static void MergeGuestInfo(this VirtualMachineConfigSpec vmcs, string settings)
-        {
-            //constitue options dictionary
-            //constitute settings array
-            //foreach setting add/update options
-            //persist result in annotation
+            vmcs.extraConfig = [.. options];
         }
 
         public static ObjectContent First(this ObjectContent[] tree, string type)
@@ -116,7 +104,7 @@ namespace TopoMojo.Hypervisor.vSphere
             foreach (var content in tree.Where(o => o.obj.type.EndsWith(type)))
             {
                 if (content.propSet
-                    .Any(p => p.name == "name" && p.val.ToString().ToLower() == name))
+                    .Any(p => p.name == "name" && p.val.ToString().Equals(name, StringComparison.CurrentCultureIgnoreCase)))
                 {
                     return content;
                 }
@@ -146,8 +134,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public static bool IsInPool(this ObjectContent content, ManagedObjectReference pool)
         {
-            ManagedObjectReference mor = content.GetProperty("resourcePool") as ManagedObjectReference;
-            return mor != null && mor.Value == pool.Value;
+            return content.GetProperty("resourcePool") is ManagedObjectReference mor && mor.Value == pool.Value;
         }
 
         public static T Clone<T>(this T obj)

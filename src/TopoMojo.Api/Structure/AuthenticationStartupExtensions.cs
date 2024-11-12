@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Authentication;
@@ -13,7 +13,8 @@ namespace Microsoft.Extensions.DependencyInjection
         public static IServiceCollection AddConfiguredAuthentication(
             this IServiceCollection services,
             OidcOptions oidc
-        ) {
+        )
+        {
             JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
             services
@@ -31,9 +32,9 @@ namespace Microsoft.Extensions.DependencyInjection
                     options.RequireHttpsMetadata = oidc.RequireHttpsMetadata;
                 })
 
-                .AddApiKey(ApiKeyAuthentication.AuthenticationScheme, options => {})
+                .AddApiKey(ApiKeyAuthentication.AuthenticationScheme, options => { })
 
-                .AddTicketAuthentication(TicketAuthentication.AuthenticationScheme, options => {})
+                .AddTicketAuthentication(TicketAuthentication.AuthenticationScheme, options => { })
 
                 .AddCookie(AppConstants.CookieScheme, opt =>
                 {
@@ -45,11 +46,13 @@ namespace Microsoft.Extensions.DependencyInjection
                         SecurePolicy = CookieSecurePolicy.SameAsRequest,
                         SameSite = SameSiteMode.Strict
                     };
-                    opt.Events.OnRedirectToAccessDenied = ctx => {
+                    opt.Events.OnRedirectToAccessDenied = ctx =>
+                    {
                         ctx.HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
                         return System.Threading.Tasks.Task.CompletedTask;
                     };
-                    opt.Events.OnRedirectToLogin = ctx => {
+                    opt.Events.OnRedirectToLogin = ctx =>
+                    {
                         ctx.HttpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
                         return System.Threading.Tasks.Task.CompletedTask;
                     };

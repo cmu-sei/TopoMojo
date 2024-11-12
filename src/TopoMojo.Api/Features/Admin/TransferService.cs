@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.IO.Compression;
@@ -18,7 +18,7 @@ public class TransferService(
     ILogger<TransferService> logger,
     IMapper mapper,
     CoreOptions options
-    ) : _Service(logger, mapper, options)
+    ) : BaseService(logger, mapper, options)
 {
     private readonly JsonSerializerOptions jsonSerializerSettings = new()
     {
@@ -241,7 +241,7 @@ public class TransferService(
     private void UpdateTenant(Workspace ws)
     {
         string src = ws.Id.ExtractTenant();
-        string dst = _options.Tenant;
+        string dst = CoreOptions.Tenant;
         string tenant = src.Length > dst.Length
             ? string.Concat(dst, new string('0', src.Length - dst.Length))
             : dst
@@ -344,7 +344,7 @@ public class TransferService(
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to zip {filePath}", filePath);
+                    Logger.LogError(ex, "Failed to zip {filePath}", filePath);
                 }
             }
         }

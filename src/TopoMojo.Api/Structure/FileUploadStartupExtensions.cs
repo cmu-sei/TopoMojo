@@ -1,5 +1,5 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
 using TopoMojo.Api;
 using TopoMojo.Api.Services;
@@ -15,7 +15,7 @@ namespace Microsoft.Extensions.DependencyInjection
         {
             return services
                 .AddScoped<IFileUploadHandler, FileUploadHandler>()
-                .AddSingleton<FileUploadOptions>(_ => options)
+                .AddSingleton(_ => options)
                 .AddSingleton<IFileUploadMonitor, FileUploadMonitor>();
         }
     }

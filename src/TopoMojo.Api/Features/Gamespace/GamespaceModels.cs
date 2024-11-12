@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
@@ -89,7 +89,7 @@ namespace TopoMojo.Api.Models
         public string Token { get; set; }
     }
 
-    public class GamespaceSearch: Search
+    public class GamespaceSearch : Search
     {
         public const string FilterAll = "all";
         public const string FilterActive = "active";
@@ -112,7 +112,7 @@ namespace TopoMojo.Api.Models
         public bool AllowPreview { get; set; }
         public bool StartGamespace { get; set; }
         public DateTimeOffset ExpirationTime { get; set; }
-        public RegistrationPlayer[] Players { get; set; } = new RegistrationPlayer[] {};
+        public RegistrationPlayer[] Players { get; set; } = [];
     }
 
     public class RegistrationPlayer

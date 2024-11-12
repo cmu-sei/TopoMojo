@@ -1,14 +1,8 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Extensions;
@@ -18,25 +12,18 @@ using System.Text.RegularExpressions;
 
 namespace TopoMojo.Api.Services
 {
-    public class TemplateService : _Service
+    public partial class TemplateService(
+        ITemplateStore templateStore,
+        IHypervisorService podService,
+        ILogger<TemplateService> logger,
+        IMapper mapper,
+        CoreOptions options
+        ) : BaseService(logger, mapper, options)
     {
-        public TemplateService(
-            ITemplateStore templateStore,
-            IHypervisorService podService,
-            ILogger<TemplateService> logger,
-            IMapper mapper,
-            CoreOptions options
-        ) : base(logger, mapper, options)
-        {
-            _store = templateStore;
+        private readonly ITemplateStore _store = templateStore;
+        private readonly IHypervisorService _pod = podService;
 
-            _pod = podService;
-        }
-
-        private readonly ITemplateStore _store;
-        private readonly IHypervisorService _pod;
-
-        public async Task<TemplateSummary[]> List(TemplateSearch search, bool sudo, CancellationToken ct = default(CancellationToken))
+        public async Task<TemplateSummary[]> List(TemplateSearch search, bool sudo, CancellationToken ct = default)
         {
             var q = _store.List(search.Term)
                 .Include(t => t.Workspace)
@@ -44,8 +31,8 @@ namespace TopoMojo.Api.Services
                 as IQueryable<Data.Template>
             ;
 
-            if (sudo && search.pid.NotEmpty())
-                q = q.Where(t => t.ParentId == search.pid);
+            if (sudo && search.ParentId.NotEmpty())
+                q = q.Where(t => t.ParentId == search.ParentId);
 
             if (!sudo || search.WantsPublished)
                 q = q.Where(t => t.IsPublished);
@@ -68,7 +55,7 @@ namespace TopoMojo.Api.Services
             var entity = await _store.Load(id);
 
             if (entity.Parent is null)
-                return new TemplateSummary[]{};
+                return [];
 
             var list = await Mapper.ProjectTo<TemplateSummary>(
                 _store.List().Where(t => t.ParentId == entity.ParentId)
@@ -140,7 +127,7 @@ namespace TopoMojo.Api.Services
         {
             var entity = await _store.Retrieve(template.Id);
 
-            Mapper.Map<ChangedTemplateDetail, Data.Template>(template, entity);
+            Mapper.Map(template, entity);
 
             await _store.Update(entity);
 
@@ -155,8 +142,8 @@ namespace TopoMojo.Api.Services
             ;
 
             string suffix = "-CLONE";
-            var match = Regex.Match(entity.Name, @"v(\d+)$");
-            if (match.Success && Int32.TryParse(match.Groups[1].ValueSpan, out int version))
+            var match = NameVersionRegex().Match(entity.Name);
+            if (match.Success && int.TryParse(match.Groups[1].ValueSpan, out int version))
             {
                 suffix = $"v{version + 1}";
                 entity.Name = entity.Name[0..match.Index];
@@ -219,7 +206,7 @@ namespace TopoMojo.Api.Services
             var entity = await _store.Retrieve(newlink.TemplateId);
 
             string name = entity.Name.Length > 64
-                ? entity.Name.Substring(0, 64)
+                ? entity.Name[..64]
                 : entity.Name
             ;
 
@@ -228,7 +215,7 @@ namespace TopoMojo.Api.Services
                 ParentId = entity.Id,
                 IsLinked = true,
                 WorkspaceId = workspace.Id,
-                Name = $"{name}-{new Random().Next(100, 999).ToString()}",
+                Name = $"{name}-{new Random().Next(100, 999)}",
                 Description = entity.Description,
                 Iso = entity.Iso,
                 Networks = entity.Networks,
@@ -248,9 +235,10 @@ namespace TopoMojo.Api.Services
 
             if (entity.IsLinked)
             {
-                TemplateUtility tu = new TemplateUtility(entity.Parent.Detail);
-
-                tu.Name = entity.Name;
+                TemplateUtility tu = new(entity.Parent.Detail)
+                {
+                    Name = entity.Name
+                };
 
                 tu.LocalizeDiskPaths(entity.Workspace.Id, entity.Id);
 
@@ -293,8 +281,8 @@ namespace TopoMojo.Api.Services
 
             string isolationTag = entity.WorkspaceId
                 ?? string.Concat(
-                    _options.Tenant,
-                    Guid.Empty.ToString("n").AsSpan(_options.Tenant.Length)
+                    CoreOptions.Tenant,
+                    Guid.Empty.ToString("n").AsSpan(CoreOptions.Tenant.Length)
                 );
 
             return Mapper.Map<ConvergedTemplate>(entity)
@@ -319,16 +307,15 @@ namespace TopoMojo.Api.Services
 
         public async Task<string[]> DiskReport()
         {
-            var list =  await _store.List().ToArrayAsync();
+            var list = await _store.List().ToArrayAsync();
 
-            return list
+            return [.. list
                 .SelectMany(t =>
                     new TemplateUtility(t.Detail, "").AsTemplate().Disks
                 )
                 .Select(d => d.Path.Replace("[ds] ", ""))
                 .Distinct()
-                .OrderBy(x => x)
-                .ToArray()
+                .OrderBy(x => x)]
             ;
         }
 
@@ -343,5 +330,8 @@ namespace TopoMojo.Api.Services
             var vm = await _pod.Refresh(template);
             return vm.Status == "initialized"; // healthy is 'initialized' for existing template
         }
+
+        [GeneratedRegex(@"v(\d+)$")]
+        private static partial Regex NameVersionRegex();
     }
 }

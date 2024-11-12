@@ -1,5 +1,5 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
 namespace TopoMojo.Api
 {
@@ -27,7 +27,10 @@ namespace TopoMojo.Api
         public const string RegistrationCachePrefix = "lp:";
         public const string CookieScheme = "topomojo.mks";
         public const string MarkdownCutLine = "<!-- cut -->";
-        public static char[] InlineListSeparators = [' ', ',', ';'];
+        public const string TagDelimiter = "#";
+        public static char[] StringTokenSeparators = [' ', ',', ';', ':', '|', '\t'];
+        public static char[] StringLineSeparators = [';', '\n', '\r'];
+
         public const string ErrorListCacheKey = "errbf";
     }
 

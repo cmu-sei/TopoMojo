@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Authorization;
@@ -23,7 +23,7 @@ public class AdminController(
     JanitorService janitor,
     HubCache hubCache,
     IMemoryCache localCache
-    ) : _Controller(logger, hub)
+    ) : BaseController(logger, hub)
 {
 
     /// <summary>
@@ -33,7 +33,7 @@ public class AdminController(
     /// <returns></returns>
     [HttpPost("api/admin/announce")]
     [SwaggerOperation(OperationId = "PostAnnouncement")]
-    public async Task<ActionResult<bool>> PostAnnouncement([FromBody]string text)
+    public async Task<ActionResult<bool>> PostAnnouncement([FromBody] string text)
     {
         await Task.Run(() => SendBroadcast(text));
         return Ok(true);
@@ -117,21 +117,21 @@ public class AdminController(
     /// <returns></returns>
     [HttpPost("api/admin/janitor")]
     [SwaggerOperation(OperationId = "RunJanitorCleanup")]
-    public async Task<ActionResult<JanitorReport[]>> RunJanitorCleanup([FromBody]JanitorOptions options = null)
+    public async Task<ActionResult<JanitorReport[]>> RunJanitorCleanup([FromBody] JanitorOptions options = null)
     {
         return Ok(await janitor.Cleanup(options));
     }
 
     [HttpPost("api/admin/janitor/idlewsvms")]
     [SwaggerOperation(OperationId = "RunJanitorCleanupIdleWorkspaceVms")]
-    public async Task<ActionResult<JanitorReport[]>> RunJanitorCleanupIdleWorkspaceVms([FromBody]JanitorOptions options = null)
+    public async Task<ActionResult<JanitorReport[]>> RunJanitorCleanupIdleWorkspaceVms([FromBody] JanitorOptions options = null)
     {
         return Ok(await janitor.CleanupIdleWorkspaceVms(options));
     }
 
     [HttpGet("api/admin/log")]
     [SwaggerOperation(OperationId = "GetAdminLog")]
-    public ActionResult<TimestampedException[]> GetAdminLog([FromQuery]string since)
+    public ActionResult<TimestampedException[]> GetAdminLog([FromQuery] string since)
     {
         var errbf = localCache.Get<List<TimestampedException>>(AppConstants.ErrorListCacheKey)
             ?? [];

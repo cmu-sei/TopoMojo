@@ -1,32 +1,20 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using TopoMojo.Api.Services;
 
 namespace TopoMojo.HostedServices
 {
-    public class JanitorHostedService : IHostedService
+    public class JanitorHostedService(
+        IServiceProvider serviceProvider,
+        ILogger<JanitorHostedService> logger
+        ) : IHostedService
     {
         private Timer _timer;
-        private readonly ILogger _logger;
-        private readonly IServiceProvider _services;
+        private readonly ILogger _logger = logger;
+        private readonly IServiceProvider _services = serviceProvider;
         private int periodCount = 0;
         private int periodMax = 100;
-
-        public JanitorHostedService(
-            IServiceProvider serviceProvider,
-            ILogger<JanitorHostedService> logger
-        )
-        {
-            _services = serviceProvider;
-            _logger = logger;
-        }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
@@ -55,26 +43,24 @@ namespace TopoMojo.HostedServices
 
         private void StaleCheck(object state)
         {
-            using (var scope = _services.CreateScope())
+            using var scope = _services.CreateScope();
+            var janitor = scope.ServiceProvider.GetService<JanitorService>();
+
+            if (periodCount == 0)
+                _logger.LogInformation("Janitor is checking for stale spaces");
+
+            // run every period
+            janitor.EndExpired().Wait();
+            janitor.CleanupEndedGamespaces().Wait();
+
+            // run after multiple periods (intermittently)
+            if (periodCount >= periodMax)
             {
-                var janitor = scope.ServiceProvider.GetService<JanitorService>();
-
-                if (periodCount == 0)
-                    _logger.LogInformation("Janitor is checking for stale spaces");
-
-                // run every period
-                janitor.EndExpired().Wait();
-                janitor.CleanupEndedGamespaces().Wait();
-
-                // run after multiple periods (intermittently)
-                if (periodCount >= periodMax)
-                {
-                    periodCount = 0;
-                    janitor.Cleanup().Wait();
-                }
-
-                periodCount += 1;
+                periodCount = 0;
+                janitor.Cleanup().Wait();
             }
+
+            periodCount += 1;
         }
     }
 }

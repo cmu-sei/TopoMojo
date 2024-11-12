@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.Text.Json;
@@ -23,8 +23,8 @@ namespace TopoMojo.Api
 
             CreateMap<NewWorkspace, Data.Workspace>()
                 .ForMember(d => d.Challenge, opt => opt.MapFrom(s => s.Challenge ??
-                    JsonSerializer.Serialize<ChallengeSpec>(
-                        new ChallengeSpec(), new JsonSerializerOptions()
+                    JsonSerializer.Serialize(
+                        new ChallengeSpec(), JsonSerializerOptions.Default
                     )
                 ))
             ;

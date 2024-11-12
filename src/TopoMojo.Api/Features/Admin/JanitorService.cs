@@ -1,12 +1,7 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Hypervisor;
@@ -14,28 +9,19 @@ using TopoMojo.Api.Models;
 
 namespace TopoMojo.Api.Services
 {
-    public class JanitorService
-    {
-        public JanitorService(
-            ILogger<JanitorService> logger,
-            CoreOptions options,
-            IHypervisorService pod,
-            IWorkspaceStore workspaceStore,
-            IGamespaceStore gamespaceStore
+    public class JanitorService(
+        ILogger<JanitorService> logger,
+        CoreOptions options,
+        IHypervisorService pod,
+        IWorkspaceStore workspaceStore,
+        IGamespaceStore gamespaceStore
         )
-        {
-            _logger = logger;
-            _options = options;
-            _pod = pod;
-            _workspaceStore = workspaceStore;
-            _gamespaceStore = gamespaceStore;
-        }
-
-        private readonly ILogger _logger;
-        private readonly CoreOptions _options;
-        private readonly IHypervisorService _pod;
-        private readonly IWorkspaceStore _workspaceStore;
-        private readonly IGamespaceStore _gamespaceStore;
+    {
+        private readonly ILogger _logger = logger;
+        private readonly CoreOptions _options = options;
+        private readonly IHypervisorService _pod = pod;
+        private readonly IWorkspaceStore _workspaceStore = workspaceStore;
+        private readonly IGamespaceStore _gamespaceStore = gamespaceStore;
 
         public async Task EndExpired()
         {
@@ -72,7 +58,7 @@ namespace TopoMojo.Api.Services
             {
                 try
                 {
-                    _logger.LogInformation($"Cleaning ended gamespace {gs.Id}");
+                    _logger.LogInformation("Cleaning ended gamespace {id}", gs.Id);
 
                     await _pod.DeleteAll(gs.Id);
 
@@ -82,7 +68,7 @@ namespace TopoMojo.Api.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Failed to clean gamespace {gs.Id}");
+                    _logger.LogError(ex, "Failed to clean gamespace {id}", gs.Id);
                 }
             }
         }
@@ -175,12 +161,9 @@ namespace TopoMojo.Api.Services
 
         private async Task RemoveVms(string[] ids)
         {
-            var tasks = new List<Task>();
-
-            foreach (var g in ids)
-                tasks.Add(_pod.DeleteAll(g));
-
-            await Task.WhenAll(tasks.ToArray());
+            await Task.WhenAll(
+                ids.Select(_pod.DeleteAll)
+            );
         }
 
         public async Task<JanitorReport[]> Cleanup(JanitorOptions options = null)
@@ -195,7 +178,7 @@ namespace TopoMojo.Api.Services
 
             result.AddRange(await CleanupInactiveWorkspaces(opt));
 
-            return result.ToArray();
+            return [.. result];
         }
 
     }

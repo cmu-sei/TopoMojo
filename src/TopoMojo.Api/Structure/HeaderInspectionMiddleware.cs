@@ -1,27 +1,16 @@
-// Copyright 2021 Carnegie Mellon University.
-// Released under a MIT (SEI) license. See LICENSE.md in the project root.
+// Copyright 2025 Carnegie Mellon University.
+// Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using TopoMojo.Api;
 
 namespace TopoMojo.Api
 {
-    public class HeaderInspectionMiddleware
+    public class HeaderInspectionMiddleware(
+        RequestDelegate next,
+        ILogger<HeaderInspectionMiddleware> logger
+        )
     {
-        public HeaderInspectionMiddleware(
-            RequestDelegate next,
-            ILogger<HeaderInspectionMiddleware> logger
-        ){
-            _next = next;
-            _logger = logger;
-        }
-        private readonly RequestDelegate _next;
-        private readonly ILogger _logger;
-
         public async Task Invoke(HttpContext context)
         {
             var sb = new StringBuilder($"Request Headers: {context.Request.Scheme}://{context.Request.Host}{context.Request.PathBase} from {context.Connection.RemoteIpAddress}\n");
@@ -38,9 +27,9 @@ namespace TopoMojo.Api
                 sb.AppendLine($"\t{header.Key}: {val}");
             }
 
-            _logger.LogInformation(sb.ToString());
+            logger.LogInformation("{headers}", sb.ToString());
 
-            await _next(context);
+            await next(context);
         }
     }
 }
@@ -49,7 +38,7 @@ namespace Microsoft.AspNetCore.Builder
 {
     public static class StartUpExtensions
     {
-        public static IApplicationBuilder UseHeaderInspection (
+        public static IApplicationBuilder UseHeaderInspection(
             this IApplicationBuilder builder
         )
         {

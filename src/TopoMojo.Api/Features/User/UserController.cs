@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.Security.Claims;
@@ -17,7 +17,7 @@ namespace TopoMojo.Api.Controllers;
 [Authorize]
 [ApiController]
 [TypeFilter<UserValidator>]
-public class UserController : _Controller
+public class UserController : BaseController
 {
     public UserController(
         ILogger<AdminController> logger,
@@ -28,7 +28,8 @@ public class UserController : _Controller
     {
         _svc = userService;
         _distCache = distributedCache;
-        _cacheOpts = new DistributedCacheEntryOptions {
+        _cacheOpts = new DistributedCacheEntryOptions
+        {
             AbsoluteExpirationRelativeToNow = new TimeSpan(0, 0, 30)
         };
     }
@@ -46,7 +47,7 @@ public class UserController : _Controller
     [HttpGet("api/users")]
     [SwaggerOperation(OperationId = "ListUsers")]
     [Authorize(AppConstants.AdminOnlyPolicy)]
-    public async Task<ActionResult<User[]>> ListUsers([FromQuery]UserSearch model, CancellationToken ct)
+    public async Task<ActionResult<User[]>> ListUsers([FromQuery] UserSearch model, CancellationToken ct)
     {
         if (!AuthorizeAny(
             () => Actor.IsAdmin
@@ -144,7 +145,7 @@ public class UserController : _Controller
     [HttpPost("api/user")]
     [SwaggerOperation(OperationId = "AddOrUpdateUser")]
     [Authorize(AppConstants.AdminOnlyPolicy)]
-    public async Task<ActionResult<User>> AddOrUpdateUser([FromBody]ChangedUser model)
+    public async Task<ActionResult<User>> AddOrUpdateUser([FromBody] ChangedUser model)
     {
         if (!AuthorizeAny(
             () => Actor.IsAdmin

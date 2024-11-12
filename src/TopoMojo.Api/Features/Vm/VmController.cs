@@ -1,4 +1,4 @@
-// Copyright 2021 Carnegie Mellon University. All Rights Reserved.
+// Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Authorization;
@@ -25,7 +25,7 @@ public class VmController(
     UserService userService,
     IHypervisorService podService,
     CoreOptions options
-    ) : _Controller(logger, hub)
+    ) : BaseController(logger, hub)
 {
 
     /// <summary>
@@ -37,7 +37,7 @@ public class VmController(
     [SwaggerOperation(OperationId = "ListVms")]
     [Authorize]
 
-    public async Task<ActionResult<Vm[]>> ListVms([FromQuery]string filter)
+    public async Task<ActionResult<Vm[]>> ListVms([FromQuery] string filter)
     {
         if (!AuthorizeAny(
             () => Actor.IsObserver
@@ -99,7 +99,7 @@ public class VmController(
     [HttpPut("api/vm")]
     [SwaggerOperation(OperationId = "ChangeVm")]
     [Authorize(AppConstants.AnyUserPolicy)]
-    public async Task<ActionResult<Vm>> ChangeVm([FromBody]VmOperation op)
+    public async Task<ActionResult<Vm>> ChangeVm([FromBody] VmOperation op)
     {
         if (!AuthorizeAny(
             () => CanManageVmOperation(op).Result
@@ -152,7 +152,7 @@ public class VmController(
         if (
             Actor.IsBuilder.Equals(false) &&
             change.Key == "net" &&
-            change.Value.Contains('#').Equals(false) &&
+            change.Value.Contains(AppConstants.TagDelimiter).Equals(false) &&
             options.AllowUnprivilegedVmReconfigure.Equals(false)
         )
         {
@@ -233,8 +233,9 @@ public class VmController(
         if (
             Actor.IsBuilder.Equals(false) &&
             options.AllowUnprivilegedVmReconfigure.Equals(false)
-        ) {
-            opt.Net = opt.Net.Where(x => x.Contains('#')).ToArray();
+        )
+        {
+            opt.Net = opt.Net.Where(x => x.Contains(AppConstants.TagDelimiter)).ToArray();
         }
 
         return Ok(opt);
@@ -259,7 +260,7 @@ public class VmController(
         if (info.Url.IsEmpty())
             return Ok(info);
 
-        Logger.LogDebug($"mks url: {info.Url}");
+        Logger.LogDebug("mks url: {url}", info.Url);
 
         var src = new Uri(info.Url);
         string target = "";
@@ -273,28 +274,28 @@ public class VmController(
         {
             case "local-app":
                 target = $"{Request.Host.Value}{Request.PathBase}{internalHost}";
-            break;
+                break;
 
             case "external-domain":
                 target = $"{internalHost}.{domain}";
-            break;
+                break;
 
             case "host-map":
                 var map = podService.Options.TicketUrlHostMap;
-                if (map.ContainsKey(src.Host))
-                    target = map[src.Host];
-            break;
+                if (map.TryGetValue(src.Host, out string value))
+                    target = value;
+                break;
 
             // TODO: make this default after publishing change
             case "none":
             case "":
-            break;
+                break;
 
             case "querystring":
             default:
                 qs = $"?vmhost={src.Host}";
                 target = options.ConsoleHost;
-            break;
+                break;
         }
 
         if (target.NotEmpty())
@@ -302,7 +303,7 @@ public class VmController(
 
         info.Url += qs;
 
-        Logger.LogDebug($"mks url: {info.Url}");
+        Logger.LogDebug("mks url: {url}", info.Url);
 
         return Ok(info);
     }
@@ -317,9 +318,9 @@ public class VmController(
     [Authorize]
     public async Task<ActionResult<Vm>> ResolveVmFromTemplate(string id)
     {
-        var template  = await templateService.GetDeployableTemplate(id, null);
+        var template = await templateService.GetDeployableTemplate(id, null);
 
-        string name = $"{template.Name}#{template.IsolationTag}";
+        string name = $"{template.Name}{AppConstants.TagDelimiter}{template.IsolationTag}";
 
         if (!AuthorizeAny(
             () => CanManageVm(name, Actor).Result
@@ -340,11 +341,11 @@ public class VmController(
     [Authorize]
     public async Task<ActionResult<Vm>> DeployVm(string id)
     {
-        VmTemplate template  = await templateService
+        VmTemplate template = await templateService
             .GetDeployableTemplate(id, null)
         ;
 
-        string name = $"{template.Name}#{template.IsolationTag}";
+        string name = $"{template.Name}{AppConstants.TagDelimiter}{template.IsolationTag}";
 
         if (!AuthorizeAny(
             () => CanManageVm(name, Actor).Result
@@ -356,7 +357,7 @@ public class VmController(
         {
             await podService.SetAffinity(
                 template.IsolationTag,
-                new Vm[] { vm },
+                [vm],
                 true
             );
 
@@ -390,9 +391,9 @@ public class VmController(
     [Authorize]
     public async Task<ActionResult<int>> InitializeVmTemplate(string id)
     {
-        VmTemplate template  = await templateService.GetDeployableTemplate(id, null);
+        VmTemplate template = await templateService.GetDeployableTemplate(id, null);
 
-        string name = $"{template.Name}#{template.IsolationTag}";
+        string name = $"{template.Name}{AppConstants.TagDelimiter}{template.IsolationTag}";
 
         if (!AuthorizeAny(
             () => CanManageVm(name, Actor).Result
@@ -443,7 +444,7 @@ public class VmController(
     private async Task<string> GetVmIsolationTag(string id)
     {
         // id here can be name#isolationId, vm-id, or just isolationId
-        return id.Contains('#')
+        return id.Contains(AppConstants.TagDelimiter)
             ? id.Tag()
             : (await podService.Load(id))?.Name.Tag() ?? id
         ;
