@@ -241,6 +241,53 @@ public class VmController(
     }
 
     /// <summary>
+    /// Start a vm command execution.
+    /// </summary>
+    /// <param name="id">Vm Id</param>
+    /// <param name="commandList">Commands to execute</param>
+    /// <returns>The pid of the started command execution process.</returns>
+    [HttpPost("api/vm/{id}/exec")]
+    [SwaggerOperation(OperationId = "ExecVmCommand")]
+    [Authorize(AppConstants.AnyUserPolicy)]
+    public async Task<ActionResult<int>> ExecVmCommand(string id, [FromBody] string[] commandList)
+    {
+        if (!AuthorizeAny(
+            () => CanManageVm(id, Actor).Result
+        )) return Forbid();
+
+        try {
+            return Ok(
+                await podService.ExecCommand(id, commandList)
+            );
+        } catch (Exception ex) {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Get a vm command execution output.
+    /// </summary>
+    /// <param name="id">Vm Id</param>
+    /// <param name="pid">Command pid @see ExecVmCommand</param>
+    /// <returns>The output of the command execution.</returns>
+    [HttpGet("api/vm/{id}/exec/{pid}")]
+    [SwaggerOperation(OperationId = "GetVmCommandOutput")]
+    [Authorize(AppConstants.AnyUserPolicy)]
+    public async Task<ActionResult<VmExecResponse>> GetVmCommandOutput(string id, int pid)
+    {
+        if (!AuthorizeAny(
+            () => CanManageVm(id, Actor).Result
+        )) return Forbid();
+
+        try {
+            return Ok(
+                await podService.GetCommandOutput(id, pid)
+            );
+        } catch (Exception ex) {
+            return BadRequest(ex.Message);
+        }
+    }
+    /// <summary>
     /// Request a vm console access ticket.
     /// </summary>
     /// <param name="id"></param>

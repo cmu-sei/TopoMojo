@@ -31,6 +31,8 @@ namespace TopoMojo.Hypervisor
         // Task<TemplateOptions> GetTemplateOptions(string key);
         Task<VmOptions> GetVmIsoOptions(string key);
         Task<VmOptions> GetVmNetOptions(string key);
+        Task<int> ExecCommand(string id, string[] command);
+        Task<VmExecResponse> GetCommandOutput(string id, int pid);
         string Version { get; }
         Task ReloadHost(string host);
         HypervisorServiceConfiguration Options { get; }

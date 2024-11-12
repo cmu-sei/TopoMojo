@@ -477,6 +477,19 @@ namespace TopoMojo.Hypervisor.vSphere
                 Net = _vlanman.FindNetworks(id)
             };
         }
+
+        public async Task<int> ExecCommand(string id, string[] command)
+        {
+            // TODO: implement
+            throw new NotImplementedException();
+        }
+
+        public async Task<VmExecResponse> GetCommandOutput(string id, int pid)
+        {
+            // TODO: implement
+            throw new NotImplementedException();
+        }
+
         public string Version
         {
             get
