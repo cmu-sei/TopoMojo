@@ -12,7 +12,7 @@ using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
-    public class ProxmoxHypervisorService : IHypervisorService
+    public partial class ProxmoxHypervisorService : IHypervisorService
     {
         public ProxmoxHypervisorService(
             HypervisorServiceConfiguration options,
@@ -144,7 +144,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (template.IsolationTag.HasValue())
             {
                 var tag = "#" + template.IsolationTag;
-                var rgx = new Regex("#.*");
+                var rgx = MyRegex();
 
                 if (!template.Name.EndsWith(template.IsolationTag))
                     template.Name = rgx.Replace(template.Name, "") + tag;
@@ -480,7 +480,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private Task DeploymentHandler()
         {
-            foreach(var ctx in DeploymentCollection.GetConsumingEnumerable())
+            foreach (var ctx in DeploymentCollection.GetConsumingEnumerable())
                 _ = DeployBatch(ctx);
 
             return Task.CompletedTask;
@@ -505,5 +505,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             else
                 DeploymentCollection.Add(ctx);
         }
+
+        [GeneratedRegex("#.*")]
+        private static partial Regex MyRegex();
     }
 }

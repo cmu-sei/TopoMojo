@@ -29,7 +29,7 @@ namespace TopoMojo.Hypervisor.vSphere
         public static ManagedObjectReference AsVim(this Vm vm)
         {
             string[] mor = vm.Reference.Split('|');
-            return new ManagedObjectReference { type = mor[0], Value=mor[1]};
+            return new ManagedObjectReference { type = mor[0], Value = mor[1] };
         }
 
         public static void AddRam(this VirtualMachineConfigSpec vmcs, int ram)
@@ -84,7 +84,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 int x = item.IndexOf('=');
                 if (x > 0)
                 {
-                    option.key = item[..x].Replace(" " , "").Trim();
+                    option.key = item[..x].Replace(" ", "").Trim();
                     if (!option.key.StartsWith("guestinfo."))
                         option.key = "guestinfo." + option.key;
                     option.value = item[(x + 1)..].Trim();

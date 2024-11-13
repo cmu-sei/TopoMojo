@@ -15,7 +15,7 @@ using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.vSphere
 {
-    public class VimClient
+    public partial class VimClient
     {
         public VimClient(
             HypervisorServiceConfiguration options,
@@ -343,7 +343,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         };
 
                         vmcs.deviceChange = [
-                            new VirtualDeviceConfigSpec {
+                            new VirtualDeviceConfigSpec
+                            {
                                 device = cdrom,
                                 operation = VirtualDeviceConfigSpecOperation.edit,
                                 operationSpecified = true
@@ -375,7 +376,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         }
 
                         vmcs.deviceChange = [
-                            new VirtualDeviceConfigSpec {
+                            new VirtualDeviceConfigSpec
+                            {
                                 device = card,
                                 operation = VirtualDeviceConfigSpecOperation.edit,
                                 operationSpecified = true
@@ -395,7 +397,7 @@ namespace TopoMojo.Hypervisor.vSphere
                         newvalue += '\n';
                     vmcs.annotation = config.annotation + newvalue;
                     if (vm.State == VmPowerState.Running && vmcs.annotation.HasValue())
-                        vmcs.AddGuestInfo(Regex.Split(vmcs.annotation, "\r\n|\r|\n"));
+                        vmcs.AddGuestInfo(EndOfLineRegex().Split(vmcs.annotation));
                     break;
 
                 default:
@@ -442,15 +444,15 @@ namespace TopoMojo.Hypervisor.vSphere
                             _taskMap[id].description.message,
                             _taskMap[id].error.localizedMessage
                         );
-                    break;
+                        break;
 
                     case TaskInfoState.success:
                         progress = 100;
-                    break;
+                        break;
 
                     default:
                         progress = _taskMap[id].progress;
-                    break;
+                        break;
                 }
             }
             catch
@@ -561,7 +563,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
                     if (recursive)
                     {
-                        try {
+                        try
+                        {
 
                             if (_config.DebugVerbose)
                                 _logger.LogDebug("searching recursive {path} for {pattern}", dsPath.FolderPath, pattern);
@@ -591,7 +594,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     else
                     {
                         if (_config.DebugVerbose)
-                                _logger.LogDebug("searching {path} for {pattern}", dsPath.FolderPath, pattern);
+                            _logger.LogDebug("searching {path} for {pattern}", dsPath.FolderPath, pattern);
 
                         task = await _vim.SearchDatastore_TaskAsync(
                             dsBrowser, dsPath.FolderPath, spec
@@ -815,7 +818,8 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 _logger.LogError(ex, "Failed to get TaskInfo for {value}", task.Value);
 
-                info = new TaskInfo {
+                info = new TaskInfo
+                {
                     task = task,
                     state = TaskInfoState.error
                 };
@@ -930,7 +934,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         type = "Datacenter",
                         path = "hostFolder",
                         selectSet = [
-                            new SelectionSpec {
+                            new SelectionSpec
+                            {
                                 name = "FolderTraverseSpec"
                             }
                         ]
@@ -941,7 +946,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         type = "Datacenter",
                         path = "networkFolder",
                         selectSet = [
-                            new SelectionSpec {
+                            new SelectionSpec
+                            {
                                 name = "FolderTraverseSpec"
                             }
                         ]
@@ -955,8 +961,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         [
                             new TraversalSpec
                             {
-                                type="ResourcePool",
-                                path="resourcePool"
+                                type = "ResourcePool",
+                                path = "resourcePool"
                             }
                         ]
                     },
@@ -1293,7 +1299,8 @@ namespace TopoMojo.Hypervisor.vSphere
                     if (_vim != null && _vim.State == CommunicationState.Opened)
                     {
                         await ReloadVmCache();
-                        if (step == 0) {
+                        if (step == 0)
+                        {
                             await _netman.Clean();
                         }
                     }
@@ -1313,7 +1320,7 @@ namespace TopoMojo.Hypervisor.vSphere
                         await Connect();
                 }
 
-                step = (step+1)%2;
+                step = (step + 1) % 2;
             }
         }
 
@@ -1372,6 +1379,9 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await _netman.ProvisionAll(eths, useUplinkSwitch);
         }
+
+        [GeneratedRegex("\r\n|\r|\n")]
+        private static partial Regex EndOfLineRegex();
     }
 
 }

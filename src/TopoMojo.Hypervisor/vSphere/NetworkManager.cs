@@ -110,7 +110,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 var pgs = AddPortGroups(sw, manifest).Result;
 
                 _vlanManager.Activate(
-                    pgs.Select(p => new Vlan {
+                    pgs.Select(p => new Vlan
+                    {
                         Id = p.VlanId,
                         Name = p.Net,
                         OnUplink = sw == _client.UplinkSwitch
@@ -132,7 +133,7 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await Task.Delay(0);
 
-            lock(_pgAllocation)
+            lock (_pgAllocation)
             {
                 var map = GetKeyMap();
 
@@ -149,7 +150,7 @@ namespace TopoMojo.Hypervisor.vSphere
             await Task.Delay(0);
             _logger.LogDebug("cleaning nets [{tag}]", tag);
 
-            lock(_pgAllocation)
+            lock (_pgAllocation)
             {
                 IEnumerable<PortGroupAllocation> q = string.IsNullOrEmpty(tag)
                     ? _pgAllocation.Values

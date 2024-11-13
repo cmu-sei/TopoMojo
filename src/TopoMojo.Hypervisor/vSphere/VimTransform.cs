@@ -140,14 +140,16 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (nic.Net.StartsWith("nsx."))
             {
-                eth.backing = new VirtualEthernetCardOpaqueNetworkBackingInfo {
+                eth.backing = new VirtualEthernetCardOpaqueNetworkBackingInfo
+                {
                     opaqueNetworkId = nic.Key.Tag(),
                     opaqueNetworkType = nic.Key.Untagged()
                 };
             }
             else if (dvsuuid.HasValue())
             {
-                eth.backing = new VirtualEthernetCardDistributedVirtualPortBackingInfo {
+                eth.backing = new VirtualEthernetCardDistributedVirtualPortBackingInfo
+                {
                     port = new DistributedVirtualSwitchPortConnection
                     {
                         switchUuid = dvsuuid,

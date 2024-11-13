@@ -14,7 +14,7 @@ using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.vMock
 {
-    public class MockHypervisorService : IHypervisorService, IHostedService
+    public partial class MockHypervisorService : IHypervisorService, IHostedService
     {
         public MockHypervisorService(
             HypervisorServiceConfiguration podConfiguration,
@@ -69,7 +69,8 @@ namespace TopoMojo.Hypervisor.vMock
                 }
                 else if (progress.Sum() >= 0)
                 {
-                    vm.Task = new VmTask {
+                    vm.Task = new VmTask
+                    {
                         Name = "initializing",
                         Progress = progress.Sum() / progress.Length
                     };
@@ -153,8 +154,8 @@ namespace TopoMojo.Hypervisor.vMock
                     DefaultChoice = "yes",
 
                     Choices = [
-                        new VmQuestionChoice { Key="yes", Label="Yes" },
-                        new VmQuestionChoice { Key="no", Label="No" }
+                        new VmQuestionChoice { Key = "yes", Label = "Yes" },
+                        new VmQuestionChoice { Key = "no", Label = "No" }
                     ]
                 };
             }
@@ -304,7 +305,9 @@ namespace TopoMojo.Hypervisor.vMock
                 if (disk.Path.Contains("blank-"))
                 {
                     result[index] = 100;
-                } else {
+                }
+                else
+                {
                     // check file existence
                     result[index] = _disks.Any(d => d.Path == disk.Path) ? 100 : -1;
                 }
@@ -479,7 +482,7 @@ namespace TopoMojo.Hypervisor.vMock
 
         private static void NormalizeOptions(HypervisorServiceConfiguration options)
         {
-            var regex = new Regex("(]|/)$");
+            var regex = DataStoreEndsWithRegex();
 
             if (!regex.IsMatch(options.VmStore))
                 options.VmStore += "/";
@@ -519,6 +522,9 @@ namespace TopoMojo.Hypervisor.vMock
             else
                 DeploymentCollection.Add(ctx);
         }
+
+        [GeneratedRegex("(]|/)$")]
+        private static partial Regex DataStoreEndsWithRegex();
     }
 
     public class MockDisk

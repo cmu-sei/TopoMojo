@@ -57,7 +57,8 @@ namespace TopoMojo.Hypervisor.vSphere
             if (
                 string.IsNullOrEmpty(_config.CertificatePath).Equals(false) &&
                 File.Exists(_config.CertificatePath)
-            ) {
+            )
+            {
                 InitClientWithCertificate();
                 return;
             }
@@ -97,7 +98,7 @@ namespace TopoMojo.Hypervisor.vSphere
             _sddc = new HttpClient();
 
             var content = new FormUrlEncodedContent(
-                new KeyValuePair<string,string>[] {
+                new KeyValuePair<string, string>[] {
                     new("refresh_token",_config.ApiKey)
                 }
             );
@@ -131,7 +132,7 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             await InitClient();
 
-            string url = $"{_apiUrl}/{_apiSegments}/{eth.Net.Replace("#","%23")}";
+            string url = $"{_apiUrl}/{_apiSegments}/{eth.Net.Replace("#", "%23")}";
 
             var response = await _sddc.PutAsync(
                 url,
@@ -177,7 +178,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             foreach (var eth in eths)
             {
-                string url = $"{_apiUrl}/{_apiSegments}/{eth.Net.Replace("#","%23")}";
+                string url = $"{_apiUrl}/{_apiSegments}/{eth.Net.Replace("#", "%23")}";
 
                 var response = await _sddc.PutAsync(
                     url,
@@ -309,7 +310,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 await InitClient();
 
                 var response = await _sddc.DeleteAsync(
-                    $"{_apiUrl}/{_apiSegments}/{pga.Net.Replace("#","%23")}"
+                    $"{_apiUrl}/{_apiSegments}/{pga.Net.Replace("#", "%23")}"
                 );
 
                 if (!response.IsSuccessStatusCode)

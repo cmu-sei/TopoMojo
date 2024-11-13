@@ -41,7 +41,8 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             int port = 443;
             string host = _config.Url;
-            if (Uri.TryCreate(_config.Url, UriKind.RelativeOrAbsolute, out Uri result) && result.IsAbsoluteUri) {
+            if (Uri.TryCreate(_config.Url, UriKind.RelativeOrAbsolute, out Uri result) && result.IsAbsoluteUri)
+            {
                 host = result.Host;
                 port = result.Port;
             }
@@ -707,7 +708,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             return nodes.ElementAt(randomNum).Node;
         }
 
-        private string GetArgs(VmTemplate template)
+        private static string GetArgs(VmTemplate template)
         {
             if (template.GuestSettings.Length == 0)
                 return null;
@@ -752,12 +753,12 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
         }
 
-        private string GetMemory(VmTemplate template)
+        private static string GetMemory(VmTemplate template)
         {
             return ((template.Ram > 0) ? template.Ram * 1024 : 1024).ToString();
         }
 
-        private int? GetCoresPerSocket(VmTemplate template)
+        private static int? GetCoresPerSocket(VmTemplate template)
         {
             string[] p = template.Cpu.Split('x');
             int coresPerSocket = 1;
@@ -773,7 +774,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             return coresPerSocket;
         }
 
-        private int? GetSockets(VmTemplate template)
+        private static int? GetSockets(VmTemplate template)
         {
             string[] p = template.Cpu.Split('x');
             if (!int.TryParse(p[0], out int sockets))

@@ -18,7 +18,7 @@ namespace TopoMojo.Hypervisor
         private string _ds;
         public string Datastore
         {
-            get { return _ds;}
+            get { return _ds; }
             set { _ds = value; }
         }
 
@@ -38,7 +38,8 @@ namespace TopoMojo.Hypervisor
         public string TopLevelFolder
         {
             get { return _folder.Split('/').First(); }
-            set {
+            set
+            {
                 List<string> list = [value, .. _folder.Split('/').Skip(1)];
                 _folder = string.Join("/", list);
             }
@@ -47,8 +48,8 @@ namespace TopoMojo.Hypervisor
         private string _file;
         public string File
         {
-            get { return _file;}
-            set { _file = value;}
+            get { return _file; }
+            set { _file = value; }
         }
 
         /// <summary>
@@ -72,7 +73,7 @@ namespace TopoMojo.Hypervisor
 
             if (x >= 0 && y > x)
             {
-                ds = folder.Substring(x+1, y-x-1);
+                ds = folder.Substring(x + 1, y - x - 1);
                 folder = folder[(y + 1)..].Trim();
             }
 

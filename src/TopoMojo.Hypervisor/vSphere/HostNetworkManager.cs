@@ -44,7 +44,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 await _client.Vim.AddPortGroupAsync(_client.Net, spec);
 
-            } catch {}
+            }
+            catch { }
 
             return new PortGroupAllocation
             {
@@ -104,7 +105,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             var list = new List<PortGroupAllocation>();
 
-            foreach(HostPortGroup pg in pgs)
+            foreach (HostPortGroup pg in pgs)
             {
                 string net = pg.spec.name;
 
@@ -129,7 +130,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 await _client.Vim.RemovePortGroupAsync(_client.Net, pgReference);
             }
-            catch {}
+            catch { }
             return true;
         }
 
@@ -139,7 +140,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 await _client.Vim.RemoveVirtualSwitchAsync(_client.Net, sw);
             }
-            catch {}
+            catch { }
         }
 
         public override void UpdateEthernetCardBacking(VirtualEthernetCard card, string portgroupName)

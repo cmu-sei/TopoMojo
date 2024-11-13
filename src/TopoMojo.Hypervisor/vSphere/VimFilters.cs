@@ -24,11 +24,13 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 obj = mor, //_vms or vm-mor
                 selectSet = [
-                    new TraversalSpec {
+                    new TraversalSpec
+                    {
                         type = "Folder",
                         path = "childEntity"
                     },
-                    new TraversalSpec {
+                    new TraversalSpec
+                    {
                         type = "ResourcePool",
                         path = "vm"
                     }
@@ -36,7 +38,8 @@ namespace TopoMojo.Hypervisor.vSphere
             };
 
             return [
-                new() {
+                new()
+                {
                     propSet = [prop],
                     objectSet = [objectspec]
                 }
@@ -57,7 +60,8 @@ namespace TopoMojo.Hypervisor.vSphere
             };
 
             return [
-                new() {
+                new()
+                {
                     propSet = [prop],
                     objectSet = [objectspec]
                 }
@@ -82,7 +86,8 @@ namespace TopoMojo.Hypervisor.vSphere
             };
 
             return [
-                new() {
+                new()
+                {
                     propSet = [prop],
                     objectSet = [objectspec]
                 }
@@ -101,7 +106,8 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 obj = mor, //_res
                 selectSet = [
-                    new TraversalSpec {
+                    new TraversalSpec
+                    {
                         type = "ComputeResource",
                         path = "datastore"
                     }
@@ -109,7 +115,8 @@ namespace TopoMojo.Hypervisor.vSphere
             };
 
             return [
-                new() {
+                new()
+                {
                     propSet = [prop],
                     objectSet = [objectspec]
                 }
@@ -130,7 +137,8 @@ namespace TopoMojo.Hypervisor.vSphere
             };
 
             return [
-                new() {
+                new()
+                {
                     propSet = [prop],
                     objectSet = [objectspec]
                 }
@@ -150,7 +158,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 obj = mor, //_pool
                 selectSet =
                 [
-                    new TraversalSpec {
+                    new TraversalSpec
+                    {
                         type = "ComputeResource",
                         path = "network",
                     }
@@ -158,7 +167,8 @@ namespace TopoMojo.Hypervisor.vSphere
             };
 
             return [
-                new() {
+                new()
+                {
                     propSet = [prop],
                     objectSet = [objectspec]
                 }
@@ -178,7 +188,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 obj = mor, //_pool
                 selectSet =
                 [
-                    new TraversalSpec {
+                    new TraversalSpec
+                    {
                         type = "ComputeResource",
                         path = "network",
                     }
@@ -186,7 +197,8 @@ namespace TopoMojo.Hypervisor.vSphere
             };
 
             return [
-                new() {
+                new()
+                {
                     propSet = [prop],
                     objectSet = [objectspec]
                 }
@@ -207,7 +219,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         type = "Datacenter",
                         path = "hostFolder",
                         selectSet = [
-                            new SelectionSpec {
+                            new SelectionSpec
+                            {
                                 name = "FolderTraverseSpec"
                             }
                         ]
@@ -218,7 +231,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         type = "Datacenter",
                         path = "networkFolder",
                         selectSet = [
-                            new() {
+                            new()
+                            {
                                 name = "FolderTraverseSpec"
                             }
                         ]
@@ -232,8 +246,8 @@ namespace TopoMojo.Hypervisor.vSphere
                         [
                             new TraversalSpec
                             {
-                                type="ResourcePool",
-                                path="resourcePool"
+                                type = "ResourcePool",
+                                path = "resourcePool"
                             }
                         ]
                     },
