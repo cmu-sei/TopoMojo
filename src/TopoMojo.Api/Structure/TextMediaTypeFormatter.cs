@@ -13,7 +13,7 @@ namespace TopoMojo.Api
     {
         public bool CanRead(InputFormatterContext context)
         {
-            if (context == null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullException.ThrowIfNull(context);
 
             var contentType = context.HttpContext.Request.ContentType;
             if (contentType == null || contentType == "text/plain")
@@ -23,7 +23,7 @@ namespace TopoMojo.Api
 
         public Task<InputFormatterResult> ReadAsync(InputFormatterContext context)
         {
-            if (context == null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullException.ThrowIfNull(context);
 
             var request = context.HttpContext.Request;
             if (request.ContentLength == 0)
@@ -33,11 +33,9 @@ namespace TopoMojo.Api
                 else return InputFormatterResult.SuccessAsync(null);
             }
 
-            using (var reader = new StreamReader(context.HttpContext.Request.Body))
-            {
-                var model = reader.ReadToEndAsync().Result;
-                return InputFormatterResult.SuccessAsync(model);
-            }
+            using var reader = new StreamReader(context.HttpContext.Request.Body);
+            var model = reader.ReadToEndAsync().Result;
+            return InputFormatterResult.SuccessAsync(model);
         }
     }
 }

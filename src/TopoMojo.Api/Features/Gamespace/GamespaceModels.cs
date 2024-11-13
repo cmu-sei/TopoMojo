@@ -112,7 +112,7 @@ namespace TopoMojo.Api.Models
         public bool AllowPreview { get; set; }
         public bool StartGamespace { get; set; }
         public DateTimeOffset ExpirationTime { get; set; }
-        public RegistrationPlayer[] Players { get; set; } = new RegistrationPlayer[] { };
+        public RegistrationPlayer[] Players { get; set; } = [];
     }
 
     public class RegistrationPlayer

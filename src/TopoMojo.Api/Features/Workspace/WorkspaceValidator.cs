@@ -90,7 +90,7 @@ namespace TopoMojo.Api.Validators
                 Problems.Add(new Problem(key, "Missing value for required property 'name'"));
         }
 
-        private async Task Validate(string key, ChallengeSpec model)
+        private static async Task Validate(string key, ChallengeSpec model)
         {
             await Task.CompletedTask;
         }

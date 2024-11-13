@@ -368,12 +368,12 @@ namespace TopoMojo.Api.Data.Migrations.PostgreSQL.TopoMojoDb
             migrationBuilder.AddPrimaryKey(
                 name: "PK_Workers",
                 table: "Workers",
-                columns: new[] { "SubjectId", "WorkspaceId" });
+                columns: ["SubjectId", "WorkspaceId"]);
 
             migrationBuilder.AddPrimaryKey(
                 name: "PK_Players",
                 table: "Players",
-                columns: new[] { "SubjectId", "GamespaceId" });
+                columns: ["SubjectId", "GamespaceId"]);
 
             migrationBuilder.AddPrimaryKey(
                 name: "PK_ApiKeys",

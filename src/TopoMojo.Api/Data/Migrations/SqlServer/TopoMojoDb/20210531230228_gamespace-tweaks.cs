@@ -87,7 +87,7 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
             migrationBuilder.CreateIndex(
                 name: "IX_Players_SubjectId_WorkspaceId",
                 table: "Players",
-                columns: new[] { "SubjectId", "WorkspaceId" });
+                columns: ["SubjectId", "WorkspaceId"]);
 
             migrationBuilder.AddForeignKey(
                 name: "FK_Players_Users_UserId",

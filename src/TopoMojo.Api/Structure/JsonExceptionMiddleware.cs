@@ -26,7 +26,7 @@ namespace TopoMojo.Api
                 {
                     logger.LogError(ex, "Error");
 
-                    var errorList = cache.Get<List<TimestampedException>>(AppConstants.ErrorListCacheKey) ?? new List<TimestampedException>();
+                    var errorList = cache.Get<List<TimestampedException>>(AppConstants.ErrorListCacheKey) ?? [];
                     errorList.Add(new TimestampedException
                     {
                         Timestamp = DateTimeOffset.UtcNow,

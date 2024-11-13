@@ -29,20 +29,14 @@ namespace TopoMojo.Api
         }
 
     }
-    public class TicketAuthenticationHandler : AuthenticationHandler<TicketAuthenticationOptions>
+    public class TicketAuthenticationHandler(
+        IOptionsMonitor<TicketAuthenticationOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder,
+        IDistributedCache cache
+        ) : AuthenticationHandler<TicketAuthenticationOptions>(options, logger, encoder)
     {
-        public TicketAuthenticationHandler(
-            IOptionsMonitor<TicketAuthenticationOptions> options,
-            ILoggerFactory logger,
-            UrlEncoder encoder,
-            IDistributedCache cache
-        )
-            : base(options, logger, encoder)
-        {
-            _cache = cache;
-        }
-
-        private readonly IDistributedCache _cache;
+        private readonly IDistributedCache _cache = cache;
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
         {
@@ -86,8 +80,8 @@ namespace TopoMojo.Api
             var principal = new ClaimsPrincipal(
                 new ClaimsIdentity(
                     new Claim[] {
-                        new Claim(TicketAuthentication.ClaimNames.Subject, subject),
-                        new Claim(TicketAuthentication.ClaimNames.Name, name)
+                        new(TicketAuthentication.ClaimNames.Subject, subject),
+                        new(TicketAuthentication.ClaimNames.Name, name)
                     },
                     Scheme.Name
                 )

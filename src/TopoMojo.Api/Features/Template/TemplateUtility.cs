@@ -38,12 +38,12 @@ namespace TopoMojo.Api.Services
             }
         }
 
-        private VmTemplate _template = null;
-        private JsonSerializerOptions JsonDeserializerOption => new()
+        private readonly VmTemplate _template = null;
+        private static JsonSerializerOptions JsonDeserializerOption => new()
         {
             PropertyNameCaseInsensitive = true
         };
-        private JsonSerializerOptions JsonOptions => new()
+        private static JsonSerializerOptions JsonOptions => new()
         {
             WriteIndented = true,
         };

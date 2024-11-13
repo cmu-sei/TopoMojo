@@ -10,7 +10,7 @@ namespace TopoMojo.Api.Services
         public Data.Gamespace Gamespace { get; set; }
         public Data.Workspace Workspace { get; set; }
         public GamespaceRegistration Request { get; set; }
-        public bool WorkspaceExists { get { return Workspace is Data.Workspace; } }
-        public bool GamespaceExists { get { return Gamespace is Data.Gamespace; } }
+        public bool WorkspaceExists { get { return Workspace is not null; } }
+        public bool GamespaceExists { get { return Gamespace is not null; } }
     }
 }
