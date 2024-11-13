@@ -37,7 +37,7 @@ public class VmController(
     [SwaggerOperation(OperationId = "ListVms")]
     [Authorize]
 
-    public async Task<ActionResult<Vm[]>> ListVms([FromQuery]string filter)
+    public async Task<ActionResult<Vm[]>> ListVms([FromQuery] string filter)
     {
         if (!AuthorizeAny(
             () => Actor.IsObserver
@@ -99,7 +99,7 @@ public class VmController(
     [HttpPut("api/vm")]
     [SwaggerOperation(OperationId = "ChangeVm")]
     [Authorize(AppConstants.AnyUserPolicy)]
-    public async Task<ActionResult<Vm>> ChangeVm([FromBody]VmOperation op)
+    public async Task<ActionResult<Vm>> ChangeVm([FromBody] VmOperation op)
     {
         if (!AuthorizeAny(
             () => CanManageVmOperation(op).Result
@@ -233,7 +233,8 @@ public class VmController(
         if (
             Actor.IsBuilder.Equals(false) &&
             options.AllowUnprivilegedVmReconfigure.Equals(false)
-        ) {
+        )
+        {
             opt.Net = opt.Net.Where(x => x.Contains(AppConstants.TagDelimiter)).ToArray();
         }
 
@@ -273,28 +274,28 @@ public class VmController(
         {
             case "local-app":
                 target = $"{Request.Host.Value}{Request.PathBase}{internalHost}";
-            break;
+                break;
 
             case "external-domain":
                 target = $"{internalHost}.{domain}";
-            break;
+                break;
 
             case "host-map":
                 var map = podService.Options.TicketUrlHostMap;
                 if (map.TryGetValue(src.Host, out string value))
                     target = value;
-            break;
+                break;
 
             // TODO: make this default after publishing change
             case "none":
             case "":
-            break;
+                break;
 
             case "querystring":
             default:
                 qs = $"?vmhost={src.Host}";
                 target = options.ConsoleHost;
-            break;
+                break;
         }
 
         if (target.NotEmpty())
@@ -317,7 +318,7 @@ public class VmController(
     [Authorize]
     public async Task<ActionResult<Vm>> ResolveVmFromTemplate(string id)
     {
-        var template  = await templateService.GetDeployableTemplate(id, null);
+        var template = await templateService.GetDeployableTemplate(id, null);
 
         string name = $"{template.Name}{AppConstants.TagDelimiter}{template.IsolationTag}";
 
@@ -340,7 +341,7 @@ public class VmController(
     [Authorize]
     public async Task<ActionResult<Vm>> DeployVm(string id)
     {
-        VmTemplate template  = await templateService
+        VmTemplate template = await templateService
             .GetDeployableTemplate(id, null)
         ;
 
@@ -390,7 +391,7 @@ public class VmController(
     [Authorize]
     public async Task<ActionResult<int>> InitializeVmTemplate(string id)
     {
-        VmTemplate template  = await templateService.GetDeployableTemplate(id, null);
+        VmTemplate template = await templateService.GetDeployableTemplate(id, null);
 
         string name = $"{template.Name}{AppConstants.TagDelimiter}{template.IsolationTag}";
 

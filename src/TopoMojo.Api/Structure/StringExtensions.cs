@@ -102,14 +102,14 @@ namespace TopoMojo.Api.Extensions
         public static string ExtractBefore(this string s, string target)
         {
             int x = s.IndexOf(target);
-            return (x>-1)
+            return (x > -1)
                 ? s[..x]
                 : s;
         }
         public static string ExtractAfter(this string s, string target)
         {
             int x = s.IndexOf(target);
-            return (x>-1)
+            return (x > -1)
                 ? s[(x + 1)..]
                 : s;
         }
@@ -201,7 +201,7 @@ namespace TopoMojo.Api.Extensions
         {
             return DateTimeOffset.UtcNow
                 .Subtract(
-                    new TimeSpan( 0, 0, ts.ToSeconds())
+                    new TimeSpan(0, 0, ts.ToSeconds())
                 );
         }
 
@@ -280,13 +280,13 @@ namespace TopoMojo.Api.Extensions
                 uint mask = 0xFFFFFFFF << (32 - int.Parse(net.Last()));
                 if (~mask > 0)
                 {
-                    uint host = (uint) new Random().Next(1,(int)~mask);
+                    uint host = (uint)new Random().Next(1, (int)~mask);
                     addr |= host;
                 }
 
-                result = $"{addr>>24&0xff}.{addr>>16&0xff}.{addr>>8&0xff}.{addr&0xff}";
+                result = $"{addr >> 24 & 0xff}.{addr >> 16 & 0xff}.{addr >> 8 & 0xff}.{addr & 0xff}";
             }
-            catch {}
+            catch { }
 
             return result;
         }

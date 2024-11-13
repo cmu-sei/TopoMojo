@@ -5,13 +5,14 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using TopoMojo.Api;
 
-namespace  Microsoft.Extensions.DependencyInjection
+namespace Microsoft.Extensions.DependencyInjection
 {
     public static class AuthorizationStartupExtensions
     {
         public static IServiceCollection AddConfiguredAuthorization(
             this IServiceCollection services
-        ) {
+        )
+        {
             services.AddAuthorizationBuilder()
                 .SetDefaultPolicy(new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()

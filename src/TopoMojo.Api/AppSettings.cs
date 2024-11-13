@@ -119,18 +119,21 @@ namespace TopoMojo.Api
             CorsPolicyBuilder policy = new();
 
             var origins = Origins.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
-            if (origins.Length != 0) {
+            if (origins.Length != 0)
+            {
                 if (origins.First() == "*") policy.AllowAnyOrigin(); else policy.WithOrigins(origins);
                 if (AllowCredentials && origins.First() != "*") policy.AllowCredentials(); else policy.DisallowCredentials();
             }
 
             var methods = Methods.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
-            if (methods.Length != 0) {
+            if (methods.Length != 0)
+            {
                 if (methods.First() == "*") policy.AllowAnyMethod(); else policy.WithMethods(methods);
             }
 
             var headers = Headers.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
-            if (headers.Length != 0) {
+            if (headers.Length != 0)
+            {
                 if (headers.First() == "*") policy.AllowAnyHeader(); else policy.WithHeaders(headers);
             }
 

@@ -7,7 +7,7 @@ namespace TopoMojo.Api.Hubs
 {
     public class HubCache
     {
-        public ConcurrentDictionary<string,CachedConnection> Connections { get; } = new ConcurrentDictionary<string,CachedConnection>();
+        public ConcurrentDictionary<string, CachedConnection> Connections { get; } = new ConcurrentDictionary<string, CachedConnection>();
     }
 
     public class CachedConnection

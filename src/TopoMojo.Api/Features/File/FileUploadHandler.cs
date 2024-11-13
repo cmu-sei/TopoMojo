@@ -146,7 +146,7 @@ namespace TopoMojo.Api.Services
 
     public class FileUploadStatus
     {
-        public NameValueCollection Metadata { get; set;}
+        public NameValueCollection Metadata { get; set; }
         public string Key { get; set; }
         public long Size { get; set; }
         public long Count { get; set; }
@@ -155,7 +155,8 @@ namespace TopoMojo.Api.Services
         public Exception Error { get; set; }
         public int Progress => (int)(Count / (float)Size * 100);
         public int Duration => (int)StoppedAt.Subtract(StartedAt).TotalSeconds;
-        public int Rate {
+        public int Rate
+        {
             get
             {
                 DateTimeOffset now = (StoppedAt > DateTimeOffset.MinValue) ? StoppedAt : DateTimeOffset.UtcNow;

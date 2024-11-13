@@ -54,7 +54,7 @@ namespace TopoMojo.Api.Models
         public TemplateDetail Parent { get; set; }
     }
 
-    public class NewTemplateDetail: TemplateDetail
+    public class NewTemplateDetail : TemplateDetail
     {
     }
 
@@ -117,7 +117,7 @@ namespace TopoMojo.Api.Models
         public int Variant { get; set; }
     }
 
-    public class TemplateSearch: Search
+    public class TemplateSearch : Search
     {
         public const string PublishFilter = "published";
         public const string ParentFilter = "parents";
@@ -125,8 +125,8 @@ namespace TopoMojo.Api.Models
         [SwaggerIgnore][JsonIgnore] public bool WantsPublished => Filter.Contains(PublishFilter);
         [SwaggerIgnore][JsonIgnore] public bool WantsParents => Filter.Contains(ParentFilter);
 
-        [BindProperty(Name="aud")] public string Audience { get; set; }
-        [BindProperty(Name="pid")] public string ParentId { get; set; }
-        [BindProperty(Name="sib")] public string Sibling { get; set; }
+        [BindProperty(Name = "aud")] public string Audience { get; set; }
+        [BindProperty(Name = "pid")] public string ParentId { get; set; }
+        [BindProperty(Name = "sib")] public string Sibling { get; set; }
     }
 }

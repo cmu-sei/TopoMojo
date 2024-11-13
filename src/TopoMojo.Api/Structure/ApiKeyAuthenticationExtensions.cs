@@ -12,7 +12,8 @@ namespace Microsoft.Extensions.DependencyInjection
             this AuthenticationBuilder builder,
             string scheme,
             Action<ApiKeyAuthenticationOptions> options
-        ) {
+        )
+        {
 
             builder.AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
                 scheme ?? ApiKeyAuthentication.AuthenticationScheme,

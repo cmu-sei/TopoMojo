@@ -37,7 +37,7 @@ namespace TopoMojo.Api.Controllers
         {
             bool valid = true;
 
-            foreach(var requirement in requirements)
+            foreach (var requirement in requirements)
                 valid &= requirement.Invoke();
 
             return valid;
@@ -54,7 +54,7 @@ namespace TopoMojo.Api.Controllers
 
             bool valid = false;
 
-            foreach(var requirement in requirements)
+            foreach (var requirement in requirements)
             {
                 valid |= requirement.Invoke();
                 if (valid) break;
@@ -65,10 +65,10 @@ namespace TopoMojo.Api.Controllers
 
         internal void Log(string action, dynamic item, string msg = "")
         {
-            string entry = String.Format("{0} [{1}] {2} {3} {4} [{5}] {6}",
+            string entry = string.Format("{0} [{1}] {2} {3} {4} [{5}] {6}",
                 Actor?.Name, Actor?.Id, action, item?.GetType().Name, item?.Name, item?.Id, msg);
 
-            Logger.LogInformation(entry);
+            Logger.LogInformation("{entry}", entry);
         }
 
     }

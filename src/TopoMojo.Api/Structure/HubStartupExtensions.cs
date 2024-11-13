@@ -10,8 +10,9 @@ namespace Microsoft.Extensions.DependencyInjection
     {
         public static IServiceCollection AddSignalRHub(
             this IServiceCollection services
-        ) {
-            services.AddSignalR(options => {});
+        )
+        {
+            services.AddSignalR(options => { });
 
             services
                 .AddSingleton<HubCache>()

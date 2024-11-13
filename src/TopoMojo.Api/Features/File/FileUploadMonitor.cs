@@ -52,7 +52,7 @@ namespace TopoMojo.Api.Services
             while (true)
             {
                 DateTimeOffset now = DateTimeOffset.UtcNow;
-                foreach(FileProgress item in _monitor.Values.ToArray())
+                foreach (FileProgress item in _monitor.Values.ToArray())
                 {
                     if (now.CompareTo(item.Stop.AddMinutes(2)) > 0)
                     {

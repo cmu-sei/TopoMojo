@@ -60,7 +60,8 @@ namespace TopoMojo.Api
                 if (authHeader.Length > 1
                     && (scheme.Equals(TicketAuthentication.AuthenticationScheme, StringComparison.OrdinalIgnoreCase)
                     || scheme.Equals(TicketAuthentication.AltSchemeName, StringComparison.OrdinalIgnoreCase))
-                ) {
+                )
+                {
                     key = authHeader[1];
                 }
             }

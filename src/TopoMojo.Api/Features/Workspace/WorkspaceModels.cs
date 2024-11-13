@@ -93,9 +93,9 @@ namespace TopoMojo.Api.Models
 
     public class WorkspaceSearch : Search
     {
-        [BindProperty(Name="aud")] public string Audience { get; set; }
-        [BindProperty(Name="scope")] public string Scope { get; set; }
-        [BindProperty(Name="doc")] public int Doc { get; set; }
+        [BindProperty(Name = "aud")] public string Audience { get; set; }
+        [BindProperty(Name = "scope")] public string Scope { get; set; }
+        [BindProperty(Name = "doc")] public int Doc { get; set; }
         [SwaggerIgnore][JsonIgnore] public bool WantsAudience => string.IsNullOrEmpty(Audience).Equals(false);
         [SwaggerIgnore][JsonIgnore] public bool WantsManaged => Filter.Contains("my");
         [SwaggerIgnore][JsonIgnore] public bool WantsDoc => Doc > 0;

@@ -45,7 +45,8 @@ namespace TopoMojo.Api.Models
             Role == UserRole.Creator ||
             Role == UserRole.Administrator
         ;
-        public bool HasScope(string scope) {
+        public bool HasScope(string scope)
+        {
             return Scope.Split(' ', ',', ';').Contains(scope);
         }
     }
@@ -62,19 +63,19 @@ namespace TopoMojo.Api.Models
         public UserRole Role { get; set; }
     }
 
-    public class UserSearch: Search
+    public class UserSearch : Search
     {
         [SwaggerIgnore][JsonIgnore] public bool WantsAdmins => Filter.Contains(UserRole.Administrator.ToString().ToLower());
         [SwaggerIgnore][JsonIgnore] public bool WantsObservers => Filter.Contains(UserRole.Observer.ToString().ToLower());
         [SwaggerIgnore][JsonIgnore] public bool WantsCreators => Filter.Contains(UserRole.Creator.ToString().ToLower());
         [SwaggerIgnore][JsonIgnore] public bool WantsBuilders => Filter.Contains(UserRole.Builder.ToString().ToLower());
-        [BindProperty(Name="scope")] public string Scope { get; set; }
+        [BindProperty(Name = "scope")] public string Scope { get; set; }
     }
 
     public class UserRegistration
     {
         public string Id { get; set; }
-        public string Name{ get; set; }
+        public string Name { get; set; }
     }
 
     public class ApiKeyResult

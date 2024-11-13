@@ -20,7 +20,8 @@ namespace TopoMojo.Api.Services
 
         public CacheLockService(
             IDistributedCache cache
-        ) {
+        )
+        {
             _cache = cache;
 
             _opts = new DistributedCacheEntryOptions

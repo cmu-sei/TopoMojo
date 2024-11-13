@@ -19,7 +19,7 @@ namespace TopoMojo.Api.Data
             {
                 term = term.ToLower();
 
-                #pragma warning disable CA1862
+#pragma warning disable CA1862
                 q = q.Where(t =>
                     t.Name.ToLower().Contains(term) ||
                     t.Tags.ToLower().Contains(term) ||

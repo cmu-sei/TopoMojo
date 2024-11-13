@@ -25,12 +25,12 @@ public class VmValidator(
             {
 
                 case VmOperation model:
-                await Validate(key, model);
-                break;
+                    await Validate(key, model);
+                    break;
 
                 default:
-                logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
-                break;
+                    logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
+                    break;
 
             }
         }

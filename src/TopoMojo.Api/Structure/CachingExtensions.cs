@@ -25,7 +25,8 @@ namespace Microsoft.Extensions.DependencyInjection
             }
             else
             {
-                services.AddStackExchangeRedisCache(opt => {
+                services.AddStackExchangeRedisCache(opt =>
+                {
                     opt.Configuration = options.RedisUrl;
                     opt.InstanceName = options.Key;
                 });

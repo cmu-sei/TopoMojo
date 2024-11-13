@@ -16,7 +16,8 @@ namespace Microsoft.Extensions.DependencyInjection
             ForwardHeaderOptions options
         )
         {
-            services.Configure<ForwardedHeadersOptions>(config => {
+            services.Configure<ForwardedHeadersOptions>(config =>
+            {
 
                 if (Enum.TryParse(
                     options.TargetHeaders ?? "None",

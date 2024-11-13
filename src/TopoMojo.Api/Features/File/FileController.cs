@@ -72,7 +72,8 @@ public class FileController(
     {
         await uploader.Process(
             Request,
-            metadata => {
+            metadata =>
+            {
                 string publicTarget = Guid.Empty.ToString();
                 string original = metadata[Meta.OriginalName];
                 string filename = metadata[Meta.Name] ?? original;
@@ -92,7 +93,8 @@ public class FileController(
 
                 return System.IO.File.Create(dest);
             },
-            status => {
+            status =>
+            {
                 if (status.Error != null)
                 {
                     string dp = status.Metadata[Meta.DestinationPath];
@@ -103,11 +105,13 @@ public class FileController(
                 // TODO: broadcast progress to group
             },
 
-            options => {
+            options =>
+            {
                 options.MultipartBodyLengthLimit = (long)((uploadOptions.MaxFileBytes > 0) ? uploadOptions.MaxFileBytes : 1E9);
             },
 
-            metadata => {
+            metadata =>
+            {
                 string dp = metadata[Meta.DestinationPath];
 
                 if (!dp.ToLower().EndsWith(Meta.IsoFileExtension) && System.IO.File.Exists(dp))

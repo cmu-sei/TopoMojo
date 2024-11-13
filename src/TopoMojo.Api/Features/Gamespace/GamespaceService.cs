@@ -538,11 +538,12 @@ namespace TopoMojo.Api.Services
             ), true);
             // TODO: allow clients to specify `WaitForDeployment` bool #27
 
-            for (int i = 0; i < 18 ; i++)
+            for (int i = 0; i < 18; i++)
             {
                 await Task.Delay(5000);
                 var existing = await _pod.Find(gamespace.Id);
-                if (existing.Length == templates.Count) {
+                if (existing.Length == templates.Count)
+                {
                     if (gamespace.StartTime.Year <= 1)
                     {
                         gamespace.StartTime = DateTimeOffset.UtcNow;

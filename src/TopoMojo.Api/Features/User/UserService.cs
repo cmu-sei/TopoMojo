@@ -27,7 +27,7 @@ namespace TopoMojo.Api.Services
 
             string term = search.Term?.ToLower();
 
-            #pragma warning disable CA1862
+#pragma warning disable CA1862
             if (term.NotEmpty())
                 q = q.Where(p =>
                     p.Name.ToLower().Contains(term) ||
@@ -174,8 +174,8 @@ namespace TopoMojo.Api.Services
             new Random().NextBytes(buffer);
 
             string key = Convert.ToBase64String(buffer)
-                .Replace('/','_')
-                .Replace('+','_')
+                .Replace('/', '_')
+                .Replace('+', '_')
             ;
 
             entity.ApiKeys.Add(new Data.ApiKey

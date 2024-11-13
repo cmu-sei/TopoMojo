@@ -18,7 +18,7 @@ namespace TopoMojo.Api.Data
 
             string x = term.ToLower();
 
-            #pragma warning disable CA1862
+#pragma warning disable CA1862
             return base.List().Where(t =>
                 t.Name.ToLower().Contains(x) ||
                 t.Id.StartsWith(x) ||

@@ -36,7 +36,7 @@ public class TemplateController(
     [HttpGet("api/templates")]
     [SwaggerOperation(OperationId = "ListTemplates")]
     [Authorize]
-    public async Task<ActionResult<TemplateSummary[]>> ListTemplates([FromQuery]TemplateSearch search, CancellationToken ct)
+    public async Task<ActionResult<TemplateSummary[]>> ListTemplates([FromQuery] TemplateSearch search, CancellationToken ct)
     {
         if (!AuthorizeAll()) return Forbid();
 
@@ -86,7 +86,7 @@ public class TemplateController(
     [HttpPut("api/template")]
     [SwaggerOperation(OperationId = "UpdateTemplate")]
     [Authorize]
-    public async Task<ActionResult> UpdateTemplate([FromBody]ChangedTemplate model)
+    public async Task<ActionResult> UpdateTemplate([FromBody] ChangedTemplate model)
     {
         if (!AuthorizeAny(
             () => templateService.CanEdit(model.Id, Actor.Id).Result
@@ -128,7 +128,7 @@ public class TemplateController(
     [HttpPost("api/template")]
     [SwaggerOperation(OperationId = "LinkTemplate")]
     [Authorize]
-    public async Task<ActionResult<Template>> LinkTemplate([FromBody]TemplateLink model)
+    public async Task<ActionResult<Template>> LinkTemplate([FromBody] TemplateLink model)
     {
         if (!AuthorizeAny(
             () => templateService.HasValidAudience(model.TemplateId, model.WorkspaceId, Actor.Scope).Result
@@ -149,7 +149,7 @@ public class TemplateController(
     [HttpPost("api/template/unlink")]
     [SwaggerOperation(OperationId = "UnLinkTemplate")]
     [Authorize]
-    public async Task<ActionResult<Template>> UnLinkTemplate([FromBody]TemplateLink model)
+    public async Task<ActionResult<Template>> UnLinkTemplate([FromBody] TemplateLink model)
     {
         if (!AuthorizeAny(
             () => templateService.CanEdit(model.TemplateId, Actor.Id).Result
@@ -170,7 +170,7 @@ public class TemplateController(
     [HttpPost("api/template/relink")]
     [SwaggerOperation(OperationId = "ReLinkTemplate")]
     [Authorize]
-    public async Task<ActionResult<Template>> ReLinkTemplate([FromBody]TemplateReLink model)
+    public async Task<ActionResult<Template>> ReLinkTemplate([FromBody] TemplateReLink model)
     {
         if (!AuthorizeAny(
             () => templateService.CanEdit(model.TemplateId, Actor.Id).Result
@@ -208,7 +208,7 @@ public class TemplateController(
     [HttpPost("api/template-detail")]
     [SwaggerOperation(OperationId = "CreateTemplateDetail")]
     [Authorize(AppConstants.AdminOnlyPolicy)]
-    public async Task<ActionResult<TemplateDetail>> CreateTemplateDetail([FromBody]NewTemplateDetail model)
+    public async Task<ActionResult<TemplateDetail>> CreateTemplateDetail([FromBody] NewTemplateDetail model)
     {
         if (!AuthorizeAll()) return Forbid();
 
@@ -225,7 +225,7 @@ public class TemplateController(
     [HttpPost("api/template/clone")]
     [SwaggerOperation(OperationId = "CloneTemplateDetail")]
     [Authorize(AppConstants.AdminOnlyPolicy)]
-    public async Task<ActionResult<TemplateDetail>> CloneTemplateDetail([FromBody]TemplateClone model)
+    public async Task<ActionResult<TemplateDetail>> CloneTemplateDetail([FromBody] TemplateClone model)
     {
         if (!AuthorizeAll()) return Forbid();
 
@@ -242,7 +242,7 @@ public class TemplateController(
     [HttpPut("api/template-detail")]
     [SwaggerOperation(OperationId = "ConfigureTemplateDetail")]
     [Authorize(AppConstants.AdminOnlyPolicy)]
-    public async Task<ActionResult> ConfigureTemplateDetail([FromBody]ChangedTemplateDetail model)
+    public async Task<ActionResult> ConfigureTemplateDetail([FromBody] ChangedTemplateDetail model)
     {
         if (!AuthorizeAll()) return Forbid();
 
@@ -264,7 +264,7 @@ public class TemplateController(
     [HttpGet("api/healthz/{id}")]
     [SwaggerOperation(OperationId = "CheckHealth")]
     [AllowAnonymous]
-    public async Task<ActionResult> CheckHealth([FromRoute]string id)
+    public async Task<ActionResult> CheckHealth([FromRoute] string id)
     {
         bool healthy = await templateService.CheckHealth(id);
         if (healthy)

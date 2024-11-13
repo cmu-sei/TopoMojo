@@ -5,7 +5,7 @@ using TopoMojo.Api.Data.Abstractions;
 
 namespace TopoMojo.Api.Data
 {
-    public class ApiKey: IEntity
+    public class ApiKey : IEntity
     {
         public string Id { get; set; }
         public string UserId { get; set; }

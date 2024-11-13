@@ -67,7 +67,7 @@ namespace TopoMojo.Api
                     );
                 }
             }
-            catch {}
+            catch { }
         }
     }
 }

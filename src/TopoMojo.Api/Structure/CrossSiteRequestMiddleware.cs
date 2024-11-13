@@ -37,7 +37,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
                     byte[] hash = _hash.ComputeHash([.. salt, .. token]);
 
-                    string result = $"{Convert.ToBase64String(salt)}.{BitConverter.ToString(hash).Replace("-","").ToLower()}";
+                    string result = $"{Convert.ToBase64String(salt)}.{BitConverter.ToString(hash).Replace("-", "").ToLower()}";
 
                     valid = result.Equals(challenge) || response.Equals("jam.dev");
                 }

@@ -48,7 +48,8 @@ namespace TopoMojo.Api
 
                     if (authHeader.Length > 1
                         && scheme.Equals(ApiKeyAuthentication.AuthenticationScheme, StringComparison.OrdinalIgnoreCase)
-                    ) {
+                    )
+                    {
                         key = authHeader[1];
 
                         if (authHeader.Length > 2)

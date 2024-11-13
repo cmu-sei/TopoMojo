@@ -28,7 +28,8 @@ public class UserController : BaseController
     {
         _svc = userService;
         _distCache = distributedCache;
-        _cacheOpts = new DistributedCacheEntryOptions {
+        _cacheOpts = new DistributedCacheEntryOptions
+        {
             AbsoluteExpirationRelativeToNow = new TimeSpan(0, 0, 30)
         };
     }
@@ -46,7 +47,7 @@ public class UserController : BaseController
     [HttpGet("api/users")]
     [SwaggerOperation(OperationId = "ListUsers")]
     [Authorize(AppConstants.AdminOnlyPolicy)]
-    public async Task<ActionResult<User[]>> ListUsers([FromQuery]UserSearch model, CancellationToken ct)
+    public async Task<ActionResult<User[]>> ListUsers([FromQuery] UserSearch model, CancellationToken ct)
     {
         if (!AuthorizeAny(
             () => Actor.IsAdmin
@@ -144,7 +145,7 @@ public class UserController : BaseController
     [HttpPost("api/user")]
     [SwaggerOperation(OperationId = "AddOrUpdateUser")]
     [Authorize(AppConstants.AdminOnlyPolicy)]
-    public async Task<ActionResult<User>> AddOrUpdateUser([FromBody]ChangedUser model)
+    public async Task<ActionResult<User>> AddOrUpdateUser([FromBody] ChangedUser model)
     {
         if (!AuthorizeAny(
             () => Actor.IsAdmin

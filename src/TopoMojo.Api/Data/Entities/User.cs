@@ -6,7 +6,7 @@ using TopoMojo.Api.Models;
 
 namespace TopoMojo.Api.Data
 {
-    public class User: IEntity
+    public class User : IEntity
     {
         public string Id { get; set; }
         public string Name { get; set; }

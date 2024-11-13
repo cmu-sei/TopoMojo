@@ -26,8 +26,8 @@ namespace TopoMojo.Api.Services
                     VideoRam = 0,
                     Cpu = "1x2",
                     Adapters = 1,
-                    Eth = [new VmNet { Net = "lan", Type="e1000" }],
-                    Disks = [ new VmDisk
+                    Eth = [new VmNet { Net = "lan", Type = "e1000" }],
+                    Disks = [new VmDisk
                     {
                         Path = $"[ds] {Guid.Empty}/{diskname}.vmdk",
                         Source = "",
@@ -84,13 +84,14 @@ namespace TopoMojo.Api.Services
                 if (nets.Length == 0) nets = ["lan"];
 
                 for (int i = nics.Count; i > nets.Length; i--)
-                    nics.RemoveAt(i-1);
+                    nics.RemoveAt(i - 1);
 
                 for (int i = 0; i < nets.Length; i++)
                 {
-                    if (nics.Count < i+1)
+                    if (nics.Count < i + 1)
                     {
-                        nics.Add(new VmNet{
+                        nics.Add(new VmNet
+                        {
                             Type = proto.Type,
                         });
                     }

@@ -70,7 +70,7 @@ public class DocumentController(
     [HttpPut("api/document/{id}")]
     [SwaggerOperation(OperationId = "SaveDocument")]
     [Authorize]
-    public async Task<ActionResult> SaveDocument(string id, [FromBody]string text)
+    public async Task<ActionResult> SaveDocument(string id, [FromBody] string text)
     {
         if (!AuthorizeAny(
             () => workspaceService.CanEdit(id, Actor.Id).Result
@@ -107,7 +107,7 @@ public class DocumentController(
 
         return Ok(
             Directory.GetFiles(path)
-            .Select(x => new ImageFile { Filename = Path.GetFileName(x)})
+            .Select(x => new ImageFile { Filename = Path.GetFileName(x) })
             .ToArray()
         );
     }
@@ -172,12 +172,12 @@ public class DocumentController(
             await file.CopyToAsync(stream);
         }
 
-        return Ok(new ImageFile { Filename = filename});
+        return Ok(new ImageFile { Filename = filename });
     }
 
     private string BuildPath(params string[] segments)
     {
-        string path = Path.Combine([uploadOptions.DocRoot, ..segments]);
+        string path = Path.Combine([uploadOptions.DocRoot, .. segments]);
 
         Directory.CreateDirectory(path);
 
@@ -192,7 +192,8 @@ public class DocumentController(
                 new BroadcastEvent<Document>(
                     User,
                     "DOCUMENT." + action.ToUpper(),
-                    new Document {
+                    new Document
+                    {
                         Text = text,
                         Timestamp = (long)DateTimeOffset.UtcNow.Subtract(DateTimeOffset.UnixEpoch).TotalMilliseconds
                     }

@@ -74,7 +74,8 @@ namespace TopoMojo.Api.Hubs
                 !actor.IsAdmin &&
                 Context.UserIdentifier != channelId &&
                 !_store.CanInteract(Context.UserIdentifier, channelId).Result
-            ) {
+            )
+            {
                 throw new ActionForbidden();
             }
 
@@ -123,7 +124,8 @@ namespace TopoMojo.Api.Hubs
         //     return Clients.OthersInGroup(channelId).ChatEvent(new BroadcastEvent<Message>(Context.User, (val) ? "CHAT.TYPING" : "CHAT.IDLE", null));
         // }
 
-        public Task TemplateMessage(string action, Template model){
+        public Task TemplateMessage(string action, Template model)
+        {
             return Clients.OthersInGroup(model.WorkspaceId).TemplateEvent(new BroadcastEvent<Template>(Context.User, action, model));
         }
 

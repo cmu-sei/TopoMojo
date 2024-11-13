@@ -16,7 +16,8 @@ namespace TopoMojo.Api
 
         public async Task Invoke(HttpContext context, IMemoryCache cache)
         {
-            try {
+            try
+            {
                 await next(context);
             }
             catch (Exception ex)
@@ -49,7 +50,8 @@ namespace TopoMojo.Api
                         ex is InvalidOperationException ||
                         ex is ArgumentException ||
                         type.Namespace.StartsWith("TopoMojo")
-                    ) {
+                    )
+                    {
                         context.Response.StatusCode = 400;
 
                         message = type.Name
@@ -73,7 +75,7 @@ namespace Microsoft.AspNetCore.Builder
 {
     public static class JsonExceptionStartupExtensions
     {
-        public static IApplicationBuilder UseJsonExceptions (
+        public static IApplicationBuilder UseJsonExceptions(
             this IApplicationBuilder builder
         )
         {

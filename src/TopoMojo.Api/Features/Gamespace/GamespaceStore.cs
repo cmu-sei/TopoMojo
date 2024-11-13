@@ -18,7 +18,7 @@ namespace TopoMojo.Api.Data
 
             term = term.ToLower();
 
-            #pragma warning disable CA1862
+#pragma warning disable CA1862
             return base.List()
                 .Where(g =>
                     g.Name.ToLower().Contains(term) ||
@@ -122,7 +122,7 @@ namespace TopoMojo.Api.Data
             return
                 workspace.Audience.HasAnyToken(scope) ||
                 await DbContext.Workers.AnyAsync(
-                    w => w.WorkspaceId ==workspaceId &&
+                    w => w.WorkspaceId == workspaceId &&
                     w.SubjectId == subjectId
                 )
             ;
@@ -132,7 +132,7 @@ namespace TopoMojo.Api.Data
         {
             var gamespace = await DbContext.Gamespaces
                 .Where(g => g.Id == gamespaceId)
-                .Include( g => g.Workspace)
+                .Include(g => g.Workspace)
                 .FirstOrDefaultAsync();
 
             return gamespace.Workspace.Audience.HasAnyToken(scope);

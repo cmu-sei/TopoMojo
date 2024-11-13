@@ -38,7 +38,7 @@ namespace Microsoft.AspNetCore.Builder
 {
     public static class StartUpExtensions
     {
-        public static IApplicationBuilder UseHeaderInspection (
+        public static IApplicationBuilder UseHeaderInspection(
             this IApplicationBuilder builder
         )
         {

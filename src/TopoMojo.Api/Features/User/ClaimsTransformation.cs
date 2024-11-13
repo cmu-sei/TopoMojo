@@ -24,7 +24,7 @@ namespace TopoMojo.Api
             string subject = principal.Subject()
                 ?? throw new ArgumentException("ClaimsPrincipal requires 'sub' claim");
 
-            if (! _cache.TryGetValue<User>(subject, out User user))
+            if (!_cache.TryGetValue<User>(subject, out User user))
             {
                 user = await _svc.Load(subject) ?? new Models.User
                 {

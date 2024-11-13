@@ -13,7 +13,8 @@ namespace Microsoft.Extensions.DependencyInjection
             this AuthenticationBuilder builder,
             string scheme,
             Action<TicketAuthenticationOptions> options
-        ) {
+        )
+        {
 
             builder.AddScheme<TicketAuthenticationOptions, TicketAuthenticationHandler>(
                 scheme ?? TicketAuthentication.AuthenticationScheme,

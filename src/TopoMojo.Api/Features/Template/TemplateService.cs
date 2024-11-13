@@ -307,7 +307,7 @@ namespace TopoMojo.Api.Services
 
         public async Task<string[]> DiskReport()
         {
-            var list =  await _store.List().ToArrayAsync();
+            var list = await _store.List().ToArrayAsync();
 
             return [.. list
                 .SelectMany(t =>
