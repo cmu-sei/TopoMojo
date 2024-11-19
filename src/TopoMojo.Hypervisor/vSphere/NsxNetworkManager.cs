@@ -295,6 +295,9 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
             }
 
+            string info = string.Join('\n', [.. list.Select(p => $"{p.Net}::{p.Key}")]);
+            _logger.LogDebug("{info}", info);
+
             return [.. list];
         }
 
