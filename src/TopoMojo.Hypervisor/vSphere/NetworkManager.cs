@@ -35,7 +35,7 @@ namespace TopoMojo.Hypervisor.vSphere
             foreach (var pg in existing)
                 pg.Timestamp = ts;
 
-            _pgAllocation = existing.ToDictionary(p => p.Net);
+            _pgAllocation = existing.DistinctBy(p => p.Net).ToDictionary(p => p.Net);
 
             _vlanManager.Activate(
                 _pgAllocation.Values.Select(p => new Vlan
