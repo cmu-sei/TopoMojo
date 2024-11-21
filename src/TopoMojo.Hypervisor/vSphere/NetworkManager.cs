@@ -164,24 +164,19 @@ namespace TopoMojo.Hypervisor.vSphere
                 ;
 
                 // find portgroups with no associated vm's
-                foreach (var pg in q.ToArray())
+                var vm_space = _vmCache.Values.Select(v => v.Name.Tag()).Distinct();
+                var pg_space = q.Select(p => p.Net.Tag()).Distinct();
+                var inactive = pg_space.Except(vm_space).ToArray();
+                var manifest = q.Where(p => inactive.Contains(p.Net.Tag())).ToArray();
+
+                var removed_pgs = RemovePortgroups(manifest).Result;
+                foreach (var pg in removed_pgs)
                 {
-                    string id = pg.Net.Tag();
+                    _pgAllocation.Remove(pg.Net);
+                    _vlanManager.Deactivate(pg.Net);
 
-                    // if vm's still exist, skip
-                    if (_vmCache.Values.Any(v => v.Name.EndsWith(id)))
-                        continue;
-
-                    _logger.LogDebug("try removing net {net}", pg.Net);
-
-                    if (RemovePortgroup(pg.Key).Result)
-                    {
-                        _pgAllocation.Remove(pg.Net);
-                        _vlanManager.Deactivate(pg.Net);
-
-                        if (_swAllocation.ContainsKey(pg.Switch))
-                            _swAllocation[pg.Switch] -= 1;
-                    }
+                    if (_swAllocation.ContainsKey(pg.Switch))
+                        _swAllocation[pg.Switch] -= 1;
                 }
 
                 foreach (var sw in _swAllocation.Keys.ToArray())
@@ -231,7 +226,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 );
             return [.. pgs];
         }
-        public abstract Task<bool> RemovePortgroup(string pgReference);
+        public abstract Task<PortGroupAllocation[]> RemovePortgroups(PortGroupAllocation[] gps);
         public abstract Task AddSwitch(string sw);
         public abstract Task RemoveSwitch(string sw);
 

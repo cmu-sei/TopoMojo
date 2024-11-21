@@ -301,38 +301,18 @@ namespace TopoMojo.Hypervisor.vSphere
             return [.. list];
         }
 
-        public override async Task<bool> RemovePortgroup(string pgReference)
+        public override async Task<PortGroupAllocation[]> RemovePortgroups(PortGroupAllocation[] pgs)
         {
-            try
-            {
-                var pga = _pgAllocation.Values.FirstOrDefault(v => v.Key == pgReference);
+            await InitClient();
 
-                if (pga == null || !pga.Net.Contains('#'))
-                    return false;
+            // remove all
+            var tasks = pgs.Select(p => _sddc.DeleteAsync($"{_apiUrl}/{_apiSegments}/{p.Net.Replace("#", "%23")}")).ToArray();
+            Task.WaitAll(tasks);
 
-                await InitClient();
-
-                var response = await _sddc.DeleteAsync(
-                    $"{_apiUrl}/{_apiSegments}/{pga.Net.Replace("#", "%23")}"
-                );
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogWarning("error removing net: {net} {code} {reason} {content}",
-                        pga.Net,
-                        response.StatusCode,
-                        response.ReasonPhrase,
-                        await response.Content.ReadAsStringAsync()
-                    );
-                }
-
-                return response.IsSuccessStatusCode;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("error removing net: {message}", ex.Message);
-            }
-            return false;
+            // verify deletion
+            await Task.Delay(2000);
+            var existing = await LoadPortGroups();
+            return pgs.ExceptBy(existing.Select(e => e.Net), p => p.Net).ToArray();
         }
 
         public override Task RemoveSwitch(string sw)
