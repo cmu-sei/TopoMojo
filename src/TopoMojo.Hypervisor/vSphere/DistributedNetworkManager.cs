@@ -154,14 +154,17 @@ namespace TopoMojo.Hypervisor.vSphere
             return [.. list];
         }
 
-        public override async Task<bool> RemovePortgroup(string pgReference)
+        public override async Task<PortGroupAllocation[]> RemovePortgroups(PortGroupAllocation[] pgs)
         {
-            try
+            foreach (var pg in pgs)
             {
-                await _client.Vim.Destroy_TaskAsync(pgReference.AsReference());
+                try
+                {
+                    await _client.Vim.Destroy_TaskAsync(pg.Key.AsReference());
+                }
+                catch { }
             }
-            catch { }
-            return true;
+            return pgs;
         }
 
         public override Task RemoveSwitch(string sw)

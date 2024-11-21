@@ -14,7 +14,7 @@ namespace TopoMojo.Hypervisor.vSphere
         Task RemoveSwitch(string sw);
         Task<PortGroupAllocation> AddPortGroup(string sw, VmNet eth);
         Task<PortGroupAllocation[]> AddPortGroups(string sw, VmNet[] eths);
-        Task<bool> RemovePortgroup(string pgReference);
+        Task<PortGroupAllocation[]> RemovePortgroups(PortGroupAllocation[] pgs);
         Task<VmNetwork[]> GetVmNetworks(ManagedObjectReference managedObjectReference);
         Task<PortGroupAllocation[]> LoadPortGroups();
         void UpdateEthernetCardBacking(VirtualEthernetCard card, string portgroupName);
