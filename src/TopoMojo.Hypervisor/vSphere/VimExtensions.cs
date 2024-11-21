@@ -51,7 +51,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 coresPerSocket = 1;
             }
 
-            vmcs.numCPUs = sockets * 1;
+            vmcs.numCPUs = sockets * coresPerSocket;
             vmcs.numCPUsSpecified = true;
             vmcs.numCoresPerSocket = coresPerSocket;
             vmcs.numCoresPerSocketSpecified = true;
