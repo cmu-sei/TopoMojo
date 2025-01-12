@@ -694,8 +694,10 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (_hostCache.Count == 1 && _hostCache.First().Value.Options.IsNsxNetwork)
             {
-                if (existing.Any())
+                if (existing.Any()) {
                     await _hostCache.First().Value.Delete(ctx.Id);
+                    missing = [.. ctx.Templates];
+                }
 
                 var eths = ctx.Templates.SelectMany(t => t.Eth).ToArray();
 
