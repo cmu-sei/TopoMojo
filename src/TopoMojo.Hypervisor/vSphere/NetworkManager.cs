@@ -106,8 +106,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 // filter only unallocated nets
                 var manifest = nets
-                    .Where(e => _pgAllocation.ContainsKey(e.Net).Equals(false))
                     .DistinctBy(e => e.Net)
+                    .Where(e => _pgAllocation.ContainsKey(e.Net).Equals(false))
                     .ToArray()
                 ;
 
@@ -131,6 +131,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 if (_swAllocation.ContainsKey(sw))
                     _swAllocation[sw] += pgs.Length;
+
+                var missing = manifest.ExceptBy(pgs.Select(p => p.Net), m => m.Net);
+                if (missing.Any()) {
+                    throw new Exception($"Failed to provision nets:\n\t{string.Join("\n\t", missing)}");
+                }
             }
         }
 

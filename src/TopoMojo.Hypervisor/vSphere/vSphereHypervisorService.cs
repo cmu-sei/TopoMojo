@@ -502,7 +502,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 foreach (VmNet eth in template.Eth)
                 {
                     if (!(privileged && _vlanman.Contains(eth.Net)))
-                        eth.Net = $"{eth.Net}#{template.IsolationTag}";
+                        eth.Net = $"{eth.Net.Untagged()}#{template.IsolationTag}";
                 }
             }
         }

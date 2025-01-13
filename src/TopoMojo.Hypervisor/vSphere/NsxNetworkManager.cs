@@ -128,42 +128,9 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
-        public override async Task<PortGroupAllocation> AddPortGroup(string sw, VmNet eth)
+        public override Task<PortGroupAllocation> AddPortGroup(string sw, VmNet eth)
         {
-            await InitClient();
-
-            string url = $"{_apiUrl}/{_apiSegments}/{eth.Net.Replace("#", "%23")}";
-
-            var response = await _sddc.PutAsync(
-                url,
-                new StringContent(
-                    "{\"advanced_config\": { \"connectivity\": \"OFF\" } }",
-                    Encoding.UTF8,
-                    "application/json"
-                )
-            );
-
-            int count = 0;
-            PortGroupAllocation pga = null;
-
-            while (response.IsSuccessStatusCode && pga == null && count < 10)
-            {
-                // slight delay
-                await Task.Delay(1500);
-
-                count += 1;
-
-                // TODO: fetch single portgroup
-                pga = (await LoadPortGroups())
-                    .FirstOrDefault(p => p.Net == eth.Net);
-
-            }
-
-            if (pga == null)
-                throw new Exception($"Failed to create net {eth.Net}");
-
-            return pga;
-
+            throw new NotImplementedException();
         }
 
         public override async Task<PortGroupAllocation[]> AddPortGroups(string sw, VmNet[] eths)
@@ -174,11 +141,12 @@ namespace TopoMojo.Hypervisor.vSphere
             await InitClient();
 
             string tag = eths[0].Net.Tag();
-            var names = new List<string>();
 
-            foreach (var eth in eths)
+            var manifest = eths.Select(e => e.Net).Distinct().ToArray();
+
+            foreach (var eth in manifest)
             {
-                string url = $"{_apiUrl}/{_apiSegments}/{eth.Net.Replace("#", "%23")}";
+                string url = $"{_apiUrl}/{_apiSegments}/{eth.Replace("#", "%23")}";
 
                 var response = await _sddc.PutAsync(
                     url,
@@ -189,43 +157,39 @@ namespace TopoMojo.Hypervisor.vSphere
                     )
                 );
 
-                if (response.IsSuccessStatusCode)
-                    names.Add(eth.Net);
-                else
-                    _logger.LogDebug("Failed to add SDDC PortGroup {net} {reason}", eth.Net, response.ReasonPhrase);
+                if (!response.IsSuccessStatusCode)
+                    _logger.LogDebug("Failed to add SDDC PortGroup {net} {reason}", eth, response.ReasonPhrase);
 
-                await Task.Delay(100);
+                await Task.Delay(200);
             }
 
-            _logger.LogDebug("SDDC created nets: {nets}", string.Join(" ", names));
+            _logger.LogDebug("SDDC created nets:\n\t{manifest}", string.Join("\n\t", manifest));
 
-            int count = 10;
+            int count = 15;
             bool complete = false;
             PortGroupAllocation[] pgas = [];
             do
             {
-                await Task.Delay(1500);
+                await Task.Delay(2000);
 
                 pgas = (await LoadPortGroups())
-                    .Where(p => names.Contains(p.Net))
+                    .Where(p => manifest.Contains(p.Net))
+                    .DistinctBy(p => p.Net)
                     .ToArray()
                 ;
 
                 _logger.LogDebug(
-                    "[{count}] SDDC resolving portgroups, resolved/expected: {resolved}/{expected}\n{nets}",
+                    "[{count}] SDDC resolving portgroups, resolved/expected: {resolved}/{expected}\n\t{nets}",
                     count,
                     pgas.Length,
-                    names.Count,
-                    string.Join("\n", pgas.Select(p => p.Net))
+                    manifest.Length,
+                    string.Join("\n\t", pgas.Select(p => p.Net))
                 );
 
-                complete = pgas.Length >= names.Count;
+                complete = pgas.Length == manifest.Length;
                 count -= 1;
 
             } while (count > 0 && !complete);
-
-            if (!complete)
-                throw new Exception($"Failed to create net(s) for {tag}");
 
             return pgas;
         }
@@ -307,9 +271,6 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
             }
 
-            string info = string.Join('\n', [.. list.Select(p => $"{p.Net}::{p.Key}")]);
-            _logger.LogDebug("{info}", info);
-
             return [.. list];
         }
 
@@ -318,8 +279,13 @@ namespace TopoMojo.Hypervisor.vSphere
             await InitClient();
 
             // remove all
-            var tasks = pgs.Select(p => _sddc.DeleteAsync($"{_apiUrl}/{_apiSegments}/{p.Net.Replace("#", "%23")}")).ToArray();
-            Task.WaitAll(tasks);
+            foreach (var pg in pgs)
+            {
+                await _sddc.DeleteAsync($"{_apiUrl}/{_apiSegments}/{pg.Net.Replace("#", "%23")}");
+                await Task.Delay(200);
+            }
+            // var tasks = pgs.Select(p => _sddc.DeleteAsync($"{_apiUrl}/{_apiSegments}/{p.Net.Replace("#", "%23")}")).ToArray();
+            // Task.WaitAll(tasks);
 
             // verify deletion
             await Task.Delay(2000);
