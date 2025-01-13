@@ -197,19 +197,31 @@ namespace TopoMojo.Hypervisor.vSphere
                 await Task.Delay(100);
             }
 
+            _logger.LogDebug("SDDC created nets: {nets}", string.Join(" ", names));
+
             int count = 10;
             bool complete = false;
             PortGroupAllocation[] pgas = [];
             do
             {
                 await Task.Delay(1500);
-                _logger.LogDebug("SDDC resolving new portgroups [{count}]", count);
+
                 pgas = (await LoadPortGroups())
                     .Where(p => names.Contains(p.Net))
                     .ToArray()
                 ;
-                complete = pgas.Length == names.Count;
+
+                _logger.LogDebug(
+                    "[{count}] SDDC resolving portgroups, resolved/expected: {resolved}/{expected}\n{nets}",
+                    count,
+                    pgas.Length,
+                    names.Count,
+                    string.Join("\n", pgas.Select(p => p.Net))
+                );
+
+                complete = pgas.Length >= names.Count;
                 count -= 1;
+
             } while (count > 0 && !complete);
 
             if (!complete)

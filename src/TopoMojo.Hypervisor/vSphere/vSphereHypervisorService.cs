@@ -701,16 +701,13 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 var eths = ctx.Templates.SelectMany(t => t.Eth).ToArray();
 
-                string tag = new Random().Next(0xffff).ToString("x4");
+                string rand = new Random().Next(0xffff).ToString("x4");
                 foreach (var eth in eths)
-                    eth.Net += tag;
-
-                foreach (var eth in eths.DistinctBy(e => e.Net))
                 {
-                    if (ctx.Privileged && _vlanman.Contains(eth.Net))
-                        continue;
-                    eth.Net += $"#{ctx.Id}";
+                    if (!(ctx.Privileged && _vlanman.Contains(eth.Net)))
+                        eth.Net += $"{rand}#{ctx.Id}";
                 }
+
                 await _hostCache.First().Value.PreDeployNets(eths, false);
             }
 

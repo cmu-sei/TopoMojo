@@ -78,8 +78,13 @@ namespace TopoMojo.Hypervisor.vSphere
 
             foreach (var eth in template.Eth)
             {
-                eth.Key = _pgAllocation[eth.Net].Key;
-                _pgAllocation[eth.Net].Counter += 1;
+                if (_pgAllocation.TryGetValue(eth.Net, out PortGroupAllocation value)) {
+                    eth.Key = value.Key;
+                    value.Counter += 1;
+                } else {
+                    throw new Exception($"Network not provisioned: {eth.Net}");
+                }
+
             }
         }
 
