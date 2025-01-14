@@ -207,7 +207,11 @@ namespace TopoMojo.Hypervisor.vSphere
             _logger.LogDebug("Delete: deleting vm folder {folder}", folder);
             await _vim.DeleteDatastoreFile_TaskAsync(_sic.fileManager, folder, _datacenter);
 
-            _vmCache.TryRemove(vm.Id, out vm);
+            if (!_vmCache.TryRemove(vm.Id, out _))
+            {
+                await Task.Delay(100);
+                _vmCache.TryRemove(vm.Id, out _);
+            }
 
             vm.Status = "initialized";
             return vm;

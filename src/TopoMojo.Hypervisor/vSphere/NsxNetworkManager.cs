@@ -135,6 +135,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public override async Task<PortGroupAllocation[]> AddPortGroups(string sw, VmNet[] eths)
         {
+            int delay = 200;
+
             if (eths.Length == 0)
                 return [];
 
@@ -143,27 +145,32 @@ namespace TopoMojo.Hypervisor.vSphere
             string tag = eths[0].Net.Tag();
 
             var manifest = eths.Select(e => e.Net).Distinct().ToArray();
+            List<string> ok = [];
+
+            var content = new StringContent(
+                "{\"advanced_config\": { \"connectivity\": \"OFF\" } }",
+                Encoding.UTF8,
+                "application/json"
+            );
 
             foreach (var eth in manifest)
             {
                 string url = $"{_apiUrl}/{_apiSegments}/{eth.Replace("#", "%23")}";
 
-                var response = await _sddc.PutAsync(
-                    url,
-                    new StringContent(
-                        "{\"advanced_config\": { \"connectivity\": \"OFF\" } }",
-                        Encoding.UTF8,
-                        "application/json"
-                    )
+
+                HttpResponseMessage response = await SendWithRetry(
+                    () => _sddc.PutAsync(url, content)
                 );
 
-                if (!response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode)
+                    ok.Add(eth);
+                else
                     _logger.LogDebug("Failed to add SDDC PortGroup {net} {reason}", eth, response.ReasonPhrase);
 
-                await Task.Delay(200);
+                await Task.Delay(delay);
             }
 
-            _logger.LogDebug("SDDC created nets:\n\t{manifest}", string.Join("\n\t", manifest));
+            _logger.LogDebug("SDDC created nets:\n\t{ok}", string.Join("\n\t", ok));
 
             int count = 15;
             bool complete = false;
@@ -173,7 +180,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 await Task.Delay(2000);
 
                 pgas = (await LoadPortGroups())
-                    .Where(p => manifest.Contains(p.Net))
+                    .Where(p => ok.Contains(p.Net))
                     .DistinctBy(p => p.Net)
                     .ToArray()
                 ;
@@ -182,11 +189,11 @@ namespace TopoMojo.Hypervisor.vSphere
                     "[{count}] SDDC resolving portgroups, resolved/expected: {resolved}/{expected}\n\t{nets}",
                     count,
                     pgas.Length,
-                    manifest.Length,
+                    ok.Count,
                     string.Join("\n\t", pgas.Select(p => p.Net))
                 );
 
-                complete = pgas.Length == manifest.Length;
+                complete = pgas.Length == ok.Count;
                 count -= 1;
 
             } while (count > 0 && !complete);
@@ -281,11 +288,12 @@ namespace TopoMojo.Hypervisor.vSphere
             // remove all
             foreach (var pg in pgs)
             {
-                await _sddc.DeleteAsync($"{_apiUrl}/{_apiSegments}/{pg.Net.Replace("#", "%23")}");
+                string url = $"{_apiUrl}/{_apiSegments}/{pg.Net.Replace("#", "%23")}";
+                HttpResponseMessage response = await SendWithRetry(
+                    () => _sddc.DeleteAsync(url)
+                );
                 await Task.Delay(200);
             }
-            // var tasks = pgs.Select(p => _sddc.DeleteAsync($"{_apiUrl}/{_apiSegments}/{p.Net.Replace("#", "%23")}")).ToArray();
-            // Task.WaitAll(tasks);
 
             // verify deletion
             await Task.Delay(2000);
@@ -322,6 +330,18 @@ namespace TopoMojo.Hypervisor.vSphere
                     startConnected = true,
                 };
             }
+        }
+
+        public static async Task<HttpResponseMessage> SendWithRetry(Func<Task<HttpResponseMessage>> func, int retries = 3, int delay=200)
+        {
+            HttpResponseMessage response;
+            do {
+                response = await func();
+                if (response.IsSuccessStatusCode) { break; }
+                await Task.Delay(delay);
+                retries -= 1;
+            } while (retries > 0);
+            return response;
         }
 
         internal class AuthResponse
