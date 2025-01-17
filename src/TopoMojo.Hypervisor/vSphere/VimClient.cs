@@ -1295,8 +1295,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
             while (true)
             {
+                var st = DateTimeOffset.UtcNow;
+
                 try
                 {
+
                     if (_vim != null && DateTimeOffset.UtcNow.AddMinutes(-_config.KeepAliveMinutes).CompareTo(_lastAction) > 0)
                     {
                         await Disconnect();
@@ -1322,6 +1325,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 {
                     await Task.Delay(_syncInterval);
 
+                    _logger.LogDebug("MonitorSession complete {duration}", DateTimeOffset.UtcNow.Subtract(st).TotalSeconds);
                     if (_vim == null)
                         await Connect();
                 }

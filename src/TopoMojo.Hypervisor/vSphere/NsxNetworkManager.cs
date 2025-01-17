@@ -135,7 +135,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public override async Task<PortGroupAllocation[]> AddPortGroups(string sw, VmNet[] eths)
         {
-            int delay = 200;
+            // int delay = 200;
 
             if (eths.Length == 0)
                 return [];
@@ -153,10 +153,14 @@ namespace TopoMojo.Hypervisor.vSphere
                 "application/json"
             );
 
+            // var tasks = manifest.Select(p => SendWithRetry(
+            //     () => _sddc.PutAsync($"{_apiUrl}/{_apiSegments}/{p.Replace("#", "%23")}", content)
+            // )).ToArray();
+            // Task.WaitAll(tasks);
+
             foreach (var eth in manifest)
             {
                 string url = $"{_apiUrl}/{_apiSegments}/{eth.Replace("#", "%23")}";
-
 
                 HttpResponseMessage response = await SendWithRetry(
                     () => _sddc.PutAsync(url, content)
@@ -167,7 +171,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 else
                     _logger.LogDebug("Failed to add SDDC PortGroup {net} {reason}", eth, response.ReasonPhrase);
 
-                await Task.Delay(delay);
+                // await Task.Delay(delay);
             }
 
             _logger.LogDebug("SDDC created nets:\n\t{ok}", string.Join("\n\t", ok));
@@ -286,14 +290,19 @@ namespace TopoMojo.Hypervisor.vSphere
             await InitClient();
 
             // remove all
-            foreach (var pg in pgs)
-            {
-                string url = $"{_apiUrl}/{_apiSegments}/{pg.Net.Replace("#", "%23")}";
-                HttpResponseMessage response = await SendWithRetry(
-                    () => _sddc.DeleteAsync(url)
-                );
-                // await Task.Delay(200);
-            }
+            var tasks = pgs.Select(p => SendWithRetry(
+                () => _sddc.DeleteAsync($"{_apiUrl}/{_apiSegments}/{p.Net.Replace("#", "%23")}")
+            )).ToArray();
+            Task.WaitAll(tasks);
+
+            // foreach (var pg in pgs)
+            // {
+            //     string url = $"{_apiUrl}/{_apiSegments}/{pg.Net.Replace("#", "%23")}";
+            //     HttpResponseMessage response = await SendWithRetry(
+            //         () => _sddc.DeleteAsync(url)
+            //     );
+            //     // await Task.Delay(200);
+            // }
 
             // verify deletion
             await Task.Delay(2000);

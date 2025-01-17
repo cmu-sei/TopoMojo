@@ -158,7 +158,7 @@ namespace TopoMojo.Hypervisor.vSphere
         public async Task Clean(string tag = null)
         {
             await Task.Delay(0);
-            _logger.LogDebug("cleaning nets [{tag}]", tag);
+            _logger.LogDebug("cleaning nets for id [{tag}]", tag ?? "stale");
 
             lock (_pgAllocation)
             {
