@@ -285,16 +285,39 @@ namespace TopoMojo.Hypervisor.vSphere
 
             _logger.LogDebug("Removing portgroups:\n\t {nets}", string.Join("\n\t", pgs.Select(p => p.Net)));
 
-            // remove all
-            var tasks = pgs.Select(p => SendWithRetry(
-                () => _sddc.DeleteAsync(FormatUrl(p.Net))
-            )).ToArray();
-            Task.WaitAll(tasks);
+            List<PortGroupAllocation> found = [];
+            List<PortGroupAllocation> missing = [];
+            HttpResponseMessage tmp_found = null;
+            HttpResponseMessage tmp_missing = null;
 
-            // verify deletion
-            await Task.Delay(2000);
-            var existing = await LoadPortGroups();
-            return pgs.ExceptBy(existing.Select(e => e.Net), p => p.Net).ToArray();
+            foreach(var pg in pgs)
+            {
+                var response = await _sddc.GetAsync(FormatUrl(pg.Net));
+                if (response.IsSuccessStatusCode)
+                {
+                    found.Add(pg);
+                    tmp_found ??= response;
+                }
+                else
+                {
+                    missing.Add(pg);
+                    tmp_missing ??= response;
+                }
+            }
+
+            if (tmp_found is not null)
+                _logger.LogDebug("Found Sddc Net: {content}", tmp_found.Content.ToString());
+
+            if (tmp_missing is not null)
+                _logger.LogDebug("Missing Sddc Net: {content}", tmp_missing.Content.ToString());
+
+            foreach (var pg in found)
+            {
+                var response = await SendWithRetry(() => _sddc.DeleteAsync(FormatUrl(pg.Net)));
+                if (response.IsSuccessStatusCode) missing.Add(pg);
+            }
+
+            return [.. missing];
         }
 
         public override Task RemoveSwitch(string sw)
@@ -356,5 +379,6 @@ namespace TopoMojo.Hypervisor.vSphere
         {
             [JsonPropertyName("nsx_api_public_endpoint_url")] public string NsxApiPublicEndpointUrl { get; set; }
         }
+
     }
 }
