@@ -283,7 +283,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             await InitClient();
 
-            _logger.LogDebug("Removing portgroups:\n\t {nets}", string.Join("\n\t", pgs.Select(p => p.Net)));
+            _logger.LogDebug("Removing portgroups:\n\t{nets}", string.Join("\n\t", pgs.Select(p => p.Net)));
 
             List<PortGroupAllocation> found = [];
             List<PortGroupAllocation> missing = [];
@@ -306,10 +306,10 @@ namespace TopoMojo.Hypervisor.vSphere
             }
 
             if (tmp_found is not null)
-                _logger.LogDebug("Found Sddc Net: {content}", tmp_found.Content.ToString());
+                _logger.LogDebug("Found Sddc Net: {content}", await tmp_found.Content.ReadAsStringAsync());
 
             if (tmp_missing is not null)
-                _logger.LogDebug("Missing Sddc Net: {content}", tmp_missing.Content.ToString());
+                _logger.LogDebug("Missing Sddc Net: {content}", await tmp_missing.Content.ReadAsStringAsync());
 
             foreach (var pg in found)
             {

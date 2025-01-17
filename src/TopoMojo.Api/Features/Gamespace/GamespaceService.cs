@@ -540,7 +540,6 @@ namespace TopoMojo.Api.Services
 
             for (int i = 0; i < 18; i++)
             {
-                await Task.Delay(5000);
                 var existing = await _pod.Find(gamespace.Id);
                 if (existing.Length == templates.Count)
                 {
@@ -550,6 +549,10 @@ namespace TopoMojo.Api.Services
                         await _store.Update(gamespace);
                     }
                     break;
+                }
+                else
+                {
+                    await Task.Delay(5000);
                 }
             }
         }

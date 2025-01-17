@@ -132,9 +132,6 @@ public class GamespaceController(
     [Authorize]
     public async Task<ActionResult<GameState>> RegisterGamespace([FromBody] GamespaceRegistration model, CancellationToken ct)
     {
-        var st = DateTimeOffset.UtcNow;
-        Logger.LogDebug("Gamespace.Register starting.");
-
         if (!AuthorizeAny(
             () => gamespaceService.HasValidUserScope(model.ResourceId, Actor.Scope, Actor.Id).Result
         )) return Forbid();
@@ -149,11 +146,7 @@ public class GamespaceController(
             );
         }
 
-        Logger.LogDebug("Gamespace.Register starting {duration}", DateTimeOffset.UtcNow.Subtract(st).TotalSeconds);
-
         var result = await gamespaceService.Register(model, Actor);
-
-        Logger.LogDebug("Gamespace.Register started {duration}", DateTimeOffset.UtcNow.Subtract(st).TotalSeconds);
 
         string token = Guid.NewGuid().ToString("n");
 
@@ -180,8 +173,6 @@ public class GamespaceController(
                 result.LaunchpointUrl
             );
         }
-
-        Logger.LogDebug("Gamespace.Register complete {duration}", DateTimeOffset.UtcNow.Subtract(st).TotalSeconds);
 
         return Ok(result);
     }
