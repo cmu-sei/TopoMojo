@@ -287,22 +287,18 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public override async Task<PortGroupAllocation[]> RemovePortgroups(PortGroupAllocation[] pgs)
         {
+            if (pgs.Length == 0)
+                return [];
+
             await InitClient();
+
+            _logger.LogDebug("Removing portgroups:\n\t {nets}", string.Join("\n\t", pgs.Select(p => p.Net)));
 
             // remove all
             var tasks = pgs.Select(p => SendWithRetry(
                 () => _sddc.DeleteAsync($"{_apiUrl}/{_apiSegments}/{p.Net.Replace("#", "%23")}")
             )).ToArray();
             Task.WaitAll(tasks);
-
-            // foreach (var pg in pgs)
-            // {
-            //     string url = $"{_apiUrl}/{_apiSegments}/{pg.Net.Replace("#", "%23")}";
-            //     HttpResponseMessage response = await SendWithRetry(
-            //         () => _sddc.DeleteAsync(url)
-            //     );
-            //     // await Task.Delay(200);
-            // }
 
             // verify deletion
             await Task.Delay(2000);
@@ -347,7 +343,7 @@ namespace TopoMojo.Hypervisor.vSphere
             do {
                 response = await func();
                 if (response.IsSuccessStatusCode) { break; }
-                _logger.LogDebug("SDDC api returned {code}.", response.StatusCode);
+                _logger.LogDebug("SDDC api returned {code} {reason}.", response.StatusCode, response.ReasonPhrase);
                 await Task.Delay(delay);
                 retries -= 1;
             } while (retries > 0);

@@ -1323,9 +1323,10 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
                 finally
                 {
+                    _logger.LogDebug("MonitorSession complete {duration}", DateTimeOffset.UtcNow.Subtract(st).TotalSeconds);
+
                     await Task.Delay(_syncInterval);
 
-                    _logger.LogDebug("MonitorSession complete {duration}", DateTimeOffset.UtcNow.Subtract(st).TotalSeconds);
                     if (_vim == null)
                         await Connect();
                 }
