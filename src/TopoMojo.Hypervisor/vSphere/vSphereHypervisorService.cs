@@ -684,6 +684,10 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private async Task DeployBatch(DeploymentContext ctx)
         {
+            DateTimeOffset  st = DateTimeOffset.UtcNow;
+
+            _logger.LogDebug("DeployBatch: start {id}", ctx.Id);
+
             var existing = (await Find(ctx.Id)).Select(vm => vm.Name);
             var missing = ctx.Templates
                 .Where(t => existing.Contains(t.Name).Equals(false))
@@ -714,6 +718,8 @@ namespace TopoMojo.Hypervisor.vSphere
             var tasks = missing.Select(t => Deploy(t, ctx.Privileged)).ToArray();
             await Task.WhenAll(tasks);
 
+            _logger.LogDebug("DeployBatch: complete {id} {duration}", ctx.Id, DateTimeOffset.UtcNow.Subtract(st).TotalSeconds);
+
             if (ctx.Affinity)
             {
                 var vms = tasks.Select(t => t.Result).ToArray();
@@ -723,6 +729,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 foreach (var vm in vms)
                     vm.State = VmPowerState.Running;
             }
+
         }
 
         public async Task Deploy(DeploymentContext ctx, bool wait = false)

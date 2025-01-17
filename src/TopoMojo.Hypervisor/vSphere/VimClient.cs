@@ -214,6 +214,8 @@ namespace TopoMojo.Hypervisor.vSphere
             }
 
             vm.Status = "initialized";
+            _logger.LogDebug("Delete: delete complete {id}", id);
+
             return vm;
         }
 

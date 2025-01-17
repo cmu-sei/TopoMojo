@@ -134,7 +134,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 var missing = manifest.ExceptBy(pgs.Select(p => p.Net), m => m.Net);
                 if (missing.Any()) {
-                    throw new Exception($"Failed to provision nets:\n\t{string.Join("\n\t", missing)}");
+                    throw new Exception($"Failed to provision nets:\n\t{string.Join("\n\t", missing.Select(m => m.Net))}");
                 }
             }
         }

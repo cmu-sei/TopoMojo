@@ -172,7 +172,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             _logger.LogDebug("SDDC created nets:\n\t{ok}", string.Join("\n\t", ok));
 
-            int count = 15;
+            int count = 20;
             bool complete = false;
             PortGroupAllocation[] pgas = [];
             do
@@ -292,7 +292,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 HttpResponseMessage response = await SendWithRetry(
                     () => _sddc.DeleteAsync(url)
                 );
-                await Task.Delay(200);
+                // await Task.Delay(200);
             }
 
             // verify deletion
@@ -332,12 +332,13 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
-        public static async Task<HttpResponseMessage> SendWithRetry(Func<Task<HttpResponseMessage>> func, int retries = 3, int delay=200)
+        public async Task<HttpResponseMessage> SendWithRetry(Func<Task<HttpResponseMessage>> func, int retries = 3, int delay=200)
         {
             HttpResponseMessage response;
             do {
                 response = await func();
                 if (response.IsSuccessStatusCode) { break; }
+                _logger.LogDebug("SDDC api returned {code}.", response.StatusCode);
                 await Task.Delay(delay);
                 retries -= 1;
             } while (retries > 0);
