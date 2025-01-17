@@ -287,8 +287,6 @@ namespace TopoMojo.Hypervisor.vSphere
 
             List<PortGroupAllocation> found = [];
             List<PortGroupAllocation> missing = [];
-            HttpResponseMessage tmp_found = null;
-            HttpResponseMessage tmp_missing = null;
 
             foreach(var pg in pgs)
             {
@@ -296,20 +294,12 @@ namespace TopoMojo.Hypervisor.vSphere
                 if (response.IsSuccessStatusCode)
                 {
                     found.Add(pg);
-                    tmp_found ??= response;
                 }
                 else
                 {
                     missing.Add(pg);
-                    tmp_missing ??= response;
                 }
             }
-
-            if (tmp_found is not null)
-                _logger.LogDebug("Found Sddc Net: {content}", await tmp_found.Content.ReadAsStringAsync());
-
-            if (tmp_missing is not null)
-                _logger.LogDebug("Missing Sddc Net: {content}", await tmp_missing.Content.ReadAsStringAsync());
 
             foreach (var pg in found)
             {
@@ -357,7 +347,13 @@ namespace TopoMojo.Hypervisor.vSphere
             do {
                 response = await func();
                 if (response.IsSuccessStatusCode) { break; }
-                _logger.LogDebug("SDDC api returned {code} {reason}.", response.StatusCode, response.ReasonPhrase);
+
+                _logger.LogDebug(
+                    "SDDC api returned {code} {reason} {content}",
+                    response.StatusCode,
+                    response.ReasonPhrase,
+                    await response.Content.ReadAsStringAsync()
+                );
                 await Task.Delay(delay);
                 retries -= 1;
             } while (retries > 0);

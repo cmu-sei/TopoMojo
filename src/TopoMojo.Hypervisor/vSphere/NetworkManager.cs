@@ -26,7 +26,7 @@ namespace TopoMojo.Hypervisor.vSphere
         protected ConcurrentDictionary<string, Vm> _vmCache = vmCache;
         protected ILogger _logger = logger;
 
-        readonly int _clean_network_buffer_minutes = -2;
+        readonly int _clean_network_buffer_minutes = -1;
 
         public async Task Initialize()
         {
@@ -151,7 +151,10 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 foreach (var vmnet in vmnets)
                     if (map.TryGetValue(vmnet.NetworkMOR, out PortGroupAllocation value))
+                    {
+                        value.Timestamp = DateTimeOffset.UtcNow;
                         value.Counter -= 1;
+                    }
             }
         }
 
@@ -167,7 +170,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     : _pgAllocation.Values.Where(p => p.Net.EndsWith(tag))
                 ;
 
-                // exclude non-tagged and recently-added portgroups
+                // exclude non-tagged and recently-touched portgroups
                 DateTimeOffset mark = DateTimeOffset.UtcNow.AddMinutes(_clean_network_buffer_minutes);
                 q = q.Where(p => p.Net.Contains('#') && p.Timestamp < mark)
                     .OrderBy(p => p.Timestamp)
