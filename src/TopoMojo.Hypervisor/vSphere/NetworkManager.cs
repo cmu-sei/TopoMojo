@@ -26,7 +26,7 @@ namespace TopoMojo.Hypervisor.vSphere
         protected ConcurrentDictionary<string, Vm> _vmCache = vmCache;
         protected ILogger _logger = logger;
 
-        readonly int _clean_network_buffer_minutes = -1;
+        readonly int _clean_network_buffer_minutes = -2;
 
         public async Task Initialize()
         {
@@ -76,15 +76,18 @@ namespace TopoMojo.Hypervisor.vSphere
 
             await ProvisionAll(template.Eth, template.UseUplinkSwitch);
 
-            foreach (var eth in template.Eth)
+            lock (_pgAllocation)
             {
-                if (_pgAllocation.TryGetValue(eth.Net, out PortGroupAllocation value)) {
-                    eth.Key = value.Key;
-                    value.Counter += 1;
-                } else {
-                    throw new Exception($"Network not provisioned: {eth.Net}");
-                }
+                foreach (var eth in template.Eth)
+                {
+                    if (_pgAllocation.TryGetValue(eth.Net, out PortGroupAllocation value)) {
+                        eth.Key = value.Key;
+                        value.Counter += 1;
+                    } else {
+                        throw new Exception($"Network not provisioned: {eth.Net}");
+                    }
 
+                }
             }
         }
 
