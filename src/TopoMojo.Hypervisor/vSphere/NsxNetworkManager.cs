@@ -133,10 +133,10 @@ namespace TopoMojo.Hypervisor.vSphere
             throw new NotImplementedException();
         }
 
+        private string FormatUrl(string net) => $"{_apiUrl}/{_apiSegments}/{net.Replace("#", "%23")}";
+
         public override async Task<PortGroupAllocation[]> AddPortGroups(string sw, VmNet[] eths)
         {
-            // int delay = 200;
-
             if (eths.Length == 0)
                 return [];
 
@@ -153,25 +153,16 @@ namespace TopoMojo.Hypervisor.vSphere
                 "application/json"
             );
 
-            // var tasks = manifest.Select(p => SendWithRetry(
-            //     () => _sddc.PutAsync($"{_apiUrl}/{_apiSegments}/{p.Replace("#", "%23")}", content)
-            // )).ToArray();
-            // Task.WaitAll(tasks);
-
             foreach (var eth in manifest)
             {
-                string url = $"{_apiUrl}/{_apiSegments}/{eth.Replace("#", "%23")}";
-
                 HttpResponseMessage response = await SendWithRetry(
-                    () => _sddc.PutAsync(url, content)
+                    () => _sddc.PutAsync(FormatUrl(eth), content)
                 );
 
                 if (response.IsSuccessStatusCode)
                     ok.Add(eth);
                 else
-                    _logger.LogDebug("Failed to add SDDC PortGroup {net} {reason}", eth, response.ReasonPhrase);
-
-                // await Task.Delay(delay);
+                    _logger.LogDebug("Failed to add SDDC PortGroup {net} {code} {reason}", eth, response.StatusCode, response.ReasonPhrase);
             }
 
             _logger.LogDebug("SDDC created nets:\n\t{ok}", string.Join("\n\t", ok));
@@ -296,7 +287,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             // remove all
             var tasks = pgs.Select(p => SendWithRetry(
-                () => _sddc.DeleteAsync($"{_apiUrl}/{_apiSegments}/{p.Net.Replace("#", "%23")}")
+                () => _sddc.DeleteAsync(FormatUrl(p.Net))
             )).ToArray();
             Task.WaitAll(tasks);
 
@@ -337,7 +328,7 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
-        public async Task<HttpResponseMessage> SendWithRetry(Func<Task<HttpResponseMessage>> func, int retries = 3, int delay=200)
+        public async Task<HttpResponseMessage> SendWithRetry(Func<Task<HttpResponseMessage>> func, int retries = 2, int delay=200)
         {
             HttpResponseMessage response;
             do {
