@@ -76,10 +76,18 @@ namespace TopoMojo.Hypervisor.vSphere
 
             await ProvisionAll(template.Eth, template.UseUplinkSwitch);
 
-            foreach (var eth in template.Eth)
+            lock (_pgAllocation)
             {
-                eth.Key = _pgAllocation[eth.Net].Key;
-                _pgAllocation[eth.Net].Counter += 1;
+                foreach (var eth in template.Eth)
+                {
+                    if (_pgAllocation.TryGetValue(eth.Net, out PortGroupAllocation value)) {
+                        eth.Key = value.Key;
+                        value.Counter += 1;
+                    } else {
+                        throw new Exception($"Network not provisioned: {eth.Net}");
+                    }
+
+                }
             }
         }
 
@@ -101,8 +109,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 // filter only unallocated nets
                 var manifest = nets
-                    .Where(e => _pgAllocation.ContainsKey(e.Net).Equals(false))
                     .DistinctBy(e => e.Net)
+                    .Where(e => _pgAllocation.ContainsKey(e.Net).Equals(false))
                     .ToArray()
                 ;
 
@@ -126,6 +134,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 if (_swAllocation.ContainsKey(sw))
                     _swAllocation[sw] += pgs.Length;
+
+                var missing = manifest.ExceptBy(pgs.Select(p => p.Net), m => m.Net);
+                if (missing.Any()) {
+                    throw new Exception($"Failed to provision nets:\n\t{string.Join("\n\t", missing.Select(m => m.Net))}");
+                }
             }
         }
 
@@ -141,14 +154,17 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 foreach (var vmnet in vmnets)
                     if (map.TryGetValue(vmnet.NetworkMOR, out PortGroupAllocation value))
+                    {
+                        value.Timestamp = DateTimeOffset.UtcNow;
                         value.Counter -= 1;
+                    }
             }
         }
 
         public async Task Clean(string tag = null)
         {
             await Task.Delay(0);
-            _logger.LogDebug("cleaning nets [{tag}]", tag);
+            _logger.LogDebug("cleaning nets for id [{tag}]", tag ?? "stale");
 
             lock (_pgAllocation)
             {
@@ -157,7 +173,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     : _pgAllocation.Values.Where(p => p.Net.EndsWith(tag))
                 ;
 
-                // exclude non-tagged and recently-added portgroups
+                // exclude non-tagged and recently-touched portgroups
                 DateTimeOffset mark = DateTimeOffset.UtcNow.AddMinutes(_clean_network_buffer_minutes);
                 q = q.Where(p => p.Net.Contains('#') && p.Timestamp < mark)
                     .OrderBy(p => p.Timestamp)

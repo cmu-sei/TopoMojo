@@ -207,9 +207,15 @@ namespace TopoMojo.Hypervisor.vSphere
             _logger.LogDebug("Delete: deleting vm folder {folder}", folder);
             await _vim.DeleteDatastoreFile_TaskAsync(_sic.fileManager, folder, _datacenter);
 
-            _vmCache.TryRemove(vm.Id, out vm);
+            if (!_vmCache.TryRemove(vm.Id, out _))
+            {
+                await Task.Delay(100);
+                _vmCache.TryRemove(vm.Id, out _);
+            }
 
             vm.Status = "initialized";
+            _logger.LogDebug("Delete: delete complete {id}", id);
+
             return vm;
         }
 
@@ -1289,8 +1295,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
             while (true)
             {
+                var st = DateTimeOffset.UtcNow;
+
                 try
                 {
+
                     if (_vim != null && DateTimeOffset.UtcNow.AddMinutes(-_config.KeepAliveMinutes).CompareTo(_lastAction) > 0)
                     {
                         await Disconnect();
@@ -1314,6 +1323,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 }
                 finally
                 {
+                    _logger.LogDebug("MonitorSession complete {duration}", DateTimeOffset.UtcNow.Subtract(st).TotalSeconds);
+
                     await Task.Delay(_syncInterval);
 
                     if (_vim == null)

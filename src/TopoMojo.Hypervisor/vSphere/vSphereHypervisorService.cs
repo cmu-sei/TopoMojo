@@ -502,7 +502,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 foreach (VmNet eth in template.Eth)
                 {
                     if (!(privileged && _vlanman.Contains(eth.Net)))
-                        eth.Net = $"{eth.Net}#{template.IsolationTag}";
+                        eth.Net = $"{eth.Net.Untagged()}#{template.IsolationTag}";
                 }
             }
         }
@@ -684,6 +684,10 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private async Task DeployBatch(DeploymentContext ctx)
         {
+            DateTimeOffset  st = DateTimeOffset.UtcNow;
+
+            _logger.LogDebug("DeployBatch: start {id}", ctx.Id);
+
             var existing = (await Find(ctx.Id)).Select(vm => vm.Name);
             var missing = ctx.Templates
                 .Where(t => existing.Contains(t.Name).Equals(false))
@@ -694,21 +698,27 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (_hostCache.Count == 1 && _hostCache.First().Value.Options.IsNsxNetwork)
             {
-                var eths = ctx.Templates.SelectMany(t => t.Eth)
-                    .DistinctBy(e => e.Net)
-                    .ToArray();
+                if (existing.Any()) {
+                    await _hostCache.First().Value.Delete(ctx.Id);
+                    missing = [.. ctx.Templates];
+                }
 
+                var eths = ctx.Templates.SelectMany(t => t.Eth).ToArray();
+
+                string rand = new Random().Next(0xffff).ToString("x4");
                 foreach (var eth in eths)
                 {
-                    if (ctx.Privileged && _vlanman.Contains(eth.Net))
-                        continue;
-                    eth.Net += $"#{ctx.Id}";
+                    if (!(ctx.Privileged && _vlanman.Contains(eth.Net)))
+                        eth.Net += $"{rand}#{ctx.Id}";
                 }
+
                 await _hostCache.First().Value.PreDeployNets(eths, false);
             }
 
             var tasks = missing.Select(t => Deploy(t, ctx.Privileged)).ToArray();
             await Task.WhenAll(tasks);
+
+            _logger.LogDebug("DeployBatch: complete {id} {duration}", ctx.Id, DateTimeOffset.UtcNow.Subtract(st).TotalSeconds);
 
             if (ctx.Affinity)
             {
@@ -719,6 +729,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 foreach (var vm in vms)
                     vm.State = VmPowerState.Running;
             }
+
         }
 
         public async Task Deploy(DeploymentContext ctx, bool wait = false)
