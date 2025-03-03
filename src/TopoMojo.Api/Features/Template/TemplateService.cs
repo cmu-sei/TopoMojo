@@ -280,10 +280,8 @@ namespace TopoMojo.Api.Services
             var entity = await _store.Load(id);
 
             string isolationTag = entity.WorkspaceId
-                ?? string.Concat(
-                    CoreOptions.Tenant,
-                    Guid.Empty.ToString("n").AsSpan(CoreOptions.Tenant.Length)
-                );
+                ?? Guid.Empty.ToString()
+            ;
 
             return Mapper.Map<ConvergedTemplate>(entity)
                 .ToVirtualTemplate(isolationTag)

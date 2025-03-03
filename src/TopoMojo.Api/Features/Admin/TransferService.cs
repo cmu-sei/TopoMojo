@@ -144,7 +144,7 @@ public class TransferService(
 
         list.Add(new()
         {
-            Id = Guid.Empty.ToString("n"),
+            Id = Guid.Empty.ToString(),
             Templates = stock
         }
         );
