@@ -717,9 +717,9 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             // Default settings
             // TODO: Fix duplication with vsphere?
-            args.Append($"-fw_cfg name=opt/guestinfo.isolationTag,string={template.IsolationTag} ");
-            args.Append($"-fw_cfg name=opt/guestinfo.templateSource,string={template.Id} ");
-            args.Append($"-fw_cfg name=opt/guestinfo.hostname,string={template.Name.Untagged()} ");
+            args.Append($"-fw_cfg name=opt/guestinfo.isolationTag,string=\"{template.IsolationTag}\" ");
+            args.Append($"-fw_cfg name=opt/guestinfo.templateSource,string=\"{template.Id}\" ");
+            args.Append($"-fw_cfg name=opt/guestinfo.hostname,string=\"{template.Name.Untagged()}\" ");
 
             foreach (var setting in template.GuestSettings)
             {
@@ -729,7 +729,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     continue;
                 }
 
-                args.Append($"-fw_cfg name=opt/{setting.Key},string={setting.Value} ");
+                args.Append($"-fw_cfg name=opt/{setting.Key},string=\"{setting.Value}\" ");
             }
 
             return args.ToString().TrimEnd();
