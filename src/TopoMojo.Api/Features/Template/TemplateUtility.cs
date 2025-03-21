@@ -186,7 +186,7 @@ namespace TopoMojo.Api.Services
             if (!string.IsNullOrEmpty(_template.Template))
             {
                 _template.ParentTemplate = _template.Template;
-                _template.Template = _template.Name;
+                _template.Template = templateKey;
             }
         }
 
