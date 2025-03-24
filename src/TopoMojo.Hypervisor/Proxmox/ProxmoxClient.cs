@@ -161,6 +161,20 @@ namespace TopoMojo.Hypervisor.Proxmox
                 throw new Exception(task.ReasonPhrase);
             }
 
+            if (task.IsSuccessStatusCode && !string.IsNullOrEmpty(template.IsolationTag))
+            {
+                task = await _pveClient
+                        .Nodes[parentTemplate.Host]
+                        .Qemu[nextId]
+                        .Config
+                        .UpdateVmAsync(tags: template.IsolationTag);
+                await _pveClient.WaitForTaskToFinish(task);
+            }
+            else
+            {
+                throw new Exception(task.ReasonPhrase);
+            }
+
             Vm vm = new()
             {
                 Name = name,
