@@ -12,6 +12,7 @@ using TopoMojo.Api.Services;
 using TopoMojo.Api.Validators;
 using TopoMojo.Api.Models;
 using TopoMojo.Hypervisor;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace TopoMojo.Api.Controllers;
 
@@ -264,7 +265,7 @@ public class VmController(
 
         var src = new Uri(info.Url);
         string target = "";
-        string qs = "";
+        var vmHost = "";
         string internalHost = src.Host.Split('.').First();
         string domain = Request.Host.Value.Contains('.')
                     ? Request.Host.Value[(Request.Host.Value.IndexOf('.') + 1)..]
@@ -293,7 +294,7 @@ public class VmController(
 
             case "querystring":
             default:
-                qs = $"?vmhost={src.Host}";
+                vmHost = src.Host;
                 target = options.ConsoleHost;
                 break;
         }
@@ -301,7 +302,8 @@ public class VmController(
         if (target.NotEmpty())
             info.Url = info.Url.Replace(src.Host, target);
 
-        info.Url += qs;
+        if (vmHost.NotEmpty())
+            info.Url = QueryHelpers.AddQueryString(info.Url, "vmhost", src.Host);
 
         Logger.LogDebug("mks url: {url}", info.Url);
 
