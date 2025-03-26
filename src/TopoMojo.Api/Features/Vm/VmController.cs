@@ -303,7 +303,7 @@ public class VmController(
             info.Url = info.Url.Replace(src.Host, target);
 
         if (vmHost.NotEmpty())
-            info.Url = QueryHelpers.AddQueryString(info.Url, "vmhost", src.Host);
+            info.Url = QueryHelpers.AddQueryString(info.Url, "vmhost", vmHost);
 
         Logger.LogDebug("mks url: {url}", info.Url);
 
