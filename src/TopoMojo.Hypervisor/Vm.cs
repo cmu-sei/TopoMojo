@@ -21,6 +21,7 @@ namespace TopoMojo.Hypervisor
         public VmQuestion Question { get; set; }
         public VmTask Task { get; set; }
         public HypervisorType HypervisorType { get; set; } = HypervisorType.Vsphere;
+        public bool IsTemplate { get; set; }
     }
 
     public enum VmPowerState { Off, Running, Suspended }
