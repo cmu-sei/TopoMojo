@@ -164,7 +164,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             await _pveClient.WaitForTaskToFinish(task);
 
             if (!task.IsSuccessStatusCode)
-                throw new Exception($"Failed to load virtual networks from Proxmox. Status code: {task.StatusCode}");
+                throw new Exception($"Failed to load virtual networks from Proxmox. Status code: {task.StatusCode}. Reason: {task.ReasonPhrase}");
 
             return task.ToModel<PveVnet[]>().Where(x => x.Zone == _sdnZone);
         }

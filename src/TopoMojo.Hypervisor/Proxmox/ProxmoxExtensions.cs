@@ -76,6 +76,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         /// <returns></returns>
         public static async Task<bool> WaitForTaskToFinish(this PveClient client, Result result, int wait = 2000, long timeout = 3600 * 1000)
         => !(result != null &&
+            result.IsSuccessStatusCode &&
             !result.ResponseInError &&
             timeout > 0 &&
             result.ToData() is string v &&
