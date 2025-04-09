@@ -751,20 +751,13 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private async Task<string> GetIso(VmTemplate template)
         {
+            if (string.IsNullOrEmpty(template.Iso)) return null;
+
             var isos = await GetFiles();
-
-            var iso = isos
+            return isos
                 .Where(x => x.Volid == template.Iso)
-                .FirstOrDefault();
-
-            if (iso != null)
-            {
-                return iso.Volid;
-            }
-            else
-            {
-                return null;
-            }
+                .FirstOrDefault()
+                ?.Volid;
         }
 
         private static string GetMemory(VmTemplate template)

@@ -112,15 +112,12 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option, bool privileged = false)
         {
-            if (!template.Iso.HasValue())
+            if (template.Iso.HasValue())
             {
-                // need to have a backing file to add the cdrom device
-                template.Iso = option.IsoStore + "null.iso";
+                var isoPath = template.Iso.Replace('/', '#');
+                isoPath = $"{option.IsoStore.Replace("/", string.Empty)}:iso/{isoPath}";
+                template.Iso = isoPath;
             }
-
-            var isoPath = template.Iso.Replace('/', '#');
-            isoPath = $"{option.IsoStore.Replace("/", string.Empty)}:iso/{isoPath}";
-            template.Iso = isoPath;
 
             foreach (VmDisk disk in template.Disks)
             {
