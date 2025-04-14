@@ -124,11 +124,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 {
                     var deleteTask = await _pveClient.Cluster.Sdn.Vnets[vnet.Vnet].Delete();
                     await _pveClient.WaitForTaskToFinish(deleteTask);
-
-                    if (deleteTask.IsSuccessStatusCode)
-                    {
-                        deletedPveNets.Add(vnet);
-                    }
+                    deletedPveNets.Add(vnet);
                 }
                 else
                 {
@@ -148,11 +144,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             {
                 var deleteTask = await _pveClient.Cluster.Sdn.Vnets[vnet.Vnet].Delete();
                 await _pveClient.WaitForTaskToFinish(deleteTask);
-
-                if (deleteTask.IsSuccessStatusCode)
-                {
-                    deletedPveNets.Add(vnet);
-                }
+                deletedPveNets.Add(vnet);
             }
 
             return deletedPveNets;
@@ -162,10 +154,6 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             var task = await _pveClient.Cluster.Sdn.Vnets.Index();
             await _pveClient.WaitForTaskToFinish(task);
-
-            if (!task.IsSuccessStatusCode)
-                throw new Exception($"Failed to load virtual networks from Proxmox. Status code: {task.StatusCode}. Reason: {task.ReasonPhrase}");
-
             return task.ToModel<PveVnet[]>().Where(x => x.Zone == _sdnZone);
         }
 

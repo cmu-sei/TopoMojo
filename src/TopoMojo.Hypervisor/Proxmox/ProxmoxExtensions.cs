@@ -63,7 +63,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         }
 
         /// <summary>
-        /// Wait for task to finish.
+        /// Wait for task to finish and then checks the final status of the task. Throws an Exception if task ended in error.
         /// </summary>
         /// Modification of the Corsinvest implementation that adds additional check
         /// that the passed in result actually contains a task id to avoid throwing errors.
@@ -75,13 +75,37 @@ namespace TopoMojo.Hypervisor.Proxmox
         /// <param name="timeout"></param>
         /// <returns></returns>
         public static async Task<bool> WaitForTaskToFinish(this PveClient client, Result result, int wait = 2000, long timeout = 3600 * 1000)
-        => !(result != null &&
-            result.IsSuccessStatusCode &&
-            !result.ResponseInError &&
-            timeout > 0 &&
-            result.ToData() is string v &&
-            v.StartsWith("UPID:")) ||
-                await WaitForTaskToFinish(client, result.ToData(), wait, timeout);
+        {
+            if (result == null || timeout <= 0) return false;
+
+            if (result.ResponseInError || !result.IsSuccessStatusCode)
+            {
+                var statusStr = $"\n Status Code: {result.StatusCode}";
+                var reasonStr = string.IsNullOrEmpty(result.ReasonPhrase) ? "" : $"\n Reason: {result.ReasonPhrase}";
+                var error = result.GetError();
+                var errorStr = string.IsNullOrEmpty(error) ? "" : $"\n Error: {error}";
+
+                throw new Exception($"Task failed: {statusStr}{reasonStr}{errorStr}");
+            }
+
+            var data = result.ToData() as string;
+
+            if (data is null || !data.StartsWith("UPID:")) return true;
+
+            var finished = await WaitForTaskToFinish(client, data, wait, timeout);
+
+            if (finished)
+            {
+                var status = await client.GetExitStatusTaskAsync(data);
+
+                if (status != "OK")
+                {
+                    throw new Exception($"Task failed: {status}");
+                }
+            }
+
+            return finished;
+        }
 
         /// <summary>
         /// Wait for task to finish.
