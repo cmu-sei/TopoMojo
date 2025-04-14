@@ -911,7 +911,9 @@ namespace TopoMojo.Hypervisor.Proxmox
         private async Task MonitorSession()
         {
             _logger.LogDebug("{host}: starting cache loop", _config.Host);
-            await _vlanManager.Initialize();
+
+            await InitializeVlanManager();
+
             int step = 0;
 
             while (true)
@@ -924,19 +926,33 @@ namespace TopoMojo.Hypervisor.Proxmox
                         await _vlanManager.Clean(_vmCache);
                         await DeleteUnusedTemplates();
                     }
+
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(0, ex, "Failed to refresh cache for {host}", _config.Host);
-                }
-                finally
-                {
-                    await Task.Delay(_syncInterval);
+                    _logger.LogError(ex, $"Failed to refresh cache for {_config.Host}");
                 }
 
+                await Task.Delay(_syncInterval);
                 step = (step + 1) % 2;
             }
-            // _logger.LogDebug("sessionMonitor ended.");
+        }
+
+        private async Task InitializeVlanManager()
+        {
+            while (true)
+            {
+                try
+                {
+                    await _vlanManager.Initialize();
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to initialize Proxmox VlanManager");
+                    await Task.Delay(_syncInterval);
+                }
+            }
         }
 
         private async Task DeleteUnusedTemplates()
