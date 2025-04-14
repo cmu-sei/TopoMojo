@@ -150,18 +150,11 @@ namespace TopoMojo.Hypervisor.Proxmox
                 target: parentTemplate.Host);
             await _pveClient.WaitForTaskToFinish(task);
 
-            if (task.IsSuccessStatusCode)
-            {
-                // convert new vm to template
-                task = await _pveClient.Nodes[parentTemplate.Host].Qemu[nextId].Template.Template();
-                await _pveClient.WaitForTaskToFinish(task);
-            }
-            else
-            {
-                throw new Exception(task.ReasonPhrase);
-            }
+            // convert new vm to template
+            task = await _pveClient.Nodes[parentTemplate.Host].Qemu[nextId].Template.Template();
+            await _pveClient.WaitForTaskToFinish(task);
 
-            if (task.IsSuccessStatusCode && !string.IsNullOrEmpty(template.IsolationTag))
+            if (!string.IsNullOrEmpty(template.IsolationTag))
             {
                 task = await _pveClient
                         .Nodes[parentTemplate.Host]
@@ -169,10 +162,6 @@ namespace TopoMojo.Hypervisor.Proxmox
                         .Config
                         .UpdateVmAsync(tags: template.IsolationTag);
                 await _pveClient.WaitForTaskToFinish(task);
-            }
-            else
-            {
-                throw new Exception(task.ReasonPhrase);
             }
 
             Vm vm = new()
@@ -239,114 +228,118 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             await _pveClient.WaitForTaskToFinish(task);
 
-            if (task.IsSuccessStatusCode)
+            if (isoTask.IsFaulted || vnetsTask.IsFaulted)
             {
-                if (isoTask.IsFaulted || vnetsTask.IsFaulted)
+                var exceptions = new List<Exception>();
+
+                if (isoTask.IsFaulted)
                 {
-                    var exceptions = new List<Exception>();
-
-                    if (isoTask.IsFaulted)
-                    {
-                        exceptions.Add(isoTask.Exception);
-                    }
-
-                    if (vnetsTask.IsFaulted)
-                    {
-                        exceptions.Add(vnetsTask.Exception);
-                    }
-
-                    var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
-                    await _pveClient.WaitForTaskToFinish(destroyTask);
-
-                    throw new AggregateException($"Exception deploying {template.Name}", exceptions);
+                    exceptions.Add(isoTask.Exception);
                 }
 
-                // Proxmox requires using the root user account directly (not an access token)
-                // for setting the args field to add arbitrary arguments to the QEMU command line. This is currently the only
-                // way to set the fw_cfg property that we need for Guest Settings.
-                // A Patch is available to add direct fw_cfg support but has not been merged into a release.
-                // https://bugzilla.proxmox.com/show_bug.cgi?id=4068
-                // If no root password is provided, skip setting args.
-                var client = _pveClient;
-                var setGuestSettings = false;
-
-                if (!string.IsNullOrEmpty(_config.Password))
+                if (vnetsTask.IsFaulted)
                 {
-                    if (await _rootPveClient.LoginAsync("root", _config.Password))
-                    {
-                        client = _rootPveClient;
-                        setGuestSettings = true;
-                    }
-                    else
-                    {
-                        _logger.LogError("Error logging in with root password. Skipping Guest Settings.");
-                    }
+                    exceptions.Add(vnetsTask.Exception);
+                }
+
+                var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
+
+                try
+                {
+                    await _pveClient.WaitForTaskToFinish(destroyTask);
+                }
+                catch (Exception ex)
+                {
+                    exceptions.Add(ex);
+                }
+
+                throw new AggregateException($"Exception deploying {template.Name}", exceptions);
+            }
+
+            // Proxmox requires using the root user account directly (not an access token)
+            // for setting the args field to add arbitrary arguments to the QEMU command line. This is currently the only
+            // way to set the fw_cfg property that we need for Guest Settings.
+            // A Patch is available to add direct fw_cfg support but has not been merged into a release.
+            // https://bugzilla.proxmox.com/show_bug.cgi?id=4068
+            // If no root password is provided, skip setting args.
+            var client = _pveClient;
+            var setGuestSettings = false;
+
+            if (!string.IsNullOrEmpty(_config.Password))
+            {
+                if (await _rootPveClient.LoginAsync("root", _config.Password))
+                {
+                    client = _rootPveClient;
+                    setGuestSettings = true;
                 }
                 else
                 {
-                    _logger.LogDebug("No root password provided. Skipping Guest Settings");
-                }
-
-                var nics = await GetNics(template);
-                var memory = GetMemory(template);
-                var sockets = GetSockets(template);
-                var coresPerSocket = GetCoresPerSocket(template);
-                string args = null;
-
-                if (setGuestSettings)
-                {
-                    args = GetArgs(template);
-                }
-
-                task = await client.Nodes[targetNode].Qemu[nextId].Config.UpdateVmAsync(
-                    netN: nics,
-                    memory: memory,
-                    sockets: sockets,
-                    cores: coresPerSocket,
-                    cdrom: isoTask.Result,
-                    args: args);
-                await _pveClient.WaitForTaskToFinish(task);
-
-                if (!task.IsSuccessStatusCode)
-                {
-                    _logger.LogError("Error reconfiguring vm {name} ({nextid}) - {reason}", template.Name, nextId, task.ReasonPhrase);
-                    var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
-                    await _pveClient.WaitForTaskToFinish(destroyTask);
-
-                    throw new Exception(task.ReasonPhrase);
-                }
-
-                _logger.LogDebug("deploy: load vm...");
-
-                vm = new Vm()
-                {
-                    Name = template.Name,
-                    Id = nextId,
-                    State = VmPowerState.Off,
-                    Status = "deployed",
-                    Host = targetNode,
-                    HypervisorType = HypervisorType.Proxmox
-                };
-
-                if (vm.Name.Contains('#').Equals(false) || vm.Name.ToTenant() != _config.Tenant)
-                    return null;
-
-                _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
-
-                if (_enableHA)
-                {
-                    task = await _pveClient.Cluster.Ha.Resources.Create(nextId);
-                }
-
-                if (template.AutoStart && task.IsSuccessStatusCode)
-                {
-                    _logger.LogDebug("deploy: start vm...");
-                    vm = await Start(vm.Id);
+                    _logger.LogError("Error logging in with root password. Skipping Guest Settings.");
                 }
             }
             else
             {
-                throw new Exception(task.ReasonPhrase);
+                _logger.LogDebug("No root password provided. Skipping Guest Settings");
+            }
+
+            var nics = await GetNics(template);
+            var memory = GetMemory(template);
+            var sockets = GetSockets(template);
+            var coresPerSocket = GetCoresPerSocket(template);
+            string args = null;
+
+            if (setGuestSettings)
+            {
+                args = GetArgs(template);
+            }
+
+            task = await client.Nodes[targetNode].Qemu[nextId].Config.UpdateVmAsync(
+                netN: nics,
+                memory: memory,
+                sockets: sockets,
+                cores: coresPerSocket,
+                cdrom: isoTask.Result,
+                args: args);
+
+            try
+            {
+                await _pveClient.WaitForTaskToFinish(task);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reconfiguring vm {name} ({nextid}) - {reason}", template.Name, nextId, task.ReasonPhrase);
+                var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
+                await _pveClient.WaitForTaskToFinish(destroyTask);
+
+                throw;
+            }
+
+            _logger.LogDebug("deploy: load vm...");
+
+            vm = new Vm()
+            {
+                Name = template.Name,
+                Id = nextId,
+                State = VmPowerState.Off,
+                Status = "deployed",
+                Host = targetNode,
+                HypervisorType = HypervisorType.Proxmox
+            };
+
+            if (vm.Name.Contains('#').Equals(false) || vm.Name.ToTenant() != _config.Tenant)
+                return null;
+
+            _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
+
+            if (_enableHA)
+            {
+                task = await _pveClient.Cluster.Ha.Resources.Create(nextId);
+            }
+
+            if (template.AutoStart && task.IsSuccessStatusCode)
+            {
+                _logger.LogDebug("deploy: start vm...");
+                vm = await Start(vm.Id);
             }
 
             return vm;
@@ -358,15 +351,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             var task = await _pveClient.Nodes[vm.Host].Qemu[vm.GetId()].Status.Start.VmStart();
             await _pveClient.WaitForTaskToFinish(task);
-
-            if (task.IsSuccessStatusCode)
-            {
-                vm.State = VmPowerState.Running;
-            }
-            else
-            {
-                throw new Exception(task.ReasonPhrase);
-            }
+            vm.State = VmPowerState.Running;
 
             _vmCache.TryUpdate(vm.Id, vm, vm);
 
@@ -379,15 +364,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             var task = await _pveClient.Nodes[vm.Host].Qemu[vm.GetId()].Status.Stop.VmStop();
             await _pveClient.WaitForTaskToFinish(task);
-
-            if (task.IsSuccessStatusCode)
-            {
-                vm.State = VmPowerState.Off;
-            }
-            else
-            {
-                throw new Exception(task.ReasonPhrase);
-            }
+            vm.State = VmPowerState.Off;
 
             _vmCache.TryUpdate(vm.Id, vm, vm);
 
@@ -425,15 +402,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             task = await _pveClient.Nodes[vm.Host].Qemu[id].DestroyVm();
             await _pveClient.WaitForTaskToFinish(task);
-
-            if (task.IsSuccessStatusCode)
-            {
-                vm.Status = "initialized";
-            }
-            else
-            {
-                throw new Exception(task.ReasonPhrase);
-            }
+            vm.Status = "initialized";
 
             // Don't set vm to the result here, because if we get unlucky and the sync task removed
             // this vm from the cache first, we'll get a null value, which will cause errors in the
@@ -519,18 +488,19 @@ namespace TopoMojo.Hypervisor.Proxmox
             {
                 await _pveClient.WaitForTaskToFinish(task);
 
-                if (!task.IsSuccessStatusCode)
-                    throw new Exception($"Clone failed: {task.ReasonPhrase}");
-
                 // Convert to template
                 task = await _pveClient.Nodes[template.Host].Qemu[nextId].Template.Template();
-                await _pveClient.WaitForTaskToFinish(task);
 
-                if (!task.IsSuccessStatusCode)
+                try
                 {
+                    await _pveClient.WaitForTaskToFinish(task);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Convert to template failed, destroying.");
                     var destroyTask = await _pveClient.Nodes[template.Host].Qemu[nextId].DestroyVm();
                     await _pveClient.WaitForTaskToFinish(destroyTask);
-                    throw new Exception($"Convert to template failed: {task.ReasonPhrase}");
+                    throw;
                 }
 
                 // Delete old vm
@@ -545,15 +515,9 @@ namespace TopoMojo.Hypervisor.Proxmox
                     .UpdateVmAsync(tags: deleteTag);
                 await _pveClient.WaitForTaskToFinish(task);
 
-                if (!task.IsSuccessStatusCode)
-                    throw new Exception($"Rename old template failed: {task.ReasonPhrase}");
-
                 // delete old template
                 task = await _pveClient.Nodes[template.Host].Qemu[template.Id].DestroyVm();
                 await _pveClient.WaitForTaskToFinish(task);
-
-                if (!task.IsSuccessStatusCode)
-                    throw new Exception($"Delete old template failed: {task.ReasonPhrase}");
 
                 await ReloadVmCache();
             }
@@ -671,12 +635,6 @@ namespace TopoMojo.Hypervisor.Proxmox
                 );
 
             await _pveClient.WaitForTaskToFinish(updateTask);
-
-            if (!updateTask.IsSuccessStatusCode)
-            {
-                throw new Exception($"VM Id {vmId}: failed to push update to the VM. The API returned a failed status code ({updateTask.StatusCode}): {updateTask.ReasonPhrase}");
-            }
-
             return vm;
         }
 
