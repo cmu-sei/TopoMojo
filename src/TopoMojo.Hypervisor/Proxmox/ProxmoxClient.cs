@@ -17,6 +17,7 @@ using TopoMojo.Hypervisor.Proxmox.Models;
 using TopoMojo.Hypervisor.Extensions;
 using Corsinvest.ProxmoxVE.Api.Shared.Models.Node;
 using System.Text;
+using TopoMojo.Hypervisor.Exceptions;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -428,7 +429,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
             else
             {
-                throw new Exception(result.GetError());
+                throw new HypervisorException(result.GetError());
             }
 
             return new Tuple<string, string>(url, ticket);
@@ -615,10 +616,10 @@ namespace TopoMojo.Hypervisor.Proxmox
                 {
                     var resolvedName = _vlanManager.ResolvePveNetName(netUpdate.Value);
                     var vnet = vnets.FirstOrDefault(v => v.Alias == _vlanManager.ResolvePveNetName(netUpdate.Value))
-                        ?? throw new Exception($"Couldn't resolve an ID for virtual network {netUpdate.Value}");
+                        ?? throw new HypervisorException($"Couldn't resolve an ID for virtual network {netUpdate.Value}");
 
                     var nic = currentConfig.Nics.SingleOrDefault(n => n.Index == netUpdate.Key)
-                        ?? throw new Exception($"Couldn't resolve a NIC on the host machine with index {netUpdate.Key}.");
+                        ?? throw new HypervisorException($"Couldn't resolve a NIC on the host machine with index {netUpdate.Key}.");
 
                     var updateValue = $"{nic.PveModel}={nic.MacAddress},bridge={vnet.Vnet}";
                     vnetAssignmentIds.Add(netUpdate.Key, updateValue);

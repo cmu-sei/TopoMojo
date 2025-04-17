@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Corsinvest.ProxmoxVE.Api;
 using Corsinvest.ProxmoxVE.Api.Shared.Models.Node;
 using Microsoft.Extensions.DependencyInjection;
+using TopoMojo.Hypervisor.Exceptions;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -85,7 +86,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 var error = result.GetError();
                 var errorStr = string.IsNullOrEmpty(error) ? "" : $"\n Error: {error}";
 
-                throw new Exception($"Task failed: {statusStr}{reasonStr}{errorStr}");
+                throw new HypervisorException($"Task failed: {statusStr}{reasonStr}{errorStr}");
             }
 
             var data = result.ToData() as string;
@@ -100,7 +101,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                 if (status != "OK")
                 {
-                    throw new Exception($"Task failed: {status}");
+                    throw new HypervisorException($"Task failed: {status}");
                 }
             }
 

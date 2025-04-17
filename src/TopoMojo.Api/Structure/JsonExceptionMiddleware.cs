@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
 using TopoMojo.Api;
 using TopoMojo.Api.Exceptions;
+using TopoMojo.Hypervisor.Exceptions;
 
 namespace TopoMojo.Api
 {
@@ -61,6 +62,11 @@ namespace TopoMojo.Api
 
                         if (ex is ArgumentException)
                             message += $" {ex.Message}";
+                    }
+
+                    if (ex is HypervisorException)
+                    {
+                        message = ex.Message;
                     }
 
                     await context.Response.WriteAsync(JsonSerializer.Serialize(new { message }));
