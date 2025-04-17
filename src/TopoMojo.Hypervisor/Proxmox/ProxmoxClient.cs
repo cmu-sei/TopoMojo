@@ -810,7 +810,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                 Status = "deployed",
                 Host = pveVm.Node,
                 Tags = pveVm.Tags == null ? [] : pveVm.Tags.Split(' '),
-                HypervisorType = HypervisorType.Proxmox
+                HypervisorType = HypervisorType.Proxmox,
+                IsTemplate = pveVm.IsTemplate
             };
 
             if (_tasks.TryGetValue(vm.Id, out PveNodeTask value))

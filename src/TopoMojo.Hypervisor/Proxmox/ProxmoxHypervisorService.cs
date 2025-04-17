@@ -419,7 +419,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public Task<Vm[]> Find(string term)
         {
-            IEnumerable<Vm> q = _vmCache.Values;
+            IEnumerable<Vm> q = _vmCache.Values.Where(x => !x.IsTemplate);
 
             if (term.HasValue())
                 q = q.Where(o => o.Id.Contains(term) || o.Name.Contains(term));
