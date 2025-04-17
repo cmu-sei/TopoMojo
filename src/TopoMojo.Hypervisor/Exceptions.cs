@@ -1,5 +1,4 @@
 using System;
-using System.ServiceModel.Channels;
 
 namespace TopoMojo.Hypervisor.Exceptions;
 
