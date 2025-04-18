@@ -1,6 +1,7 @@
 // Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
+using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.DataProtection;
@@ -20,6 +21,7 @@ namespace TopoMojo.Api
 
             Settings.Core.DocPath = Settings.FileUpload.DocRoot;
             Settings.Pod.Tenant = Settings.Core.Tenant;
+            Array.ForEach(Settings.Pods, (x) => x.Tenant = Settings.Core.Tenant);
 
             Settings.Cache.SharedFolder = Path.Combine(
                 env.ContentRootPath,
@@ -77,7 +79,7 @@ namespace TopoMojo.Api
             services
                 .AddTopoMojo(Settings.Core)
                 .AddTopoMojoData(Settings.Database.Provider, Settings.Database.ConnectionString)
-                .AddTopoMojoHypervisor(() => Settings.Pod)
+                .AddTopoMojoHypervisor(() => Settings.Pods.Append(Settings.Pod).ToArray())
                 .AddSingleton(
                     new AutoMapper.MapperConfiguration(cfg =>
                     {

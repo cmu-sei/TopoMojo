@@ -17,6 +17,7 @@ namespace TopoMojo.Api
         public HeaderOptions Headers { get; set; } = new HeaderOptions();
         public OpenApiOptions OpenApi { get; set; } = new OpenApiOptions();
         public HypervisorServiceConfiguration Pod { get; set; } = new HypervisorServiceConfiguration();
+        public HypervisorServiceConfiguration[] Pods { get; set; } = [];
 
     }
 

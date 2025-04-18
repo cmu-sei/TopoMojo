@@ -11,6 +11,10 @@ using TopoMojo.Api.Data;
 using TopoMojo.Hypervisor;
 using TopoMojo.Api.Services;
 using TopoMojo.Hypervisor.Proxmox;
+using TopoMojo.Hypervisor.vMock;
+using TopoMojo.Hypervisor.vSphere;
+using VimClient;
+using TopoMojo.Hypervisor.Meta;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -126,30 +130,75 @@ namespace Microsoft.Extensions.DependencyInjection
 
         public static IServiceCollection AddTopoMojoHypervisor(
             this IServiceCollection services,
-            Func<HypervisorServiceConfiguration> podConfig
+            Func<HypervisorServiceConfiguration[]> podConfigs
         )
         {
-            var config = podConfig();
+            var configs = podConfigs();
+            var registeredTypes = new List<Type>();
 
-            if (string.IsNullOrWhiteSpace(config.Url))
+            foreach (var config in configs)
             {
-                services.AddSingleton<IHypervisorService, TopoMojo.Hypervisor.vMock.MockHypervisorService>();
-            }
-            else
-            {
-                if (config.HypervisorType == HypervisorType.Proxmox)
+                Type type;
+
+                if (string.IsNullOrWhiteSpace(config.Url))
                 {
-                    // give proxmox Random.Shared since it's not directly available in netstandard2.0
-                    services.AddProxmoxHypervisor(Random.Shared);
+                    type = typeof(MockHypervisorService);
+                }
+                else if (config.HypervisorType == HypervisorType.Proxmox)
+                {
+                    type = typeof(ProxmoxHypervisorService);
                 }
                 else
                 {
-                    services.AddSingleton<IHypervisorService, TopoMojo.Hypervisor.vSphere.VSphereHypervisorService>();
+                    type = typeof(VSphereHypervisorService);
                 }
+
+                if (type is not null)
+                {
+                    if (registeredTypes.Contains(type))
+                    {
+                        throw new ArgumentException($"A Hypervisor of type {type} has already been registered. You may only specify a maximum of one of each type.");
+                    }
+                    else if (type == typeof(ProxmoxHypervisorService))
+                    {
+                        // give proxmox Random.Shared since it's not directly available in netstandard2.0
+                        services.AddProxmoxHypervisor(config, Random.Shared);
+                    }
+                    else
+                    {
+                        services.AddSingleton((sp) => ActivatorUtilities.CreateInstance(sp, type, config));
+                    }
+
+                    registeredTypes.Add(type);
+                }
+
+                // services.AddSingleton<HypervisorServiceConfiguration>(sp => config);
+                var wrapperType = typeof(ServiceHostWrapper<>).MakeGenericType(type);
+                services.AddSingleton(typeof(IHostedService), sp => ActivatorUtilities.CreateInstance(sp, wrapperType));
             }
 
-            services.AddSingleton<HypervisorServiceConfiguration>(sp => config);
-            services.AddHostedService<ServiceHostWrapper<IHypervisorService>>();
+            if (registeredTypes.Count == 0)
+            {
+                throw new ArgumentException("No Hypervisor types registered");
+            }
+            else if (registeredTypes.Count > 1)
+            {
+                services.AddSingleton<IHypervisorService, MetaHypervisorService>((sp) =>
+                {
+                    var hypervisorServices = new List<IHypervisorService>();
+
+                    foreach (var type in registeredTypes)
+                    {
+                        hypervisorServices.Add(sp.GetRequiredService(type) as IHypervisorService);
+                    }
+
+                    return ActivatorUtilities.CreateInstance<MetaHypervisorService>(sp, hypervisorServices.ToArray());
+                });
+            }
+            else
+            {
+                services.AddSingleton(typeof(IHypervisorService), sp => sp.GetRequiredService(registeredTypes.First()));
+            }
 
             return services;
         }

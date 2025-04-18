@@ -53,13 +53,13 @@ namespace TopoMojo.Hypervisor.Proxmox
         ///     will be created.
         /// </param>
         /// <returns></returns>
-        public static IServiceCollection AddProxmoxHypervisor(this IServiceCollection services, Random random = null)
+        public static IServiceCollection AddProxmoxHypervisor(this IServiceCollection services, HypervisorServiceConfiguration config, Random random = null)
         {
             return services
-                .AddSingleton<IHypervisorService, ProxmoxHypervisorService>()
+                .AddSingleton((sp) => ActivatorUtilities.CreateInstance<ProxmoxHypervisorService>(sp, config))
                 .AddSingleton<IProxmoxNameService, ProxmoxNameService>()
-                .AddSingleton<IProxmoxVlanManager, ProxmoxVlanManager>()
-                .AddSingleton<IProxmoxVnetsClient, ProxmoxVnetsClient>()
+                .AddSingleton<IProxmoxVlanManager, ProxmoxVlanManager>((sp) => ActivatorUtilities.CreateInstance<ProxmoxVlanManager>(sp, config))
+                .AddSingleton<IProxmoxVnetsClient, ProxmoxVnetsClient>((sp) => ActivatorUtilities.CreateInstance<ProxmoxVnetsClient>(sp, config))
                 .AddSingleton(_ => random ?? new Random());
         }
 
