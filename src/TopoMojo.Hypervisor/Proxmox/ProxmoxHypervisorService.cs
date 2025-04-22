@@ -6,13 +6,15 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
-    public partial class ProxmoxHypervisorService : IHypervisorService
+    public partial class ProxmoxHypervisorService : IHypervisorService, IHostedService
     {
         public ProxmoxHypervisorService(
             HypervisorServiceConfiguration options,
@@ -52,6 +54,15 @@ namespace TopoMojo.Hypervisor.Proxmox
         public HypervisorServiceConfiguration Options { get { return _options; } }
         private readonly BlockingCollection<DeploymentContext> DeploymentCollection = [];
 
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
 
         public async Task<Vm> Deploy(VmTemplate template, bool privileged = false)
         {

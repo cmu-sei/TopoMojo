@@ -56,7 +56,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public static IServiceCollection AddProxmoxHypervisor(this IServiceCollection services, HypervisorServiceConfiguration config, Random random = null)
         {
             return services
-                .AddSingleton((sp) => ActivatorUtilities.CreateInstance<ProxmoxHypervisorService>(sp, config))
+                .AddSingleton(typeof(ProxmoxHypervisorService), (sp) => ActivatorUtilities.CreateInstance<ProxmoxHypervisorService>(sp, config))
                 .AddSingleton<IProxmoxNameService, ProxmoxNameService>()
                 .AddSingleton<IProxmoxVlanManager, ProxmoxVlanManager>((sp) => ActivatorUtilities.CreateInstance<ProxmoxVlanManager>(sp, config))
                 .AddSingleton<IProxmoxVnetsClient, ProxmoxVnetsClient>((sp) => ActivatorUtilities.CreateInstance<ProxmoxVnetsClient>(sp, config))

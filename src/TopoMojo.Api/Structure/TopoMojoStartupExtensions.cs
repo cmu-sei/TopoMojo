@@ -166,15 +166,18 @@ namespace Microsoft.Extensions.DependencyInjection
                     }
                     else
                     {
-                        services.AddSingleton((sp) => ActivatorUtilities.CreateInstance(sp, type, config));
+                        services.AddSingleton(type, (sp) => ActivatorUtilities.CreateInstance(sp, type, config));
                     }
 
                     registeredTypes.Add(type);
                 }
 
                 // services.AddSingleton<HypervisorServiceConfiguration>(sp => config);
-                var wrapperType = typeof(ServiceHostWrapper<>).MakeGenericType(type);
-                services.AddSingleton(typeof(IHostedService), sp => ActivatorUtilities.CreateInstance(sp, wrapperType));
+                //var wrapperType = typeof(ServiceHostWrapper<>).MakeGenericType(type);
+                if (typeof(IHostedService).IsAssignableFrom(type))
+                {
+                    services.AddSingleton(typeof(IHostedService), sp => sp.GetRequiredService(type));
+                }
             }
 
             if (registeredTypes.Count == 0)
@@ -192,7 +195,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         hypervisorServices.Add(sp.GetRequiredService(type) as IHypervisorService);
                     }
 
-                    return ActivatorUtilities.CreateInstance<MetaHypervisorService>(sp, hypervisorServices.ToArray());
+                    return ActivatorUtilities.CreateInstance<MetaHypervisorService>(sp, (object)hypervisorServices.ToArray());
                 });
             }
             else

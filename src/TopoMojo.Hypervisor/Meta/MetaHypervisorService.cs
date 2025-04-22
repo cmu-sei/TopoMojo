@@ -21,10 +21,13 @@ public class MetaHypervisorService(IHypervisorService[] hypervisorServices) : IH
 
         await Task.WhenAll(tasks.Select(x => x.Value));
 
-        var task = tasks.Where(x => x.Value.Result is not null).SingleOrDefault();
-
-        if (task.Equals(default)) return null;
+        var task = tasks.Where(x => x.Value.Result is not null && x.Value.Result.Id is not null).SingleOrDefault();
         return task.Key;
+    }
+
+    private static string GetId(string id)
+    {
+        return id.Split('/').Last();
     }
 
     public Task<Vm> Answer(string id, VmAnswer answer)
@@ -37,9 +40,39 @@ public class MetaHypervisorService(IHypervisorService[] hypervisorServices) : IH
         throw new System.NotImplementedException();
     }
 
-    public Task<Vm> ChangeState(VmOperation op)
+    public async Task<Vm> ChangeState(VmOperation op)
     {
-        throw new System.NotImplementedException();
+        Vm vm = null;
+        var id = GetId(op.Id);
+        switch (op.Type)
+        {
+            case VmOperationType.Start:
+                vm = await Start(op.Id);
+                break;
+
+            case VmOperationType.Reset:
+                _ = await Stop(op.Id);
+                vm = await Start(op.Id);
+                break;
+
+            case VmOperationType.Stop:
+                vm = await Stop(op.Id);
+                break;
+
+            case VmOperationType.Save:
+                vm = await Save(id);
+                break;
+
+            case VmOperationType.Revert:
+                vm = await Revert(op.Id);
+                break;
+
+            case VmOperationType.Delete:
+                vm = await Delete(id);
+                break;
+        }
+
+        return vm;
     }
 
     public Task<int> CreateDisks(VmTemplate template)
