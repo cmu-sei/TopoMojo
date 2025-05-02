@@ -70,7 +70,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     }
                     else
                     {
-                        VirtualDeviceConfigSpec controller = GetSCSIController(ref key, disk.Controller);
+                        VirtualDeviceConfigSpec controller = GetDiskController(ref key, disk.Controller);
                         controllerKey = controller.device.key;
                         devices.Add(controller);
                     }
@@ -200,7 +200,7 @@ namespace TopoMojo.Hypervisor.vSphere
             };
         }
 
-        private static VirtualDeviceConfigSpec GetSCSIController(ref int key, string type)
+        private static VirtualDeviceConfigSpec GetDiskController(ref int key, string type)
         {
             VirtualDevice device = null;
 
@@ -241,6 +241,15 @@ namespace TopoMojo.Hypervisor.vSphere
                 {
                     busNumber = 0,
                     sharedBus = VirtualSCSISharing.noSharing,
+                    controllerKey = key--
+                };
+            }
+
+            if (type.Equals("nvme", StringComparison.CurrentCultureIgnoreCase))
+            {
+                device = new VirtualNVMEController
+                {
+                    busNumber = 0,
                     controllerKey = key--
                 };
             }
