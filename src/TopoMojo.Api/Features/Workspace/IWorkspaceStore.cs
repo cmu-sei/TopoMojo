@@ -19,6 +19,6 @@ namespace TopoMojo.Api.Data.Abstractions
         Task<Workspace> Clone(string id, string tenantId);
         IQueryable<Template> ListScopedTemplates();
         Task<int> CheckGamespaceCount(string id);
-        Task DeleteWithTemplates(string id, Action<IEnumerable<Template>> templateAction);
+        Task DeleteWithTemplates(string id, Func<IEnumerable<Data.Template>, Task> templateAction);
     }
 }
