@@ -70,13 +70,13 @@ namespace TopoMojo.Api.Data
                 .SingleOrDefaultAsync();
         }
 
-        public async Task DeleteWithTemplates(string id, Action<IEnumerable<Data.Template>> templateAction)
+        public async Task DeleteWithTemplates(string id, Func<IEnumerable<Data.Template>, Task> templateAction)
         {
             var entity = await Retrieve(id, q =>
                 q.Include(w => w.Templates)
             );
 
-            templateAction.Invoke(entity.Templates);
+            await templateAction.Invoke(entity.Templates);
 
             DbSet.Remove(entity);
 
