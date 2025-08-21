@@ -27,3 +27,4 @@ jobs:
           push: ${{ startsWith(github.ref, 'refs/tags/') }}
           build_args: "commit=${{ github.sha }}"
           platforms: linux/amd64,linux/arm64
+
