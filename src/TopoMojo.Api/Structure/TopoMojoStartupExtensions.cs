@@ -1,8 +1,6 @@
 // Copyright 2025 Carnegie Mellon University.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
-using System;
-using System.Linq;
 using System.Reflection;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
@@ -19,11 +17,13 @@ namespace Microsoft.Extensions.DependencyInjection
 
         public static IServiceCollection AddTopoMojo(
             this IServiceCollection services,
-            CoreOptions options
+            AppSettings appSettings
         )
         {
+            services.AddSingleton<CoreOptions>(_ => appSettings.Core);
 
-            services.AddSingleton<CoreOptions>(_ => options);
+            // consumed during claims transformation, so made available here
+            services.AddSingleton(_ => appSettings.Oidc);
 
             // Auto-discover from EntityService pattern
             foreach (var t in Assembly

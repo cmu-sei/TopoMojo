@@ -23,6 +23,7 @@ namespace TopoMojo.Api.Exceptions
     public class GamespaceNotRegistered : Exception { }
     public class QuestionSetLockedByPreReq(string message) : Exception(message) { }
     public class UserDisabled : Exception { }
+    public sealed class UserResolutionFailed : Exception { }
 
     public class TimestampedException
     {

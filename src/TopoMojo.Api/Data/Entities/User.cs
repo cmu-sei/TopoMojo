@@ -17,6 +17,14 @@ namespace TopoMojo.Api.Data
         public int GamespaceCleanupGraceMinutes { get; set; }
         public UserRole Role { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
-        public ICollection<ApiKey> ApiKeys { get; set; } = new List<ApiKey>();
+        public ICollection<ApiKey> ApiKeys { get; set; } = [];
+
+        /// <summary>
+        /// A user with a value for this property can be authenticated via the client credentials flow. The current use-case
+        /// is to allow OAuth-based machine-to-machine interaction that resolves to a Topomojo User. For example, you might create 
+        /// a Gameboard client in your identity provider, give it a custom claim matching your Topo OIDC settings, and then set
+        /// a user's ServiceAccountClientId to the client ID of the Gameboard client.
+        /// </summary>
+        public string ServiceAccountClientId { get; set; }
     }
 }

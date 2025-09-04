@@ -127,6 +127,17 @@ namespace TopoMojo.Api.Services
             return Mapper.Map<User>(entity);
         }
 
+        public async Task<User> FindByServiceAccountClientId(string clientId)
+        {
+            var user = await _store
+                .DbContext
+                .Users
+                .Where(u => u.ServiceAccountClientId != null && u.ServiceAccountClientId == clientId)
+                .SingleOrDefaultAsync();
+
+            return user == null ? null : Mapper.Map<User>(user);
+        }
+
         public async Task<WorkspaceSummary[]> LoadWorkspaces(string id)
         {
             return await Mapper.ProjectTo<WorkspaceSummary>(
