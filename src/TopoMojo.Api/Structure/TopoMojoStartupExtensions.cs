@@ -22,9 +22,6 @@ namespace Microsoft.Extensions.DependencyInjection
         {
             services.AddSingleton<CoreOptions>(_ => appSettings.Core);
 
-            // consumed during claims transformation, so made available here
-            services.AddSingleton(_ => appSettings.Oidc);
-
             // Auto-discover from EntityService pattern
             foreach (var t in Assembly
                 .GetExecutingAssembly()

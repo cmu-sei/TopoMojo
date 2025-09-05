@@ -23,18 +23,7 @@ namespace TopoMojo.Api
     {
         public string Authority { get; set; } = "http://localhost:5000";
         public string Audience { get; set; } = "topomojo-api";
-        public string AuthTypeClaimName { get; set; } = "auth_type";
         public bool RequireHttpsMetadata { get; set; } = true;
-
-        /// <summary>
-        /// If set, allows clients to auth via the OAuth Client Credentials flow (see https://www.oauth.com/oauth2-servers/access-tokens/client-credentials/).
-        /// In order to authenticate via this method, the client's access token must have a claim with name equal to the value of AuthTypeClaimName (defaults to "auth_type")
-        /// and a value equal to this. There must also be a matching user in the Users table with ServiceAccountClientId equal to the access token's client ID.
-        /// 
-        /// This value defaults to null, meaning that client credentials auth is disabled. Set it to a value like "topo-service-account" and ensure incoming access tokens
-        /// have the claim with this value to auth.
-        /// </summary>
-        public string ServiceAccountAuthType { get; set; }
         public int MksCookieMinutes { get; set; } = 60;
     }
 

@@ -15,7 +15,6 @@ namespace TopoMojo.Api
     (
         IMemoryCache cache,
         ILogger<UserClaimsTransformation> logger,
-        OidcOptions oidcOptions,
         UserService svc
     ) : IClaimsTransformation
     {
@@ -50,68 +49,21 @@ namespace TopoMojo.Api
         }
 
         /// <summary>
-        /// Determines if the current ClaimsPrincipal contains a claim that indicates that it is attempting to auth as a
-        /// service account (via OAuth Client Credentials).
-        /// </summary>
-        /// <param name="principal"></param>
-        /// <returns>The clientID of the OAuth client eligible for auth if configured correctly, or null if not.</returns>
-        private string ResolveServiceAccountClientId(ClaimsPrincipal principal)
-        {
-            var serviceAccountClientId = string.Empty;
-
-            // if authenticating as a service account, appropriate OIDC options (AuthTypeClaimName and ServiceAccountAuthType) must be configured
-            // and the token must have the appropriate claim and value
-            if (oidcOptions.AuthTypeClaimName.IsEmpty())
-            {
-                logger.LogInformation("Auth type claim not configured.");
-                return null;
-            }
-
-            var claim = principal.Claims.FirstOrDefault(c => c.Type == oidcOptions.AuthTypeClaimName);
-            if (claim is null)
-            {
-                logger.LogInformation("Auth type claim {claimName} not present.", oidcOptions.AuthTypeClaimName);
-                return null;
-            }
-
-            if (claim.Value != oidcOptions.ServiceAccountAuthType)
-            {
-                logger.LogInformation("Auth type claim {claimName} has unexpected value {claimValue}", claim.Type, claim.Value);
-                return null;
-            }
-
-            var clientIdClaim = principal.Claims.FirstOrDefault(c => c.Type == "client_id" || c.Type == "azp");
-            if (clientIdClaim is null)
-            {
-                logger.LogInformation("Couldn't resolve a client ID from the ClaimsPrincipal.");
-                return null;
-            }
-
-            return clientIdClaim.Value;
-        }
-
-        /// <summary>
         /// This transformation supports two paths to resolution of a user:
         ///     1. A typical subject-claim based user identification
-        ///     2. A claim that identifies the token as belong to a service account which matches an existing user's ServiceAccountClientId property.
+        ///     2. A client_id claim that matches the ServiceAccountClientId of a Topomojo user
         /// 
-        /// The claim identifying service accounts will be consulted first if it is configured in Topo's OIDC settings and present in the claims principal. Otherwise,
-        /// this function falls back to the subject claim to match to a user.
+        /// If the client_id claim is present and matches a user's ServiceAccountClientId, the principal is authed as the matched user. If this fails, the subject claim 
+        /// is used to perform typical auth. 
         /// </summary>
         /// <param name="principal"></param>
         /// <returns>A Topomojo User representing the result of the resolution process.</returns>
         private async Task<User> ResolveUser(ClaimsPrincipal principal)
         {
             var subject = principal.Subject();
-            var serviceAccountClientId = ResolveServiceAccountClientId(principal);
+            var serviceAccountClientId = principal.Claims.FirstOrDefault(c => c.Type == "client_id")?.Value;
             var resolvedUser = default(User);
 
-            if (subject.IsEmpty() && serviceAccountClientId.IsEmpty())
-            {
-                throw new ArgumentException($"""Can't resolve user: ClaimsPrincipal requires a "subject" claim or must have the claim {oidcOptions.AuthTypeClaimName} with value {oidcOptions.ServiceAccountAuthType}.""");
-            }
-
-            // first attempt to auth by service account, then by subject
             if (serviceAccountClientId.NotEmpty())
             {
                 if (!_cache.TryGetValue(serviceAccountClientId, out User serviceAccountUser))
