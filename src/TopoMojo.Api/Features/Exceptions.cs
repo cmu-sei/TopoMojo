@@ -24,6 +24,7 @@ namespace TopoMojo.Api.Exceptions
     public class QuestionSetLockedByPreReq(string message) : Exception(message) { }
     public class UserDisabled : Exception { }
     public sealed class UserResolutionFailed : Exception { }
+    public sealed class UserServiceAccountResolutionFailed(string serviceAccountClientId) : Exception($"Couldn't resolve a user with ServiceAccountClientId {serviceAccountClientId}") { }
 
     public class TimestampedException
     {

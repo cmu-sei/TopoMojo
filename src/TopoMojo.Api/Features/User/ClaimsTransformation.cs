@@ -117,6 +117,12 @@ namespace TopoMojo.Api
                 if (!_cache.TryGetValue(serviceAccountClientId, out User serviceAccountUser))
                 {
                     serviceAccountUser = await _svc.FindByServiceAccountClientId(serviceAccountClientId) ?? throw new Exception($"Service account client ID {serviceAccountClientId} didn't resolve to a user.");
+
+                    if (serviceAccountUser is null)
+                    {
+                        throw new UserServiceAccountResolutionFailed(serviceAccountClientId);
+                    }
+
                     _cache.Set(serviceAccountClientId, serviceAccountUser, _cacheTimeout);
                 }
 
