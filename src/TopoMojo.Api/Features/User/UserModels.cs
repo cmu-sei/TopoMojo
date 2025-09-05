@@ -26,6 +26,7 @@ namespace TopoMojo.Api.Models
         public int GamespaceLimit { get; set; }
         public int GamespaceMaxMinutes { get; set; }
         public int GamespaceCleanupGraceMinutes { get; set; }
+        public bool IsServiceAccount { get; set; }
         public UserRole Role { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
         public bool IsAdmin =>
@@ -45,6 +46,7 @@ namespace TopoMojo.Api.Models
             Role == UserRole.Creator ||
             Role == UserRole.Administrator
         ;
+
         public bool HasScope(string scope)
         {
             return Scope.Split(' ', ',', ';').Contains(scope);
@@ -69,6 +71,7 @@ namespace TopoMojo.Api.Models
         [SwaggerIgnore][JsonIgnore] public bool WantsObservers => Filter.Contains(UserRole.Observer.ToString().ToLower());
         [SwaggerIgnore][JsonIgnore] public bool WantsCreators => Filter.Contains(UserRole.Creator.ToString().ToLower());
         [SwaggerIgnore][JsonIgnore] public bool WantsBuilders => Filter.Contains(UserRole.Builder.ToString().ToLower());
+        [BindProperty(Name = "isServiceAccount")] public bool? IsServiceAccount { get; set; }
         [BindProperty(Name = "scope")] public string Scope { get; set; }
     }
 

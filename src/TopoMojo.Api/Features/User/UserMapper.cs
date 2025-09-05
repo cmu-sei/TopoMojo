@@ -2,6 +2,7 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using AutoMapper;
+using TopoMojo.Api.Extensions;
 using TopoMojo.Api.Models;
 
 namespace TopoMojo.Api
@@ -11,8 +12,8 @@ namespace TopoMojo.Api
         public UserProfile()
         {
             CreateMap<Data.User, User>()
-                .ReverseMap()
-            ;
+                .ForMember(d => d.IsServiceAccount, o => o.MapFrom(s => s.ServiceAccountClientId.NotEmpty()))
+                .ReverseMap();
 
             CreateMap<ChangedUser, Data.User>();
 

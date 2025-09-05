@@ -34,6 +34,9 @@ namespace TopoMojo.Api.Services
                     p.Id.StartsWith(term)
                 );
 
+            if (search.IsServiceAccount is not null)
+                q = q.Where(p => (p.ServiceAccountClientId != null && p.ServiceAccountClientId != string.Empty) == search.IsServiceAccount);
+
             if (search.WantsAdmins)
                 q = q.Where(p => p.Role == UserRole.Administrator);
 
