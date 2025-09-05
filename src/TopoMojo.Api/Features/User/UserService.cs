@@ -129,10 +129,15 @@ namespace TopoMojo.Api.Services
 
         public async Task<User> FindByServiceAccountClientId(string clientId)
         {
+            if (clientId.IsEmpty())
+            {
+                return null;
+            }
+
             var user = await _store
                 .DbContext
                 .Users
-                .Where(u => u.ServiceAccountClientId != null && u.ServiceAccountClientId != string.Empty && u.ServiceAccountClientId == clientId)
+                .Where(u => u.ServiceAccountClientId == clientId)
                 .SingleOrDefaultAsync();
 
             return user == null ? null : Mapper.Map<User>(user);

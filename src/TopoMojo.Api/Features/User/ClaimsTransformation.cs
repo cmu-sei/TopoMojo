@@ -106,7 +106,7 @@ namespace TopoMojo.Api
             var serviceAccountClientId = ResolveServiceAccountClientId(principal);
             var resolvedUser = default(User);
 
-            if (subject.IsEmpty() && !serviceAccountClientId.IsEmpty())
+            if (subject.IsEmpty() && serviceAccountClientId.IsEmpty())
             {
                 throw new ArgumentException($"""Can't resolve user: ClaimsPrincipal requires a "subject" claim or must have the claim {oidcOptions.AuthTypeClaimName} with value {oidcOptions.ServiceAccountAuthType}.""");
             }
@@ -116,13 +116,7 @@ namespace TopoMojo.Api
             {
                 if (!_cache.TryGetValue(serviceAccountClientId, out User serviceAccountUser))
                 {
-                    serviceAccountUser = await _svc.FindByServiceAccountClientId(serviceAccountClientId) ?? throw new Exception($"Service account client ID {serviceAccountClientId} didn't resolve to a user.");
-
-                    if (serviceAccountUser is null)
-                    {
-                        throw new UserServiceAccountResolutionFailed(serviceAccountClientId);
-                    }
-
+                    serviceAccountUser = await _svc.FindByServiceAccountClientId(serviceAccountClientId) ?? throw new UserServiceAccountResolutionFailed(serviceAccountClientId);
                     _cache.Set(serviceAccountClientId, serviceAccountUser, _cacheTimeout);
                 }
 
@@ -147,7 +141,7 @@ namespace TopoMojo.Api
                 resolvedUser = user;
             }
 
-            if (resolvedUser is null)
+            if (resolvedUser == default(User))
             {
                 throw new UserResolutionFailed();
             }
