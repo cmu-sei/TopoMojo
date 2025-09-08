@@ -16,10 +16,11 @@ namespace Microsoft.Extensions.DependencyInjection
     {
         public static IServiceCollection AddTopoMojo(
             this IServiceCollection services,
-            CoreOptions coreOptions
+            AppSettings appSettings
         )
         {
-            services.AddSingleton<CoreOptions>(_ => coreOptions);
+            services.AddSingleton<CoreOptions>(_ => appSettings.Core);
+            services.AddSingleton(_ => appSettings.Oidc);
 
             // Auto-discover from EntityService pattern
             foreach (var t in Assembly

@@ -15,6 +15,7 @@ namespace TopoMojo.Api
     (
         IMemoryCache cache,
         ILogger<UserClaimsTransformation> logger,
+        OidcOptions oidcOptions,
         UserService svc
     ) : IClaimsTransformation
     {
@@ -51,7 +52,7 @@ namespace TopoMojo.Api
         /// <summary>
         /// This transformation supports two paths to resolution of a user:
         ///     1. A typical subject-claim based user identification
-        ///     2. A client_id claim that matches the ServiceAccountClientId of a Topomojo user
+        ///     2. A client_id claim that matches the ServiceAccountClientId of a Topomojo user. (You can configure Topo to look for a different claim name using Oidc__ServiceAccountClientIdClaimType.)
         /// 
         /// If the client_id claim is present and matches a user's ServiceAccountClientId, the principal is authed as the matched user. If this fails, the subject claim 
         /// is used to perform typical auth. 
@@ -61,8 +62,15 @@ namespace TopoMojo.Api
         private async Task<User> ResolveUser(ClaimsPrincipal principal)
         {
             var subject = principal.Subject();
-            var serviceAccountClientId = principal.Claims.FirstOrDefault(c => c.Type == "client_id")?.Value;
             var resolvedUser = default(User);
+
+            // if Oidc__ServiceAccountClientIdClaimType is empty, don't resolve a service account ID to disable this kind of auth
+            string serviceAccountClientId = null;
+            // TM doesn't have a way to set config values to null by configuration file, so we check for the explicit string "null"
+            if (oidcOptions.ServiceAccountClientIdClaimType.NotEmpty() && oidcOptions.ServiceAccountClientIdClaimType != "null")
+            {
+                serviceAccountClientId = principal.Claims.FirstOrDefault(c => c.Type == oidcOptions.ServiceAccountClientIdClaimType)?.Value;
+            }
 
             if (serviceAccountClientId.NotEmpty())
             {

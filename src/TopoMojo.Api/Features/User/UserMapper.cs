@@ -12,7 +12,6 @@ namespace TopoMojo.Api
         public UserProfile()
         {
             CreateMap<Data.User, User>()
-                .ForMember(d => d.IsServiceAccount, o => o.MapFrom(s => s.ServiceAccountClientId.NotEmpty()))
                 .ReverseMap();
 
             CreateMap<ChangedUser, Data.User>();

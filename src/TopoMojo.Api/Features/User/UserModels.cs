@@ -26,12 +26,10 @@ namespace TopoMojo.Api.Models
         public int GamespaceLimit { get; set; }
         public int GamespaceMaxMinutes { get; set; }
         public int GamespaceCleanupGraceMinutes { get; set; }
-        public bool IsServiceAccount { get; set; }
         public UserRole Role { get; set; }
+        public string ServiceAccountClientId { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
-        public bool IsAdmin =>
-            Role == UserRole.Administrator
-        ;
+        public bool IsAdmin => Role == UserRole.Administrator;
         public bool IsObserver =>
             Role == UserRole.Observer ||
             Role == UserRole.Creator ||
@@ -62,6 +60,7 @@ namespace TopoMojo.Api.Models
         public int GamespaceLimit { get; set; }
         public int GamespaceMaxMinutes { get; set; }
         public int GamespaceCleanupGraceMinutes { get; set; }
+        public string ServiceAccountClientId { get; set; }
         public UserRole Role { get; set; }
     }
 

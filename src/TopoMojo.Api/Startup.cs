@@ -75,7 +75,7 @@ namespace TopoMojo.Api
 
             // Configure TopoMojo
             services
-                .AddTopoMojo(Settings.Core)
+                .AddTopoMojo(Settings)
                 .AddTopoMojoData(Settings.Database.Provider, Settings.Database.ConnectionString)
                 .AddTopoMojoHypervisor(() => Settings.Pod)
                 .AddSingleton(
