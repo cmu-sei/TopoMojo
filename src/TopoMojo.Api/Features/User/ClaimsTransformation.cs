@@ -54,8 +54,8 @@ namespace TopoMojo.Api
         ///     1. A typical subject-claim based user identification
         ///     2. A client_id claim that matches the ServiceAccountClientId of a Topomojo user. (You can configure Topo to look for a different claim name using Oidc__ServiceAccountClientIdClaimType.)
         /// 
-        /// If the client_id claim is present and matches a user's ServiceAccountClientId, the principal is authed as the matched user. If this fails, the subject claim 
-        /// is used to perform typical auth. 
+        /// If the client_id claim is present, we attempt to match it to a user's ServiceAccountClientId and throw if this fails (because if the client_id is claim is present, we assume you're logging in as a service account.) 
+        /// If it is not, we perform typical auth. 
         /// </summary>
         /// <param name="principal"></param>
         /// <returns>A Topomojo User representing the result of the resolution process.</returns>
