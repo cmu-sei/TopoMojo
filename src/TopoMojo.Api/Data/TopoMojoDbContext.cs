@@ -50,6 +50,15 @@ namespace TopoMojo.Api.Data
             {
                 b.Property(w => w.Id).HasMaxLength(KEYLENGTH);
                 b.Property(w => w.Name).HasMaxLength(64);
+
+                // a user may have an associated ServiceAccountClientId (to support OAuth client credentials auth), 
+                // but most users will not
+                b
+                    .Property(w => w.ServiceAccountClientId)
+                    .HasMaxLength(128);
+                b
+                    .HasIndex(w => w.ServiceAccountClientId)
+                    .IsUnique();
             });
 
             builder.Entity<Player>(b =>

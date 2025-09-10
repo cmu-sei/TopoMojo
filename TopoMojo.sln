@@ -1,4 +1,5 @@
-﻿Microsoft Visual Studio Solution File, Format Version 12.00
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26430.12
 MinimumVisualStudioVersion = 15.0.26124.0
@@ -9,6 +10,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TopoMojo.Api", "src\TopoMojo.Api\TopoMojo.Api.csproj", "{0F958584-D445-4CD0-B34F-7B4A08927379}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TopoMojo.Agent", "src\TopoMojo.Agent\TopoMojo.Agent.csproj", "{B1EC033E-567D-454F-AD86-1C0AD347A22C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TopoMojo.Api.Client", "src\TopoMojo.Api.Client\TopoMojo.Api.Client.csproj", "{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -56,6 +59,18 @@ Global
 		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Release|x64.Build.0 = Release|Any CPU
 		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Release|x86.ActiveCfg = Release|Any CPU
 		{B1EC033E-567D-454F-AD86-1C0AD347A22C}.Release|x86.Build.0 = Release|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Debug|x64.Build.0 = Debug|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Debug|x86.Build.0 = Debug|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Release|x64.ActiveCfg = Release|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Release|x64.Build.0 = Release|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Release|x86.ActiveCfg = Release|Any CPU
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -64,5 +79,6 @@ Global
 		{E0EAD642-0C46-488A-A17C-2ED612C92641} = {DDD4132E-E50D-4B24-8B87-C6702C10EC6E}
 		{0F958584-D445-4CD0-B34F-7B4A08927379} = {DDD4132E-E50D-4B24-8B87-C6702C10EC6E}
 		{B1EC033E-567D-454F-AD86-1C0AD347A22C} = {DDD4132E-E50D-4B24-8B87-C6702C10EC6E}
+		{91641CE3-7B27-4D8C-AEC7-7B15767C8F9A} = {DDD4132E-E50D-4B24-8B87-C6702C10EC6E}
 	EndGlobalSection
 EndGlobal

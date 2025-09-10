@@ -34,6 +34,9 @@ namespace TopoMojo.Api.Services
                     p.Id.StartsWith(term)
                 );
 
+            if (search.IsServiceAccount is not null)
+                q = q.Where(p => (p.ServiceAccountClientId != null && p.ServiceAccountClientId != string.Empty) == search.IsServiceAccount);
+
             if (search.WantsAdmins)
                 q = q.Where(p => p.Role == UserRole.Administrator);
 
@@ -125,6 +128,22 @@ namespace TopoMojo.Api.Services
             _cache.Remove(entity.Id);
 
             return Mapper.Map<User>(entity);
+        }
+
+        public async Task<User> FindByServiceAccountClientId(string clientId)
+        {
+            if (clientId.IsEmpty())
+            {
+                return null;
+            }
+
+            var user = await _store
+                .DbContext
+                .Users
+                .Where(u => u.ServiceAccountClientId == clientId)
+                .SingleOrDefaultAsync();
+
+            return user == null ? null : Mapper.Map<User>(user);
         }
 
         public async Task<WorkspaceSummary[]> LoadWorkspaces(string id)

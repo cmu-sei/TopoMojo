@@ -19,23 +19,18 @@ namespace Microsoft.Extensions.DependencyInjection
 
             services
                 .AddScoped<IClaimsTransformation, UserClaimsTransformation>()
-
                 .AddAuthentication(options =>
                 {
                     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
                 })
-
                 .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
                 {
                     options.Audience = oidc.Audience;
                     options.Authority = oidc.Authority;
                     options.RequireHttpsMetadata = oidc.RequireHttpsMetadata;
                 })
-
                 .AddApiKey(ApiKeyAuthentication.AuthenticationScheme, options => { })
-
                 .AddTicketAuthentication(TicketAuthentication.AuthenticationScheme, options => { })
-
                 .AddCookie(AppConstants.CookieScheme, opt =>
                 {
                     opt.ExpireTimeSpan = new TimeSpan(0, oidc.MksCookieMinutes, 0);
@@ -49,15 +44,14 @@ namespace Microsoft.Extensions.DependencyInjection
                     opt.Events.OnRedirectToAccessDenied = ctx =>
                     {
                         ctx.HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
-                        return System.Threading.Tasks.Task.CompletedTask;
+                        return Task.CompletedTask;
                     };
                     opt.Events.OnRedirectToLogin = ctx =>
                     {
                         ctx.HttpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                        return System.Threading.Tasks.Task.CompletedTask;
+                        return Task.CompletedTask;
                     };
-                })
-            ;
+                });
 
             return services;
         }

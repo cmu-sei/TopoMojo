@@ -11,9 +11,7 @@ namespace TopoMojo.Api.Extensions
     public static class DatabaseExtensions
     {
 
-        public static IHost InitializeDatabase(
-            this IHost host
-        )
+        public static IHost InitializeDatabase(this IHost host)
         {
             using var scope = host.Services.CreateScope();
             var services = scope.ServiceProvider;
@@ -48,7 +46,6 @@ namespace TopoMojo.Api.Extensions
 
             if (File.Exists(seedFile))
             {
-
                 DbSeedModel seedData = JsonSerializer.Deserialize<DbSeedModel>(
                     File.ReadAllText(seedFile)
                 );
@@ -61,8 +58,9 @@ namespace TopoMojo.Api.Extensions
                         {
                             Name = u.Name,
                             Id = u.GlobalId,
+                            ServiceAccountClientId = u.ServiceAccountClientId,
                             WhenCreated = DateTimeOffset.UtcNow,
-                            Role = UserRole.Administrator
+                            Role = u.IsAdmin ? UserRole.Administrator : UserRole.User
                         });
                     }
                 }

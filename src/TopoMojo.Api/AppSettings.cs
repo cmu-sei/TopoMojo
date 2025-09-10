@@ -17,7 +17,6 @@ namespace TopoMojo.Api
         public HeaderOptions Headers { get; set; } = new HeaderOptions();
         public OpenApiOptions OpenApi { get; set; } = new OpenApiOptions();
         public HypervisorServiceConfiguration Pod { get; set; } = new HypervisorServiceConfiguration();
-
     }
 
     public class OidcOptions
@@ -26,6 +25,15 @@ namespace TopoMojo.Api
         public string Audience { get; set; } = "topomojo-api";
         public bool RequireHttpsMetadata { get; set; } = true;
         public int MksCookieMinutes { get; set; } = 60;
+
+        /// <summary>
+        /// To determine if an incoming authentication is associated with a Topomojo service account, Topo looks for
+        /// the presence of a claim with this name in the OAuth access token. If present, the value of that claim
+        /// will be compared to users' ServiceAccountClientId for service account authentication.
+        /// 
+        /// To disable service account authentication to Topomojo, set this value to "null".
+        /// </summary>
+        public string ServiceAccountClientIdClaimType { get; set; } = "client_id";
     }
 
     public class OpenIdClient
@@ -33,7 +41,6 @@ namespace TopoMojo.Api
         public string ClientId { get; set; }
         public string ClientName { get; set; }
         public string ClientSecret { get; set; }
-
     }
 
     public class OAuth2Client
