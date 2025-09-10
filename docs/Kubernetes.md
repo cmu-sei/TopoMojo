@@ -3,39 +3,15 @@ In Topomojo version 2.3.0, the application transitioned to a rootless container 
 
 ## Service port changed 
 Topomojo now uses a different service port. Update your values file accordingly:
+
 ```yaml
   service: 
     type: ClusterIP
     port: 8080
 ```
+
 This configuration ensures that the service is accessible within the Kubernetes cluster using port 8080.
 
-## Adding your own root certificates. 
-To include custom root certificates, you need to modify the values file and update the security context as shown below:
-```yaml
-securityContext:
-    # capabilities:
-    #   drop:
-    #   - ALL
-    readOnlyRootFilesystem: false
-    runAsNonRoot: false
-    runAsUser: 0
-```
-You must also add the `customStart` script making sure to change the dotnet execution location to /home/app
-```yaml
-customStart: 
-    command: ['/bin/sh']
-    args: ['/start/start.sh']
-    binaryFiles: {}
-    files: 
-      start.sh: |
-        #!/bin/sh
-        cp /start/*.crt /usr/local/share/ca-certificates && update-ca-certificates
-        cd /home/app && dotnet TopoMojo.Api.dll
-      cacert.crt: |-
-        <PEM Format Certs>
-```
-These changes disable the rootless container restrictions, allowing the container to modify its file system as needed to incorporate your certificates.
 
 ## Console Proxy Ingress
 To enable console proxying through Kubernetes ingress, especially useful when accessing Topomojo over the internet without direct network access to vCenter or ESXi hosts, configure the ingress as follows:
@@ -78,7 +54,9 @@ spec:
     hosts:
       - topomojo.local
 ```
+
 Additionally, update the environment variables in the `topomojo-api` section of the values file:
+
 ```yaml
 Core__ConsoleHost: https://topomojo.local/console
 Pod__TicketUrlHandler: "querystring"
