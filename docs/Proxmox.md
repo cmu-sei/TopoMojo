@@ -52,9 +52,8 @@ server {
 }
 
 server {
-        listen 443;
+        listen 443 ssl;
         server_name _;
-        ssl on;
         ssl_certificate /etc/pve/local/pve-ssl.pem;
         ssl_certificate_key /etc/pve/local/pve-ssl.key;
         proxy_redirect off;
@@ -87,6 +86,11 @@ server {
         }
 }
 ```
+- After installing Nginx and creating the config file, edit the nginx.service file located in `/usr/lib/systemd/system/nginx.service`
+    - The certificate location `/etc/pve/local` gets mounted by proxmox and the nginx service may fail with the indication nginx.conf is invalid if it tries to start before the pve-cluster.service loads.
+    - Add `pve-cluster.service` at the end of the `After=` line.
+    - At the bottom of the `[Unit]` section, add `Requires=pve-cluster.service`.
+    - After saving the file and exiting, type `systemctl daemon-reload` and press Enter.    
 
 ## TopoMojo Setup
 
