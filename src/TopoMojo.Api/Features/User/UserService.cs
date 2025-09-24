@@ -231,6 +231,47 @@ namespace TopoMojo.Api.Services
             ;
         }
 
+        /// <summary>
+        /// Among a set of user roles, return the one with the most permissions. This is mainly used to resolve a user's effective role during 
+        /// claims transformation, or during mapping to DTO objects. 
+        /// 
+        /// This is static so it's accessible in mapping contexts.
+        /// </summary>
+        /// <param name="roles"></param>
+        /// <returns>
+        ///     The role with the most permissions among roles in the argument. If no roles are specified,
+        ///     defaults to the lowest-permission role "User".
+        /// </returns>
+        public static UserRole ResolveEffectiveRole(UserRole[] roles)
+        {
+            if (roles is null || roles.Length == 0)
+            {
+                return UserRole.User;
+            }
+
+            return roles.OrderBy(r =>
+            {
+                return r switch
+                {
+                    UserRole.Administrator => 0,
+                    UserRole.Creator => 1,
+                    UserRole.Observer => 2,
+                    UserRole.Builder => 3,
+                    _ => 4,
+                };
+            }).First();
+        }
+
+        public static UserRole ResolveEffectiveRole(UserRole appRole, UserRole? lastIdpAssignedRole)
+        {
+            if (lastIdpAssignedRole is null)
+            {
+                return appRole;
+            }
+
+            return ResolveEffectiveRole([appRole, lastIdpAssignedRole.Value]);
+        }
+
         internal async Task<object> LoadUserKeys(string id)
         {
             return Mapper.Map<ApiKey[]>(

@@ -26,6 +26,8 @@ namespace TopoMojo.Api.Models
         public int GamespaceLimit { get; set; }
         public int GamespaceMaxMinutes { get; set; }
         public int GamespaceCleanupGraceMinutes { get; set; }
+        public UserRole AppRole { get; set; }
+        public UserRole? LastIdpAssignedRole { get; set; }
         public UserRole Role { get; set; }
         public string ServiceAccountClientId { get; set; }
         public DateTimeOffset WhenCreated { get; set; }

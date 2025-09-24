@@ -2,6 +2,7 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using TopoMojo.Api.Models;
 using TopoMojo.Hypervisor;
 
 namespace TopoMojo.Api
@@ -34,6 +35,27 @@ namespace TopoMojo.Api
         /// To disable service account authentication to Topomojo, set this value to "null".
         /// </summary>
         public string ServiceAccountClientIdClaimType { get; set; } = "client_id";
+
+        /// <summary>
+        /// If specified, user access tokens will be inspected for IDP-assigned roles at this path.
+        /// </summary>
+        public string UserRolesClaimPath { get; set; } = "realm_access.roles";
+
+        /// <summary>
+        /// A set of role claims that are used to resolve a user's ultimate application role. If one or more of these
+        /// values is found at the path specified by <cref>UserRolesClaimPath</cref>, the user's effective role will be
+        /// the greatest of those values and their application-level (Users table) role.
+        /// </summary>
+        public Dictionary<string, string> UserRolesClaimMap { get; set; } = new Dictionary<string, string>()
+        {
+            // note that we don't allow mapping for the Disabled role from IDP, because people are created as User
+            // by default and we give them the strongest role they have access to
+            { "administrator", UserRole.Administrator.ToString() },
+            { "builder", UserRole.Builder.ToString() },
+            { "creator", UserRole.Creator.ToString() },
+            { "observer", UserRole.Observer.ToString() },
+            { "user", UserRole.User.ToString() }
+        };
     }
 
     public class OpenIdClient
