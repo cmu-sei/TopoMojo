@@ -17,7 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="13.0.0" />
-    <PackageReference Include="Crucible.Common.Authentication" Version="1.0.0" />
+    <PackageReference Include="Crucible.Common.Authentication" Version="0.0.7" />
     <PackageReference Include="DiscUtils.Iso9660" Version="0.16.13" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="8.0.8" />
