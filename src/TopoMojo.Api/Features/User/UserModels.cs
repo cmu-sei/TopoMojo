@@ -4,6 +4,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using TopoMojo.Api.Services;
 
 namespace TopoMojo.Api.Models
 {
@@ -31,21 +32,34 @@ namespace TopoMojo.Api.Models
         public UserRole Role { get; set; }
         public string ServiceAccountClientId { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
-        public bool IsAdmin => Role == UserRole.Administrator;
-        public bool IsObserver =>
-            Role == UserRole.Observer ||
-            Role == UserRole.Creator ||
-            Role == UserRole.Administrator
-        ;
-        public bool IsCreator =>
-            Role == UserRole.Creator ||
-            Role == UserRole.Administrator
-        ;
-        public bool IsBuilder =>
-            Role == UserRole.Builder ||
-            Role == UserRole.Creator ||
-            Role == UserRole.Administrator
-        ;
+
+        public bool IsAdmin => UserService.ResolveEffectiveRole(Role, LastIdpAssignedRole) == UserRole.Administrator;
+        public bool IsObserver
+        {
+            get
+            {
+                var observerRoles = new UserRole[] { UserRole.Observer, UserRole.Creator, UserRole.Administrator };
+                return observerRoles.Contains(UserService.ResolveEffectiveRole(Role, LastIdpAssignedRole));
+            }
+        }
+
+        public bool IsCreator
+        {
+            get
+            {
+                var creatorRoles = new UserRole[] { UserRole.Creator, UserRole.Administrator };
+                return creatorRoles.Contains(UserService.ResolveEffectiveRole(Role, LastIdpAssignedRole));
+            }
+        }
+
+        public bool IsBuilder
+        {
+            get
+            {
+                var builderRoles = new UserRole[] { UserRole.Builder, UserRole.Creator, UserRole.Administrator };
+                return builderRoles.Contains(UserService.ResolveEffectiveRole(Role, LastIdpAssignedRole));
+            }
+        }
 
         public bool HasScope(string scope)
         {
