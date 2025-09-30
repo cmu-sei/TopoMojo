@@ -127,24 +127,25 @@ public class UserClaimsTransformation
     {
         var userRolesClaimPath = oidcOptions.UserRolesClaimPath;
         var userRolesClaimMap = oidcOptions.UserRolesClaimMap;
-
-        if (userRolesClaimPath.IsEmpty() || userRolesClaimMap.Count == 0)
-        {
-            return user.Role;
-        }
-
         var idpResolvedRoles = new List<UserRole>();
-        var roleClaims = claimsPrincipal.GetClaimValues(userRolesClaimPath);
 
-        foreach (var mappedRole in userRolesClaimMap)
+        if (userRolesClaimPath.NotEmpty() && userRolesClaimPath != "null" && userRolesClaimMap.Count != 0)
         {
-            if (roleClaims.Contains(mappedRole.Key) && Enum.TryParse<UserRole>(mappedRole.Value, out var typedRole))
+            var roleClaims = claimsPrincipal.GetClaimValues(userRolesClaimPath);
+
+            foreach (var mappedRole in userRolesClaimMap)
             {
-                idpResolvedRoles.Add(typedRole);
+                if (roleClaims.Contains(mappedRole.Key) && Enum.TryParse<UserRole>(mappedRole.Value, out var typedRole))
+                {
+                    idpResolvedRoles.Add(typedRole);
+                }
             }
         }
 
         // update the user's last assigned IDP role if we resolved one
+        // note that we do this even if claims-based roles aren't configured to support the case where
+        // they configure it and then later undo the change (i.e., we always want the LastIdpAssignedRole
+        // property to reflect the claims-based roles configuration state at the time that the user last authed)
         if (idpResolvedRoles.Count != 0)
         {
             var strongestIdpRole = UserService.ResolveEffectiveRole([.. idpResolvedRoles]);
