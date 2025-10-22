@@ -42,4 +42,4 @@ The end of `appsettings.conf` has an example `appsettings.Development.conf`.
 
 ## Documentation
 
-TopoMojo is part of the [Crucible](https://cmu-sei.github.io/crucible/) framework. We maintain comprehensive documentation for all Crucible apps, including Gameboard, there. [Check it out!](https://cmu-sei.github.io/crucible/topomojo/about/)
+TopoMojo is part of the [Crucible](https://cmu-sei.github.io/crucible/) framework. We maintain comprehensive documentation for all Crucible apps, including Gameboard, there. [Check it out!](https://cmu-sei.github.io/crucible/topomojo)
