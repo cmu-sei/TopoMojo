@@ -127,7 +127,8 @@ public class DocumentController(
             () => workspaceService.CanEdit(id, Actor.Id).Result
         )) return Forbid();
 
-        string path = BuildPath(id, filename);
+        string path = BuildPath(id);
+        path = Path.Combine(path, filename);
 
         if (filename.IsEmpty() || !System.IO.File.Exists(path))
             return BadRequest();
