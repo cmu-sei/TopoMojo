@@ -7,8 +7,6 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
-    environment:
-      name: default
     steps:
       - uses: actions/checkout@v4
 
