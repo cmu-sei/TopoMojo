@@ -11,7 +11,7 @@ jobs:
       - name: Update Helm chart
         uses: cmu-sei/Crucible-Github-Actions/actions/update-helm-chart@update-helm-chart-v2
         with:
-          github_app_name: TopoMojo API
+          app_name: TopoMojo API
           github_app_id: ${{ secrets.CRUCIBLE_HELM_UPDATE_APP_ID }}
           github_app_private_key: ${{ secrets.CRUCIBLE_HELM_UPDATE_PRIVATE_KEY }}
           chart_file: charts/topomojo/charts/topomojo-api/Chart.yaml
