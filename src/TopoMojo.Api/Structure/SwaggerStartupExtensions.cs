@@ -2,7 +2,7 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
 using System.Reflection;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using TopoMojo.Api;
 
 namespace Microsoft.Extensions.DependencyInjection
@@ -74,14 +74,11 @@ namespace Microsoft.Extensions.DependencyInjection
                         },
                     });
 
-                    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+                    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
                     {
                         {
-                            new OpenApiSecurityScheme
-                            {
-                                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "oauth2" }
-                            },
-                            new[] { oidc.Audience }
+                            new OpenApiSecuritySchemeReference("oauth2", document),
+                            [oidc.Audience]
                         }
                     });
                 }
