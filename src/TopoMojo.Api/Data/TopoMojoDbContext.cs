@@ -51,7 +51,7 @@ namespace TopoMojo.Api.Data
                 b.Property(w => w.Id).HasMaxLength(KEYLENGTH);
                 b.Property(w => w.Name).HasMaxLength(64);
 
-                // a user may have an associated ServiceAccountClientId (to support OAuth client credentials auth), 
+                // a user may have an associated ServiceAccountClientId (to support OAuth client credentials auth),
                 // but most users will not
                 b
                     .Property(w => w.ServiceAccountClientId)
@@ -95,6 +95,17 @@ namespace TopoMojo.Api.Data
                 b.HasIndex(d => d.TargetGroup);
             });
 
+            builder.Entity<WorkspaceFavorite>(b =>
+            {
+                b.HasKey(x => x.Id);
+                b.HasIndex(x => new { x.UserId, x.WorkspaceId }).IsUnique();
+            });
+
+            builder.Entity<GamespaceFavorite>(b =>
+            {
+                b.HasKey(x => x.Id);
+                b.HasIndex(x => new { x.UserId, x.GamespaceId }).IsUnique();
+            });
         }
 
         public DbSet<Workspace> Workspaces { get; set; }
@@ -105,6 +116,8 @@ namespace TopoMojo.Api.Data
         public DbSet<Player> Players { get; set; }
         public DbSet<ApiKey> ApiKeys { get; set; }
         public DbSet<Dispatch> Dispatches { get; set; }
+        public DbSet<WorkspaceFavorite> WorkspaceFavorites { get; set; }
+        public DbSet<GamespaceFavorite> GamespaceFavorites { get; set; }
 
     }
 

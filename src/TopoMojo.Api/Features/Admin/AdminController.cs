@@ -9,6 +9,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Hubs;
 using TopoMojo.Api.Models;
+using TopoMojo.Api.Features.Theme;
 using TopoMojo.Api.Services;
 
 namespace TopoMojo.Api.Controllers;
@@ -22,7 +23,8 @@ public class AdminController(
     FileUploadOptions fileUploadOptions,
     JanitorService janitor,
     HubCache hubCache,
-    IMemoryCache localCache
+    IMemoryCache localCache,
+    IWebHostEnvironment env
     ) : BaseController(logger, hub)
 {
 
@@ -154,4 +156,59 @@ public class AdminController(
                 )
             );
     }
+
+    [HttpPost("api/admin/background")]
+    [DisableRequestSizeLimit]
+    [RequestFormLimits(MultipartBodyLengthLimit = 5 * 1024 * 1024)] // 5MB
+    public async Task<ActionResult<ThemeInfo>> UploadBackground([FromForm] IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file uploaded.");
+
+        // allow only these formats
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext is not ".png" and not ".jpg" and not ".jpeg" and not ".webp")
+            return BadRequest("Only png, jpg/jpeg, webp are allowed.");
+
+        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        var themeDir = Path.Combine(webRoot, "theme");
+        Directory.CreateDirectory(themeDir);
+
+        // delete any existing background.*
+        foreach (var e in new[] { ".png", ".jpg", ".jpeg", ".webp" })
+        {
+            var p = Path.Combine(themeDir, "background" + e);
+            if (System.IO.File.Exists(p)) System.IO.File.Delete(p);
+        }
+
+        var savePath = Path.Combine(themeDir, "background" + ext);
+
+        await using (var fs = System.IO.File.Create(savePath))
+        {
+            await file.CopyToAsync(fs);
+        }
+
+        var ticks = System.IO.File.GetLastWriteTimeUtc(savePath).Ticks;
+        var url = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/api/theme/background?v={ticks}";
+        return Ok(new ThemeInfo { BackgroundUrl = url });
+    }
+
+    [HttpDelete("api/admin/background")]
+    public ActionResult<ThemeInfo> ClearBackground()
+    {
+        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        var themeDir = Path.Combine(webRoot, "theme");
+
+        if (Directory.Exists(themeDir))
+        {
+            foreach (var e in new[] { ".png", ".jpg", ".jpeg", ".webp" })
+            {
+                var p = Path.Combine(themeDir, "background" + e);
+                if (System.IO.File.Exists(p)) System.IO.File.Delete(p);
+            }
+        }
+
+        return Ok(new ThemeInfo { BackgroundUrl = null });
+    }
+
 }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TopoMojo.Api.Data;
 
@@ -11,9 +12,11 @@ using TopoMojo.Api.Data;
 namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
 {
     [DbContext(typeof(TopoMojoDbContextSqlServer))]
-    partial class TopoMojoDbContextSqlServerModelSnapshot : ModelSnapshot
+    [Migration("20251217220543_WorkspaceFavorites")]
+    partial class WorkspaceFavorites
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -147,27 +150,6 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                     b.HasIndex("WorkspaceId");
 
                     b.ToTable("Gamespaces");
-                });
-
-            modelBuilder.Entity("TopoMojo.Api.Data.GamespaceFavorite", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("GamespaceId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "GamespaceId")
-                        .IsUnique()
-                        .HasFilter("[UserId] IS NOT NULL AND [GamespaceId] IS NOT NULL");
-
-                    b.ToTable("GamespaceFavorites");
                 });
 
             modelBuilder.Entity("TopoMojo.Api.Data.Player", b =>
