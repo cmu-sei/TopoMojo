@@ -5,7 +5,7 @@ using TopoMojo.Api.Features.Theme;
 namespace TopoMojo.Api.Controllers;
 
 [ApiController]
-[AllowAnonymous] // so even logged-out pages can show it; remove if you want auth-only
+[AllowAnonymous]
 public class ThemeController(IWebHostEnvironment env) : ControllerBase
 {
     private static readonly string[] AllowedExts = [".png", ".jpg", ".jpeg", ".webp"];

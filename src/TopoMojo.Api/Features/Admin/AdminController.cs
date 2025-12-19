@@ -159,13 +159,12 @@ public class AdminController(
 
     [HttpPost("api/admin/background")]
     [DisableRequestSizeLimit]
-    [RequestFormLimits(MultipartBodyLengthLimit = 5 * 1024 * 1024)] // 5MB
+    [RequestFormLimits(MultipartBodyLengthLimit = 5 * 1024 * 1024)]
     public async Task<ActionResult<ThemeInfo>> UploadBackground([FromForm] IFormFile file)
     {
         if (file == null || file.Length == 0)
             return BadRequest("No file uploaded.");
 
-        // allow only these formats
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (ext is not ".png" and not ".jpg" and not ".jpeg" and not ".webp")
             return BadRequest("Only png, jpg/jpeg, webp are allowed.");
@@ -174,7 +173,6 @@ public class AdminController(
         var themeDir = Path.Combine(webRoot, "theme");
         Directory.CreateDirectory(themeDir);
 
-        // delete any existing background.*
         foreach (var e in new[] { ".png", ".jpg", ".jpeg", ".webp" })
         {
             var p = Path.Combine(themeDir, "background" + e);
