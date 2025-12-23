@@ -37,6 +37,7 @@ namespace TopoMojo.Api.Models
         public string Audience { get; set; }
         public string Author { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
+        public DateTimeOffset LastActivity { get; set; }
     }
 
     public class NewWorkspace

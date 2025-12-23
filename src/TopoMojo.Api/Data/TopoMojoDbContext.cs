@@ -106,6 +106,12 @@ namespace TopoMojo.Api.Data
                 b.HasKey(x => x.Id);
                 b.HasIndex(x => new { x.UserId, x.GamespaceId }).IsUnique();
             });
+
+            builder.Entity<TemplateFavorite>(b =>
+            {
+                b.HasKey(x => x.Id);
+                b.HasIndex(x => new { x.UserId, x.TemplateId }).IsUnique();
+            });
         }
 
         public DbSet<Workspace> Workspaces { get; set; }
@@ -118,6 +124,7 @@ namespace TopoMojo.Api.Data
         public DbSet<Dispatch> Dispatches { get; set; }
         public DbSet<WorkspaceFavorite> WorkspaceFavorites { get; set; }
         public DbSet<GamespaceFavorite> GamespaceFavorites { get; set; }
+        public DbSet<TemplateFavorite> TemplateFavorites { get; set; }
 
     }
 

@@ -157,11 +157,22 @@ public class AdminController(
             );
     }
 
+    public class BackgroundUploadRequest
+    {
+        public IFormFile File { get; set; } = default!;
+    }
+
+
     [HttpPost("api/admin/background")]
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = 5 * 1024 * 1024)]
-    public async Task<ActionResult<ThemeInfo>> UploadBackground([FromForm] IFormFile file)
+    [Consumes("multipart/form-data")]
+    [SwaggerOperation(OperationId = "UploadBackground")]
+    [ProducesResponseType(typeof(ThemeInfo), 200)]
+    public async Task<ActionResult<ThemeInfo>> UploadBackground([FromForm] BackgroundUploadRequest request)
     {
+        var file = request.File;
+
         if (file == null || file.Length == 0)
             return BadRequest("No file uploaded.");
 
@@ -190,6 +201,7 @@ public class AdminController(
         var url = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/api/theme/background?v={ticks}";
         return Ok(new ThemeInfo { BackgroundUrl = url });
     }
+
 
     [HttpDelete("api/admin/background")]
     public ActionResult<ThemeInfo> ClearBackground()

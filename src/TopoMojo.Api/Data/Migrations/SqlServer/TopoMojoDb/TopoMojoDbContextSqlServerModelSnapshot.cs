@@ -262,6 +262,29 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                     b.ToTable("Templates");
                 });
 
+            modelBuilder.Entity("TopoMojo.Api.Data.TemplateFavorite", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("TemplateId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset>("WhenCreated")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "TemplateId")
+                        .IsUnique()
+                        .HasFilter("[UserId] IS NOT NULL AND [TemplateId] IS NOT NULL");
+
+                    b.ToTable("TemplateFavorites");
+                });
+
             modelBuilder.Entity("TopoMojo.Api.Data.User", b =>
                 {
                     b.Property<string>("Id")
