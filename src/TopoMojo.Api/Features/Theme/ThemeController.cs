@@ -14,7 +14,6 @@ public class ThemeController(IWebHostEnvironment env, AppSettings settings) : Co
     [HttpGet("api/theme")]
     public ActionResult<ThemeInfo> GetTheme()
     {
-        // 1) Prefer appsettings-configured theme file (served as static)
         var configuredRel = ResolveConfiguredThemeRelativePath();
         if (configuredRel is not null)
         {
@@ -22,7 +21,6 @@ public class ThemeController(IWebHostEnvironment env, AppSettings settings) : Co
             return Ok(new ThemeInfo { BackgroundUrl = url });
         }
 
-        // 2) Otherwise, fall back to UI-uploaded background if present
         var uploadedPath = FindUploadedBackgroundPath();
         if (uploadedPath is not null)
         {
