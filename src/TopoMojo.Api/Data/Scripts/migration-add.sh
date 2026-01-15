@@ -13,14 +13,14 @@ if [ "$#" -ne 2 ]; then
     exit 1
 fi
 
-context=${2%Context}
-name=$1
+context=${1%Context}
+name=$2
 declare -a providers=("SqlServer" "PostgreSQL")
 
 for provider in "${providers[@]}"; do
     export Database__Provider=$provider
     echo $provider $name $context
-    dotnet ef migrations add $name --context ${context}Context${provider} -o ./Data/Migrations/$provider/${context} --project /mnt/data/crucible/topomojo/topomojo/src/TopoMojo.Api
+    dotnet ef migrations add $name --context ${context}Context${provider} -o ./Data/Migrations/$provider/${context}
     wait
 done
 
