@@ -165,7 +165,7 @@ public class AdminController(
 
     [HttpPost("api/admin/background")]
     [DisableRequestSizeLimit]
-    [RequestFormLimits(MultipartBodyLengthLimit = 5 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = int.MaxValue, ValueLengthLimit = int.MaxValue, ValueCountLimit = int.MaxValue)]
     [Consumes("multipart/form-data")]
     [SwaggerOperation(OperationId = "UploadBackground")]
     [ProducesResponseType(typeof(ThemeInfo), 200)]
@@ -177,14 +177,14 @@ public class AdminController(
             return BadRequest("No file uploaded.");
 
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (ext is not ".png" and not ".jpg" and not ".jpeg" and not ".webp")
+        if (!ThemeBackground.AllowedExtensions.Contains(ext))
             return BadRequest("Only png, jpg/jpeg, webp are allowed.");
 
         var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
         var themeDir = Path.Combine(webRoot, "theme");
         Directory.CreateDirectory(themeDir);
 
-        foreach (var e in new[] { ".png", ".jpg", ".jpeg", ".webp" })
+        foreach (var e in ThemeBackground.AllowedExtensions)
         {
             var p = Path.Combine(themeDir, "background" + e);
             if (System.IO.File.Exists(p)) System.IO.File.Delete(p);
@@ -211,7 +211,7 @@ public class AdminController(
 
         if (Directory.Exists(themeDir))
         {
-            foreach (var e in new[] { ".png", ".jpg", ".jpeg", ".webp" })
+            foreach (var e in ThemeBackground.AllowedExtensions)
             {
                 var p = Path.Combine(themeDir, "background" + e);
                 if (System.IO.File.Exists(p)) System.IO.File.Delete(p);
