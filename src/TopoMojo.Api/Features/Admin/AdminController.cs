@@ -197,9 +197,9 @@ public class AdminController(
             await file.CopyToAsync(fs);
         }
 
-        var ticks = System.IO.File.GetLastWriteTimeUtc(savePath).Ticks;
-        var url = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/api/theme/background?v={ticks}";
+        var url = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/api/theme/background";
         return Ok(new ThemeInfo { BackgroundUrl = url });
+
     }
 
 

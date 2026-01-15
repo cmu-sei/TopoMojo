@@ -89,7 +89,6 @@ namespace TopoMojo.Api
             services.AddConfiguredAuthentication(Settings.Oidc);
             services.AddConfiguredAuthorization();
             services.AddSingleton(Settings);
-            services.AddHostedService<TopoMojo.Api.Features.Theme.ThemeBackgroundInitializer>();
         }
 
         public void Configure(IApplicationBuilder app)

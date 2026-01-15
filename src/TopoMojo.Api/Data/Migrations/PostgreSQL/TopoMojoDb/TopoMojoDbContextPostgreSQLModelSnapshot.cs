@@ -151,15 +151,17 @@ namespace TopoMojo.Api.Data.Migrations.PostgreSQL.TopoMojoDb
 
             modelBuilder.Entity("TopoMojo.Api.Data.GamespaceFavorite", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
 
                     b.Property<string>("GamespaceId")
                         .HasColumnType("text");
 
                     b.Property<string>("UserId")
                         .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("WhenCreated")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
