@@ -18,6 +18,8 @@ namespace TopoMojo.Api
         public HeaderOptions Headers { get; set; } = new HeaderOptions();
         public OpenApiOptions OpenApi { get; set; } = new OpenApiOptions();
         public HypervisorServiceConfiguration Pod { get; set; } = new HypervisorServiceConfiguration();
+        public UiOptions Ui { get; set; } = new UiOptions();
+
     }
 
     public class OidcOptions
@@ -31,7 +33,7 @@ namespace TopoMojo.Api
         /// To determine if an incoming authentication is associated with a Topomojo service account, Topo looks for
         /// the presence of a claim with this name in the OAuth access token. If present, the value of that claim
         /// will be compared to users' ServiceAccountClientId for service account authentication.
-        /// 
+        ///
         /// To disable service account authentication to Topomojo, set this value to "null".
         /// </summary>
         public string ServiceAccountClientIdClaimType { get; set; } = "client_id";
@@ -207,4 +209,16 @@ namespace TopoMojo.Api
         // unpublished workspaces deleted 7d after last activity
         public string UnpublishedWorkspaceTimeout { get; set; } = "1w";
     }
+
+    public class UiOptions
+    {
+        public BrandingOptions Branding { get; set; } = new BrandingOptions();
+    }
+
+    public class BrandingOptions
+    {
+        public string? BackgroundImageUrl { get; set; } = null;
+
+    }
+
 }

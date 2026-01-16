@@ -36,7 +36,9 @@ namespace TopoMojo.Api.Models
         public string Text { get; set; }
         public string Audience { get; set; }
         public string Author { get; set; }
+        public int DurationMinutes { get; set; }
         public DateTimeOffset WhenCreated { get; set; }
+        public DateTimeOffset LastActivity { get; set; }
     }
 
     public class NewWorkspace
@@ -60,6 +62,7 @@ namespace TopoMojo.Api.Models
         public string Tags { get; set; }
         public string Author { get; set; }
         public string Audience { get; set; }
+        public int DurationMinutes { get; set; }
     }
 
     public class ChangedWorkspace

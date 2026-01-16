@@ -82,6 +82,8 @@ namespace TopoMojo.Api.Models
         public string ParentName { get; set; }
         public bool IsLinked { get; set; }
         public bool IsPublished { get; set; }
+        public DateTimeOffset WhenCreated { get; set; }
+
     }
 
     public class TemplateLink
