@@ -2,9 +2,9 @@
   <PropertyGroup>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <TargetFramework>net8.0</TargetFramework>
-    <Version>2.5.1-rc1</Version>
-    <InformationalVersion>2.5.1-rc1</InformationalVersion>
-    <AssemblyVersion>2.5.1.0</AssemblyVersion>
+    <Version>2.5.2</Version>
+    <InformationalVersion>2.5.2</InformationalVersion>
+    <AssemblyVersion>2.5.2</AssemblyVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
