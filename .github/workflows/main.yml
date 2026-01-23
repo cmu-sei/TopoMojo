@@ -2,20 +2,60 @@ name: CI
 
 on:
   release:
-    types: [ "published" ]
+    types: ["published"]
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Build and push Docker images
-      uses: docker/build-push-action@v1.1.0
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_PASSWORD }}
-        repository: cmusei/topomojo-api
-        tag_with_ref: true
-        push: ${{ startsWith(github.ref, 'refs/tags/') }}
-        build_args: "commit=${{ github.sha }}"
+      - name: Derive version from release tag
+        run: |
+          TAG='${{ github.event.release.tag_name }}'
+          VERSION="${TAG#v}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Update csproj versions to match tag
+        run: |
+          FILE="src/TopoMojo.Api/TopoMojo.Api.csproj"
+          for key in Version InformationalVersion AssemblyVersion; do
+            perl -0777 -i -pe "s|<$key>.*?</$key>|<$key>$VERSION</$key>|g" "$FILE"
+          done
+          git diff -- "$FILE"
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # If no changes, don't commit/retag
+          if git diff --quiet; then
+            echo "No version change needed."
+            exit 0
+          fi
+
+          git add src/TopoMojo.Api/TopoMojo.Api.csproj
+          git commit -m "chore: set version to $VERSION"
+
+      - name: Force-move tag to include version bump commit
+        run: |
+          # Recreate tag to point to the new commit
+          git tag -f "$TAG"
+          git push origin -f "refs/tags/$TAG"
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v1.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          repository: cmusei/topomojo-api
+          tag_with_ref: true
+          push: ${{ startsWith(github.ref, 'refs/tags/') }}
+          build_args: "commit=${{ github.sha }}"

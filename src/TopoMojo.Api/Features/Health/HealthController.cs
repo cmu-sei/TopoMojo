@@ -8,7 +8,7 @@ using System.Reflection;
 namespace TopoMojo.Api.Features.Health
 {
     [ApiController]
-    [Route("health")]
+    [Route("api/health")]
     public class HealthController : ControllerBase
     {
         [HttpGet("version")]
