@@ -15,7 +15,7 @@ jobs:
       imageName: cmusei/topomojo-api
       tagName: ${{ github.event.release.tag_name }}
       versionMode: csproj
-      versionFiles: |
+      versionFiles: |-
         src/TopoMojo.Api/TopoMojo.Api.csproj
       buildArgs: |
         commit=${{ github.sha }}
