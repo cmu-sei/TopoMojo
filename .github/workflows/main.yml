@@ -10,7 +10,7 @@ permissions:
 jobs:
   build-and-publish:
     name: Build & Publish
-    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/docker-build.yaml@docker-v1.0
+    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/docker-build.yaml@docker-v1.1
     with:
       imageName: cmusei/topomojo-api
       tagName: ${{ github.event.release.tag_name }}
