@@ -2,20 +2,24 @@ name: CI
 
 on:
   release:
-    types: [ "published" ]
+    types: ["published"]
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
+  build-and-publish:
+    name: Build & Publish
+    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/docker-build.yaml@docker-v1.1
+    with:
+      imageName: cmusei/topomojo-api
+      tagName: ${{ github.event.release.tag_name }}
+      versionMode: csproj
+      versionFiles: |
+        src/TopoMojo.Api/TopoMojo.Api.csproj
+      buildArgs: |
+        commit=${{ github.sha }}
 
-    - name: Build and push Docker images
-      uses: docker/build-push-action@v1.1.0
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_PASSWORD }}
-        repository: cmusei/topomojo-api
-        tag_with_ref: true
-        push: ${{ startsWith(github.ref, 'refs/tags/') }}
-        build_args: "commit=${{ github.sha }}"
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
