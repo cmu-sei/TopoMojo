@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TopoMojo.Api.Data;
@@ -11,9 +12,11 @@ using TopoMojo.Api.Data;
 namespace TopoMojo.Api.Data.Migrations.PostgreSQL.TopoMojoDb
 {
     [DbContext(typeof(TopoMojoDbContextPostgreSQL))]
-    partial class TopoMojoDbContextPostgreSQLModelSnapshot : ModelSnapshot
+    [Migration("20251121164147_Version10UpgradeSync")]
+    partial class Version10UpgradeSync
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -149,28 +152,6 @@ namespace TopoMojo.Api.Data.Migrations.PostgreSQL.TopoMojoDb
                     b.ToTable("Gamespaces");
                 });
 
-            modelBuilder.Entity("TopoMojo.Api.Data.GamespaceFavorite", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<string>("GamespaceId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("WhenCreated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "GamespaceId")
-                        .IsUnique();
-
-                    b.ToTable("GamespaceFavorites");
-                });
-
             modelBuilder.Entity("TopoMojo.Api.Data.Player", b =>
                 {
                     b.Property<string>("SubjectId")
@@ -261,28 +242,6 @@ namespace TopoMojo.Api.Data.Migrations.PostgreSQL.TopoMojoDb
                     b.HasIndex("WorkspaceId");
 
                     b.ToTable("Templates");
-                });
-
-            modelBuilder.Entity("TopoMojo.Api.Data.TemplateFavorite", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<string>("TemplateId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("WhenCreated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "TemplateId")
-                        .IsUnique();
-
-                    b.ToTable("TemplateFavorites");
                 });
 
             modelBuilder.Entity("TopoMojo.Api.Data.User", b =>
@@ -417,28 +376,6 @@ namespace TopoMojo.Api.Data.Migrations.PostgreSQL.TopoMojoDb
                     b.HasKey("Id");
 
                     b.ToTable("Workspaces");
-                });
-
-            modelBuilder.Entity("TopoMojo.Api.Data.WorkspaceFavorite", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("WhenCreated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("WorkspaceId")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "WorkspaceId")
-                        .IsUnique();
-
-                    b.ToTable("WorkspaceFavorites");
                 });
 
             modelBuilder.Entity("TopoMojo.Api.Data.ApiKey", b =>
