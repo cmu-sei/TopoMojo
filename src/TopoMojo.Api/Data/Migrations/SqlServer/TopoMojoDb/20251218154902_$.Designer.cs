@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TopoMojo.Api.Data;
 
@@ -11,9 +12,11 @@ using TopoMojo.Api.Data;
 namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
 {
     [DbContext(typeof(TopoMojoDbContextSqlServer))]
-    partial class TopoMojoDbContextSqlServerModelSnapshot : ModelSnapshot
+    [Migration("20251218154902_$")]
+    partial class _
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -151,17 +154,15 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
 
             modelBuilder.Entity("TopoMojo.Api.Data.GamespaceFavorite", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("GamespaceId")
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("UserId")
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTimeOffset>("WhenCreated")
-                        .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
 
@@ -262,29 +263,6 @@ namespace TopoMojo.Api.Data.Migrations.SqlServer.TopoMojoDb
                     b.HasIndex("WorkspaceId");
 
                     b.ToTable("Templates");
-                });
-
-            modelBuilder.Entity("TopoMojo.Api.Data.TemplateFavorite", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("TemplateId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTimeOffset>("WhenCreated")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "TemplateId")
-                        .IsUnique()
-                        .HasFilter("[UserId] IS NOT NULL AND [TemplateId] IS NOT NULL");
-
-                    b.ToTable("TemplateFavorites");
                 });
 
             modelBuilder.Entity("TopoMojo.Api.Data.User", b =>

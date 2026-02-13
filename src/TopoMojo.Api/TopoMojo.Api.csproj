@@ -1,6 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <TargetFramework>net10.0</TargetFramework>
+    <Version>2.5.2</Version>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>14</LangVersion>
