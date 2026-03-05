@@ -5,6 +5,7 @@
     <Version>2.5.2</Version>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>cmu-sei-crucible-topomojo-api</UserSecretsId>
   </PropertyGroup>
   <PropertyGroup>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
