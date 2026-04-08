@@ -2,10 +2,11 @@
 #multi-stage target: dev
 #
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dev
+ARG VERSION
 ENV ASPNETCORE_ENVIRONMENT=DEVELOPMENT
 COPY . /home/app
 WORKDIR /home/app/src/TopoMojo.Api
-RUN dotnet publish --use-current-runtime -o /home/app/dist
+RUN dotnet publish --use-current-runtime -o /home/app/dist /p:Version=${VERSION:-1.0.0} /p:AssemblyVersion=${VERSION:-1.0.0}
 CMD ["dotnet", "run"]
 
 #
