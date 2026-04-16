@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.DataProtection;
 using TopoMojo.HostedServices;
+using Crucible.Common.ServiceDefaults;
 
 namespace TopoMojo.Api
 {
@@ -89,6 +90,17 @@ namespace TopoMojo.Api
             services.AddConfiguredAuthentication(Settings.Oidc);
             services.AddConfiguredAuthorization();
             services.AddSingleton(Settings);
+
+            // add Crucible Common Service Defaults with configuration from appsettings
+            services.AddServiceDefaults(Environment, Configuration, openTelemetryOptions =>
+            {
+                // Bind configuration from appsettings.json "OpenTelemetry" section
+                var telemetrySection = Configuration.GetSection("OpenTelemetry");
+                if (telemetrySection.Exists())
+                {
+                    telemetrySection.Bind(openTelemetryOptions);
+                }
+            });
         }
 
         public void Configure(IApplicationBuilder app)
