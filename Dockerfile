@@ -1,7 +1,7 @@
 #
 #multi-stage target: dev
 #
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dev
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dev
 ARG VERSION
 ENV ASPNETCORE_ENVIRONMENT=DEVELOPMENT
 COPY . /home/app
@@ -12,7 +12,7 @@ CMD ["dotnet", "run"]
 #
 #multi-stage target: prod
 #
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS prod
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS prod
 ARG commit
 ENV COMMIT=$commit
 ENV DOTNET_HOSTBUILDER__RELOADCONFIGCHANGE=false
