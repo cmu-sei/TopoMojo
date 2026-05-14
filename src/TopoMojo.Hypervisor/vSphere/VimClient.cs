@@ -22,11 +22,13 @@ namespace TopoMojo.Hypervisor.vSphere
             HypervisorServiceConfiguration options,
             ConcurrentDictionary<string, Vm> vmCache,
             VlanManager networkManager,
-            ILogger<VimClient> logger
+            ILogger<VimClient> logger,
+            IHttpClientFactory httpClientFactory
         )
         {
             _logger = logger;
             _config = options;
+            _httpClientFactory = httpClientFactory;
             _logger.LogDebug("Constructing, Client {host}", _config.Host);
             _tasks = [];
             _vmCache = vmCache;
@@ -39,6 +41,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private readonly VlanManager _vlanman;
         private readonly ILogger<VimClient> _logger;
+        private readonly IHttpClientFactory _httpClientFactory;
         readonly Dictionary<string, VimHostTask> _tasks;
         private readonly ConcurrentDictionary<string, Vm> _vmCache;
         readonly Dictionary<string, TaskInfo> _taskMap = [];
@@ -862,19 +865,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private System.Net.Http.HttpClient CreateAuthenticatedHttpClient()
         {
-            var handler = new System.Net.Http.HttpClientHandler();
-
-            // Handle certificate validation
-            if (_config.IgnoreCertificateErrors)
-            {
-                handler.ServerCertificateCustomValidationCallback =
-                    System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
-            }
-
-            var client = new System.Net.Http.HttpClient(handler)
-            {
-                Timeout = TimeSpan.FromMinutes(30) // Long timeout for large ISOs
-            };
+            // Use named client configured for vSphere datastore uploads
+            var client = _httpClientFactory.CreateClient("vSphereDatastore");
 
             // Authenticate with basic auth (username/password)
             // This is simpler than extracting session cookie and works reliably

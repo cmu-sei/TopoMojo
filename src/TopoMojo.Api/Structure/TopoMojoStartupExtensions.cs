@@ -128,6 +128,20 @@ namespace Microsoft.Extensions.DependencyInjection
         {
             var config = podConfig();
 
+            // Configure HttpClient for vSphere datastore uploads
+            services.AddHttpClient("vSphereDatastore")
+                .ConfigurePrimaryHttpMessageHandler(() =>
+                {
+                    var handler = new HttpClientHandler();
+                    if (config.IgnoreCertificateErrors)
+                    {
+                        handler.ServerCertificateCustomValidationCallback =
+                            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+                    }
+                    return handler;
+                })
+                .SetHandlerLifetime(TimeSpan.FromMinutes(30));
+
             if (string.IsNullOrWhiteSpace(config.Url))
             {
                 services.AddSingleton<IHypervisorService, TopoMojo.Hypervisor.vMock.MockHypervisorService>();

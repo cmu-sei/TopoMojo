@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,11 +19,13 @@ namespace TopoMojo.Hypervisor.vSphere
     {
         public VSphereHypervisorService(
             HypervisorServiceConfiguration options,
-            ILoggerFactory mill
+            ILoggerFactory mill,
+            IHttpClientFactory httpClientFactory
         )
         {
             _options = options;
             _mill = mill;
+            _httpClientFactory = httpClientFactory;
             _logger = _mill.CreateLogger<VSphereHypervisorService>();
             _hostCache = new ConcurrentDictionary<string, VimClient>();
             _affinityMap = [];
@@ -38,6 +41,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private readonly ILogger<VSphereHypervisorService> _logger;
         private readonly ILoggerFactory _mill;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ConcurrentDictionary<string, VimClient> _hostCache;
         private readonly Dictionary<string, VimClient> _affinityMap;
         private readonly ConcurrentDictionary<string, Vm> _vmCache;
@@ -647,7 +651,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 hostOptions,
                 _vmCache,
                 _vlanman,
-                _mill.CreateLogger<VimClient>()
+                _mill.CreateLogger<VimClient>(),
+                _httpClientFactory
             );
             _hostCache.AddOrUpdate(hostname, vHost, (k, v) => v = vHost);
             _logger.LogDebug("Added host {hostname}; cache: {count}", hostname, _hostCache.Values.Count);
