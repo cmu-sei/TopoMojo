@@ -108,6 +108,16 @@ namespace TopoMojo.Api
         public string IsoRoot { get; set; } = "wwwroot/isos";
         public string DocRoot { get; set; } = "wwwroot/docs";
         public bool SupportsSubfolders { get; set; } = true;
+
+        /// <summary>
+        /// Enable API-based datastore uploads for VMware Cloud environments where NFS is not available
+        /// </summary>
+        public bool UseDatastoreApi { get; set; } = false;
+
+        /// <summary>
+        /// Temp directory for staging uploads when UseDatastoreApi is enabled
+        /// </summary>
+        public string TempRoot { get; set; } = "/tmp/topoiso";
     }
 
     public class HeaderOptions

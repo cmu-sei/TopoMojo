@@ -1,6 +1,7 @@
 // Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
+using System;
 using System.Threading.Tasks;
 
 namespace TopoMojo.Hypervisor
@@ -34,6 +35,15 @@ namespace TopoMojo.Hypervisor
         string Version { get; }
         Task ReloadHost(string host);
         HypervisorServiceConfiguration Options { get; }
+
+        /// <summary>
+        /// Upload a file to datastore via API (for VMware Cloud environments where NFS is not available)
+        /// </summary>
+        /// <param name="datastorePath">vSphere datastore path in format: [datastore] folder/file.iso</param>
+        /// <param name="localFilePath">Local filesystem path to file to upload</param>
+        /// <param name="progressCallback">Optional callback for progress updates</param>
+        /// <returns>The datastore path where file was uploaded</returns>
+        Task<string> UploadFileToDatastore(string datastorePath, string localFilePath, Action<long> progressCallback = null);
     }
 
 }

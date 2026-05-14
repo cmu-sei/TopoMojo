@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.ServiceModel;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
@@ -775,6 +776,120 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
+        /// <summary>
+        /// Upload a file to vSphere datastore via HTTP PUT
+        /// </summary>
+        public async Task<string> UploadFileToDatastore(
+            string datastorePath,
+            string localFilePath,
+            Action<long> progressCallback = null)
+        {
+            await Connect();
+
+            // Parse datastore path: [datastore] folder/file.iso
+            DatastorePath dsPath = new(datastorePath);
+
+            // Ensure directory exists on datastore
+            if (!string.IsNullOrEmpty(dsPath.Folder))
+            {
+                string dirPath = $"[{dsPath.Datastore}] {dsPath.Folder}";
+                await MakeDirectories(dirPath);
+            }
+
+            // Build HTTP PUT URL for vSphere datastore browser
+            string uploadUrl = BuildDatastoreUploadUrl(dsPath);
+
+            _logger.LogInformation("Uploading file to datastore: {path}", datastorePath);
+
+            // Create HTTP client with vSphere session authentication
+            using var httpClient = CreateAuthenticatedHttpClient();
+
+            // Stream file from disk with progress tracking
+            using var fileStream = File.OpenRead(localFilePath);
+            var streamToUpload = progressCallback != null
+                ? new ProgressStream(fileStream, progressCallback)
+                : (Stream)fileStream;
+
+            using var content = new StreamContent(streamToUpload);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content.Headers.ContentLength = fileStream.Length;
+
+            // Upload via HTTP PUT
+            try
+            {
+                var response = await httpClient.PutAsync(uploadUrl, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string error = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Datastore upload failed ({statusCode}): {error}", response.StatusCode, error);
+                    throw new Exception($"Datastore upload failed ({response.StatusCode}): {error}");
+                }
+
+                _logger.LogInformation("Upload complete: {path}", datastorePath);
+                return datastorePath;
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogError(ex, "Datastore upload timeout for {path}", datastorePath);
+                throw new Exception("Datastore upload timed out", ex);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Failed to upload file to datastore {path}", datastorePath);
+                throw new Exception($"Datastore upload failed: {ex.Message}", ex);
+            }
+        }
+
+        private string BuildDatastoreUploadUrl(DatastorePath dsPath)
+        {
+            // vSphere datastore browser URL format:
+            // https://{host}/folder/{folder}/{file}?dcPath={datacenter}&dsName={datastore}
+
+            string host = _config.Url.Replace("/sdk", "").Replace("https://", "");
+            string folder = string.IsNullOrEmpty(dsPath.Folder) ? "" : Uri.EscapeDataString(dsPath.Folder) + "/";
+            string file = Uri.EscapeDataString(dsPath.File);
+            string dcPath = Uri.EscapeDataString(GetDatacenterName());
+            string dsName = Uri.EscapeDataString(dsPath.Datastore);
+
+            return $"https://{host}/folder/{folder}{file}?dcPath={dcPath}&dsName={dsName}";
+        }
+
+        private string GetDatacenterName()
+        {
+            // Extract datacenter name from PoolPath configuration
+            // PoolPath format: "<datacenter>/<cluster>"
+            string poolPath = _config.PoolPath ?? "";
+            int slashIndex = poolPath.IndexOf('/');
+            return slashIndex > 0 ? poolPath.Substring(0, slashIndex) : poolPath;
+        }
+
+        private System.Net.Http.HttpClient CreateAuthenticatedHttpClient()
+        {
+            var handler = new System.Net.Http.HttpClientHandler();
+
+            // Handle certificate validation
+            if (_config.IgnoreCertificateErrors)
+            {
+                handler.ServerCertificateCustomValidationCallback =
+                    System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+            }
+
+            var client = new System.Net.Http.HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromMinutes(30) // Long timeout for large ISOs
+            };
+
+            // Authenticate with basic auth (username/password)
+            // This is simpler than extracting session cookie and works reliably
+            string credentials = Convert.ToBase64String(
+                System.Text.Encoding.ASCII.GetBytes($"{_config.User}:{_config.Password}")
+            );
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+
+            return client;
+        }
 
         private async Task<TaskInfo> WaitForVimTask(ManagedObjectReference task)
         {

@@ -740,6 +740,18 @@ namespace TopoMojo.Hypervisor.vSphere
                 DeploymentCollection.Add(ctx);
         }
 
+        public async Task<string> UploadFileToDatastore(
+            string datastorePath,
+            string localFilePath,
+            Action<long> progressCallback = null)
+        {
+            // Use primary host or select based on datastore availability
+            var client = _hostCache.Values.FirstOrDefault()
+                ?? throw new Exception("No vSphere host connection available");
+
+            return await client.UploadFileToDatastore(datastorePath, localFilePath, progressCallback);
+        }
+
         [GeneratedRegex(@"\[[\d-,]*\]")]
         private static partial Regex HostRangeRegex();
         [GeneratedRegex("(]|/)$")]
