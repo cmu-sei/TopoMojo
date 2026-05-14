@@ -804,13 +804,9 @@ namespace TopoMojo.Hypervisor.vSphere
             // Create HTTP client with vSphere session authentication
             using var httpClient = CreateAuthenticatedHttpClient();
 
-            // Stream file from disk with progress tracking
+            // Stream file from disk
             using var fileStream = File.OpenRead(localFilePath);
-            var streamToUpload = progressCallback != null
-                ? new ProgressStream(fileStream, progressCallback)
-                : (Stream)fileStream;
-
-            using var content = new StreamContent(streamToUpload);
+            using var content = new StreamContent(fileStream);
             content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
             content.Headers.ContentLength = fileStream.Length;
 
