@@ -117,7 +117,22 @@ namespace TopoMojo.Api
         /// <summary>
         /// Temp directory for staging uploads when UseDatastoreApi is enabled
         /// </summary>
-        public string TempRoot { get; set; } = "/tmp/topoiso";
+        public string TempRoot { get; set; } = Path.Combine(Path.GetTempPath(), "topoiso");
+
+        /// <summary>
+        /// Timeout in minutes for datastore API uploads (default: 120 minutes / 2 hours)
+        /// </summary>
+        public int UploadTimeoutMinutes { get; set; } = 120;
+
+        /// <summary>
+        /// Max file size in bytes to block on datastore upload (default: 1GB). Files larger than this will upload async.
+        /// </summary>
+        public long AsyncUploadThresholdBytes { get; set; } = 1_073_741_824; // 1GB
+
+        /// <summary>
+        /// Hours after which temp files are considered stale and can be deleted (default: 24 hours)
+        /// </summary>
+        public int TempFileExpirationHours { get; set; } = 24;
     }
 
     public class HeaderOptions

@@ -31,6 +31,7 @@ public class FileController(
         public const string GroupKey = "group-key";
         public const string Size = "size";
         public const string DestinationPath = "destination-path";
+        public const string DatastorePath = "DatastorePath";
         public const string IsoVolumeId = "UploadedFile";
         public const string IsoFileExtension = ".iso";
     }
@@ -87,20 +88,15 @@ public class FileController(
                 if (key != publicTarget && !workspaceService.CanEdit(key, Actor.Id).Result && !Actor.IsAdmin)
                     throw new InvalidOperationException();
 
-                // Choose temp path or final path based on UseDatastoreApi
                 string dest;
                 if (uploadOptions.UseDatastoreApi)
                 {
-                    // Write to temp directory, will upload to vSphere later
                     dest = BuildTempPath(filename, key);
-
-                    // Store the final datastore path for postProcess
                     string datastorePath = ConvertToDatastorePath(filename, key);
-                    metadata.Add("DatastorePath", datastorePath);
+                    metadata.Add(Meta.DatastorePath, datastorePath);
                 }
                 else
                 {
-                    // Write directly to NFS-mounted datastore
                     dest = BuildDestinationPath(filename, key);
                 }
 
@@ -130,59 +126,40 @@ public class FileController(
             {
                 string dp = metadata[Meta.DestinationPath];
 
-                // Handle vSphere API upload
                 if (uploadOptions.UseDatastoreApi)
                 {
-                    string datastorePath = metadata["DatastorePath"];
+                    string datastorePath = metadata[Meta.DatastorePath];
+                    long fileSize = long.Parse(metadata[Meta.Size] ?? "0");
+                    bool isLargeFile = fileSize > uploadOptions.AsyncUploadThresholdBytes;
 
+                    if (isLargeFile)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await UploadToDatastore(dp, datastorePath);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log("async upload failed", null, ex.Message);
+                            }
+                        });
+                        return;
+                    }
                     try
                     {
-                        // Wrap in ISO if needed (same logic as before, but in temp dir)
-                        string fileToUpload = dp;
-
-                        if (!dp.ToLower().EndsWith(Meta.IsoFileExtension))
-                        {
-                            // Create ISO wrapper in temp directory
-                            string isoPath = dp + Meta.IsoFileExtension;
-
-                            CDBuilder builder = new()
-                            {
-                                UseJoliet = true,
-                                VolumeIdentifier = Meta.IsoVolumeId
-                            };
-                            builder.AddFile(Path.GetFileName(dp), dp);
-                            builder.Build(isoPath);
-
-                            // Delete raw file, keep ISO
-                            System.IO.File.Delete(dp);
-                            fileToUpload = isoPath;
-                            datastorePath += Meta.IsoFileExtension;
-                        }
-
-                        // Upload to vSphere datastore
-                        Log("uploading to datastore", null, datastorePath);
-                        await hypervisorService.UploadFileToDatastore(datastorePath, fileToUpload);
-                        Log("upload complete", null, datastorePath);
-
-                        // Cleanup temp file
-                        System.IO.File.Delete(fileToUpload);
+                        await UploadToDatastore(dp, datastorePath);
                     }
                     catch (Exception ex)
                     {
                         Log("upload failed", null, ex.Message);
-
-                        // Cleanup temp files on error
-                        if (System.IO.File.Exists(dp))
-                            System.IO.File.Delete(dp);
-                        if (System.IO.File.Exists(dp + Meta.IsoFileExtension))
-                            System.IO.File.Delete(dp + Meta.IsoFileExtension);
-
+                        CleanupTempFiles(dp);
                         throw;
                     }
                 }
                 else
                 {
-                    // EXISTING: Filesystem-based ISO wrapping (unchanged)
                     if (!dp.ToLower().EndsWith(Meta.IsoFileExtension) && System.IO.File.Exists(dp))
                     {
                         CDBuilder builder = new()
@@ -227,16 +204,15 @@ public class FileController(
 
     private string BuildTempPath(string filename, string key)
     {
-        // Ensure temp directory exists
         if (!Directory.Exists(uploadOptions.TempRoot))
             Directory.CreateDirectory(uploadOptions.TempRoot);
 
-        // Use same subfolder logic for organization
         if (uploadOptions.SupportsSubfolders)
         {
             string path = Path.Combine(
                 uploadOptions.TempRoot,
-                key.SanitizePath()
+                key.SanitizePath(),
+                Actor.Id
             );
 
             if (!Directory.Exists(path))
@@ -249,21 +225,14 @@ public class FileController(
         }
         else
         {
-            var fileName = $"{key.SanitizePath()}#{filename.Replace(" ", "").SanitizeFilename()}";
+            var fileName = $"{key.SanitizePath()}#{Actor.Id}#{filename.Replace(" ", "").SanitizeFilename()}";
             return Path.Combine(uploadOptions.TempRoot, fileName);
         }
     }
 
     private string ConvertToDatastorePath(string filename, string key)
     {
-        // Get IsoStore from hypervisor config: "[datastore] topomojo/isos"
-        string isoStore = hypervisorService.Options.IsoStore;
-
-        // Remove trailing slash if present
-        if (isoStore.EndsWith('/'))
-            isoStore = isoStore.TrimEnd('/');
-
-        // Build path using same subfolder logic
+        string isoStore = hypervisorService.Options.IsoStore.TrimEnd('/');
         string sanitizedFilename = filename.Replace(" ", "").SanitizeFilename();
 
         if (uploadOptions.SupportsSubfolders)
@@ -276,6 +245,42 @@ public class FileController(
             string flatName = $"{key.SanitizePath()}#{sanitizedFilename}";
             return $"{isoStore}/{flatName}";
         }
+    }
+
+    private async Task UploadToDatastore(string tempFilePath, string datastorePath)
+    {
+        string fileToUpload = tempFilePath;
+
+        if (!tempFilePath.ToLower().EndsWith(Meta.IsoFileExtension))
+        {
+            string isoPath = tempFilePath + Meta.IsoFileExtension;
+
+            CDBuilder builder = new()
+            {
+                UseJoliet = true,
+                VolumeIdentifier = Meta.IsoVolumeId
+            };
+            builder.AddFile(Path.GetFileName(tempFilePath), tempFilePath);
+            builder.Build(isoPath);
+
+            System.IO.File.Delete(tempFilePath);
+            fileToUpload = isoPath;
+            datastorePath += Meta.IsoFileExtension;
+        }
+
+        Log("uploading to datastore", null, datastorePath);
+        await hypervisorService.UploadFileToDatastore(datastorePath, fileToUpload);
+        Log("upload complete", null, datastorePath);
+
+        System.IO.File.Delete(fileToUpload);
+    }
+
+    private void CleanupTempFiles(string tempFilePath)
+    {
+        if (System.IO.File.Exists(tempFilePath))
+            System.IO.File.Delete(tempFilePath);
+        if (System.IO.File.Exists(tempFilePath + Meta.IsoFileExtension))
+            System.IO.File.Delete(tempFilePath + Meta.IsoFileExtension);
     }
 
 }

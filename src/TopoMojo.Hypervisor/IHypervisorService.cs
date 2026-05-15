@@ -41,9 +41,8 @@ namespace TopoMojo.Hypervisor
         /// </summary>
         /// <param name="datastorePath">vSphere datastore path in format: [datastore] folder/file.iso</param>
         /// <param name="localFilePath">Local filesystem path to file to upload</param>
-        /// <param name="progressCallback">Optional callback for progress updates</param>
         /// <returns>The datastore path where file was uploaded</returns>
-        Task<string> UploadFileToDatastore(string datastorePath, string localFilePath, Action<long> progressCallback = null);
+        Task<string> UploadFileToDatastore(string datastorePath, string localFilePath);
     }
 
 }

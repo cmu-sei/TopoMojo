@@ -4,6 +4,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.DataProtection;
+using TopoMojo.Api.Services;
 using TopoMojo.HostedServices;
 using Crucible.Common.ServiceDefaults;
 
@@ -72,13 +73,16 @@ namespace TopoMojo.Api
             services.AddFileUpload(Settings.FileUpload);
 
             if (Environment.IsDevelopment().Equals(false))
+            {
+                services.AddScoped<JanitorService>();
                 services.AddHostedService<JanitorHostedService>();
+            }
 
             // Configure TopoMojo
             services
                 .AddTopoMojo(Settings)
                 .AddTopoMojoData(Settings.Database.Provider, Settings.Database.ConnectionString)
-                .AddTopoMojoHypervisor(() => Settings.Pod)
+                .AddTopoMojoHypervisor(() => Settings.Pod, Settings.FileUpload)
                 .AddSingleton(
                     new AutoMapper.MapperConfiguration(cfg =>
                     {
@@ -129,6 +133,9 @@ namespace TopoMojo.Api
 
             app.UseAuthorization();
 
+            ValidateTempStorage(Settings.FileUpload);
+            CleanupStaleTempFiles(Settings.FileUpload);
+
             if (Settings.OpenApi.Enabled)
                 app.UseConfiguredSwagger(Settings.OpenApi, Settings.Oidc.Audience, Settings.PathBase);
 
@@ -138,6 +145,59 @@ namespace TopoMojo.Api
 
                 ep.MapControllers().RequireAuthorization();
             });
+        }
+
+        private void ValidateTempStorage(FileUploadOptions options)
+        {
+            if (!options.UseDatastoreApi || string.IsNullOrEmpty(options.TempRoot))
+                return;
+
+            string tempRoot = Path.GetFullPath(options.TempRoot);
+
+            if (tempRoot.StartsWith("/tmp") || tempRoot.StartsWith(Path.GetTempPath()))
+            {
+                Console.WriteLine($"WARNING: TempRoot ({options.TempRoot}) is on ephemeral storage.");
+                Console.WriteLine("For production with large ISO uploads, mount a persistent volume (e.g., EFS) to prevent node crashes.");
+            }
+        }
+
+        private void CleanupStaleTempFiles(FileUploadOptions options)
+        {
+            if (!options.UseDatastoreApi || string.IsNullOrEmpty(options.TempRoot))
+                return;
+
+            try
+            {
+                if (!Directory.Exists(options.TempRoot))
+                    return;
+
+                var cutoff = DateTimeOffset.UtcNow.AddHours(-options.TempFileExpirationHours);
+                var deletedCount = 0;
+
+                foreach (var file in Directory.GetFiles(options.TempRoot, "*.*", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        var fileInfo = new FileInfo(file);
+                        if (fileInfo.LastWriteTimeUtc < cutoff)
+                        {
+                            File.Delete(file);
+                            deletedCount++;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore errors on individual files
+                    }
+                }
+
+                if (deletedCount > 0)
+                    Console.WriteLine($"Cleaned up {deletedCount} stale temp files from {options.TempRoot}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to cleanup temp files: {ex.Message}");
+            }
         }
     }
 }

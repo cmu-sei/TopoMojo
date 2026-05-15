@@ -747,14 +747,12 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public async Task<string> UploadFileToDatastore(
             string datastorePath,
-            string localFilePath,
-            Action<long> progressCallback = null)
+            string localFilePath)
         {
-            // Use primary host or select based on datastore availability
             var client = _hostCache.Values.FirstOrDefault()
-                ?? throw new Exception("No vSphere host connection available");
+                ?? throw new InvalidOperationException("Cannot upload to datastore: no vSphere connections available.");
 
-            return await client.UploadFileToDatastore(datastorePath, localFilePath, progressCallback);
+            return await client.UploadFileToDatastore(datastorePath, localFilePath);
         }
 
         [GeneratedRegex(@"\[[\d-,]*\]")]

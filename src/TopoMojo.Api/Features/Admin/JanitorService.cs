@@ -14,7 +14,8 @@ namespace TopoMojo.Api.Services
         CoreOptions options,
         IHypervisorService pod,
         IWorkspaceStore workspaceStore,
-        IGamespaceStore gamespaceStore
+        IGamespaceStore gamespaceStore,
+        FileUploadOptions fileUploadOptions
         )
     {
         private readonly ILogger _logger = logger;
@@ -22,6 +23,7 @@ namespace TopoMojo.Api.Services
         private readonly IHypervisorService _pod = pod;
         private readonly IWorkspaceStore _workspaceStore = workspaceStore;
         private readonly IGamespaceStore _gamespaceStore = gamespaceStore;
+        private readonly FileUploadOptions _fileUploadOptions = fileUploadOptions;
 
         public async Task EndExpired()
         {
@@ -179,6 +181,47 @@ namespace TopoMojo.Api.Services
             result.AddRange(await CleanupInactiveWorkspaces(opt));
 
             return [.. result];
+        }
+
+        public Task CleanupStaleTempFiles()
+        {
+            if (!_fileUploadOptions.UseDatastoreApi || string.IsNullOrEmpty(_fileUploadOptions.TempRoot))
+                return Task.CompletedTask;
+
+            try
+            {
+                if (!Directory.Exists(_fileUploadOptions.TempRoot))
+                    return Task.CompletedTask;
+
+                var cutoff = DateTimeOffset.UtcNow.AddHours(-_fileUploadOptions.TempFileExpirationHours);
+                var deletedCount = 0;
+
+                foreach (var file in Directory.GetFiles(_fileUploadOptions.TempRoot, "*.*", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        var fileInfo = new FileInfo(file);
+                        if (fileInfo.LastWriteTimeUtc < cutoff)
+                        {
+                            File.Delete(file);
+                            deletedCount++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to delete stale temp file: {file}", file);
+                    }
+                }
+
+                if (deletedCount > 0)
+                    _logger.LogInformation("Cleaned up {count} stale temp files from {path}", deletedCount, _fileUploadOptions.TempRoot);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to cleanup temp files in {path}", _fileUploadOptions.TempRoot);
+            }
+
+            return Task.CompletedTask;
         }
 
     }

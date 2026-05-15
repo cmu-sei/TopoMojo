@@ -53,6 +53,7 @@ namespace TopoMojo.Hypervisor.vSphere
         ManagedObjectReference _props, _vdm, _file;
         ManagedObjectReference _datacenter, _dsns, _vms, _res, _pool;
         string _dvsuuid = "";
+        string _datacenterName = "";
         readonly int _pollInterval = 1000;
         readonly int _syncInterval = 30000;
         readonly int _taskMonitorInterval = 3000;
@@ -784,8 +785,7 @@ namespace TopoMojo.Hypervisor.vSphere
         /// </summary>
         public async Task<string> UploadFileToDatastore(
             string datastorePath,
-            string localFilePath,
-            Action<long> progressCallback = null)
+            string localFilePath)
         {
             await Connect();
 
@@ -803,9 +803,9 @@ namespace TopoMojo.Hypervisor.vSphere
             string uploadUrl = BuildDatastoreUploadUrl(dsPath);
 
             _logger.LogInformation("Uploading file to datastore: {path}", datastorePath);
+            _logger.LogDebug("Upload URL: {url}", uploadUrl);
 
-            // Create HTTP client with vSphere session authentication
-            using var httpClient = CreateAuthenticatedHttpClient();
+            var httpClient = CreateAuthenticatedHttpClient();
 
             // Stream file from disk
             using var fileStream = File.OpenRead(localFilePath);
@@ -845,7 +845,7 @@ namespace TopoMojo.Hypervisor.vSphere
             // vSphere datastore browser URL format:
             // https://{host}/folder/{folder}/{file}?dcPath={datacenter}&dsName={datastore}
 
-            string host = _config.Url.Replace("/sdk", "").Replace("https://", "");
+            string host = new Uri(_config.Url).Authority;
             string folder = string.IsNullOrEmpty(dsPath.Folder) ? "" : Uri.EscapeDataString(dsPath.Folder) + "/";
             string file = Uri.EscapeDataString(dsPath.File);
             string dcPath = Uri.EscapeDataString(GetDatacenterName());
@@ -856,11 +856,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private string GetDatacenterName()
         {
-            // Extract datacenter name from PoolPath configuration
-            // PoolPath format: "<datacenter>/<cluster>"
-            string poolPath = _config.PoolPath ?? "";
-            int slashIndex = poolPath.IndexOf('/');
-            return slashIndex > 0 ? poolPath.Substring(0, slashIndex) : poolPath;
+            return _datacenterName ?? "";
         }
 
         private System.Net.Http.HttpClient CreateAuthenticatedHttpClient()
@@ -1155,6 +1151,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             var dcContent = clunkyTree.FindTypeByName("Datacenter", datacenter) ?? clunkyTree.First("Datacenter");
             _datacenter = dcContent.obj;
+            _datacenterName = (string)dcContent.GetProperty("name");
             _vms = (ManagedObjectReference)dcContent.GetProperty("vmFolder");
 
             var clusterContent = clunkyTree.FindTypeByName("ComputeResource", cluster) ?? clunkyTree.First("ComputeResource");
