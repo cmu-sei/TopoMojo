@@ -43,6 +43,12 @@ namespace TopoMojo.Hypervisor
         /// <param name="localFilePath">Local filesystem path to file to upload</param>
         /// <returns>The datastore path where file was uploaded</returns>
         Task<string> UploadFileToDatastore(string datastorePath, string localFilePath);
+
+        /// <summary>
+        /// Delete a file from datastore via API (for VMware Cloud environments)
+        /// </summary>
+        /// <param name="datastorePath">Datastore path in format: [datastore] folder/file.iso</param>
+        Task DeleteFileFromDatastore(string datastorePath);
     }
 
 }

@@ -266,4 +266,94 @@ public class FileController(
             System.IO.File.Delete(tempFilePath + Meta.IsoFileExtension);
     }
 
+    [HttpDelete("api/workspace/{workspaceId}/iso")]
+    [SwaggerOperation(OperationId = "DeleteWorkspaceIso")]
+    [Authorize]
+    public async Task<ActionResult<bool>> DeleteWorkspaceIso(string workspaceId, [FromQuery] string path)
+    {
+        if (string.IsNullOrWhiteSpace(workspaceId) || string.IsNullOrWhiteSpace(path))
+            return BadRequest("Workspace ID and ISO path are required");
+
+        string actualWorkspaceId = workspaceId;
+        string filename;
+
+        if (path.Contains('/'))
+        {
+            var parts = path.Split('/');
+            actualWorkspaceId = parts[0];
+            filename = parts[1];
+        }
+        else
+        {
+            filename = path;
+        }
+
+        if (actualWorkspaceId != Guid.Empty.ToString())
+        {
+            if (!await workspaceService.CanEdit(actualWorkspaceId, Actor.Id) && !Actor.IsAdmin)
+                return Forbid();
+        }
+        else
+        {
+            if (!Actor.IsAdmin)
+                return Forbid();
+        }
+
+        try
+        {
+
+            string filePath = BuildIsoFilePath(actualWorkspaceId, filename);
+
+            Logger.LogInformation("Deleting ISO: workspace={workspaceId}, file={filename}, path={filePath}", actualWorkspaceId, filename, filePath);
+
+            if (System.IO.File.Exists(filePath))
+            {
+                System.IO.File.Delete(filePath);
+                Logger.LogInformation("Deleted local ISO: {filePath}", filePath);
+            }
+
+            if (uploadOptions.UseDatastoreApi)
+            {
+                string datastorePath = ConvertToDatastorePath(filename, actualWorkspaceId);
+                await hypervisorService.DeleteFileFromDatastore(datastorePath);
+                Logger.LogInformation("Deleted datastore ISO: {datastorePath}", datastorePath);
+            }
+
+            return Json(true);
+        }
+        catch (FileNotFoundException)
+        {
+            return NotFound($"ISO file not found: {path}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Logger.LogError(ex, "ISO delete failed - access denied: workspace={workspaceId}, path={path}", actualWorkspaceId, path);
+            return StatusCode(403, "Access denied");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ISO delete failed: workspace={workspaceId}, path={path}", actualWorkspaceId, path);
+            return StatusCode(500, $"Failed to delete ISO: {ex.Message}");
+        }
+    }
+
+    private string BuildIsoFilePath(string workspaceKey, string filename)
+    {
+        string sanitizedFilename = filename.Replace(" ", "").SanitizeFilename();
+
+        if (uploadOptions.SupportsSubfolders)
+        {
+            return Path.Combine(
+                uploadOptions.IsoRoot,
+                workspaceKey.SanitizePath(),
+                sanitizedFilename
+            );
+        }
+        else
+        {
+            string flatName = $"{workspaceKey.SanitizePath()}#{sanitizedFilename}";
+            return Path.Combine(uploadOptions.IsoRoot, flatName);
+        }
+    }
+
 }

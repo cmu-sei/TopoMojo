@@ -840,6 +840,20 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
+        public async Task DeleteFileFromDatastore(string datastorePath)
+        {
+            await Connect();
+
+            DatastorePath dsPath = new(datastorePath);
+            string fullPath = $"[{dsPath.Datastore}] {dsPath.Folder}/{dsPath.File}";
+
+            _logger.LogDebug("Deleting file from datastore: {path}", fullPath);
+
+            await _vim.DeleteDatastoreFile_TaskAsync(_sic.fileManager, fullPath, _datacenter);
+
+            _logger.LogDebug("Successfully deleted file: {path}", fullPath);
+        }
+
         private string BuildDatastoreUploadUrl(DatastorePath dsPath)
         {
             // vSphere datastore browser URL format:

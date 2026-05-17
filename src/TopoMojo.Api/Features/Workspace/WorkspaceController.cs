@@ -199,9 +199,18 @@ namespace TopoMojo.Api.Controllers
         [Authorize]
         public async Task<ActionResult<VmOptions>> LoadWorkspaceIsos(string id)
         {
-            if (!AuthorizeAny(
-                () => workspaceService.CanEdit(id, Actor.Id).Result
-            )) return Forbid();
+            // Allow admins to access global ISO folder (Guid.Empty)
+            if (id == Guid.Empty.ToString())
+            {
+                if (!Actor.IsAdmin)
+                    return Forbid();
+            }
+            else
+            {
+                if (!AuthorizeAny(
+                    () => workspaceService.CanEdit(id, Actor.Id).Result
+                )) return Forbid();
+            }
 
             return Ok(
                 await podService.GetVmIsoOptions(id)

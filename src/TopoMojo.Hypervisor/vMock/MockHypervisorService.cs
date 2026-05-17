@@ -528,6 +528,11 @@ namespace TopoMojo.Hypervisor.vMock
             throw new NotSupportedException("Mock hypervisor does not support datastore uploads");
         }
 
+        public Task DeleteFileFromDatastore(string datastorePath)
+        {
+            throw new NotSupportedException("Mock hypervisor does not support datastore operations");
+        }
+
         [GeneratedRegex("(]|/)$")]
         private static partial Regex DataStoreEndsWithRegex();
     }

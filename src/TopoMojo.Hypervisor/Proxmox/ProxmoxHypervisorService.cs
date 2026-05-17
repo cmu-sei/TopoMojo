@@ -115,7 +115,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (template.Iso.HasValue())
             {
                 var isoPath = template.Iso.Replace('/', '#');
-                isoPath = $"{option.IsoStore.Replace("/", string.Empty)}:iso/{isoPath}";
+                isoPath = $"{option.IsoStore.Replace("/", string.Empty)}:{isoPath}";
                 template.Iso = isoPath;
             }
 
@@ -464,7 +464,12 @@ namespace TopoMojo.Hypervisor.Proxmox
             return new VmOptions
             {
                 Iso = isos
-                    .Where(x => x.Name.StartsWith(key) || x.Name.StartsWith(Guid.Empty.ToString()))
+                    .Where(x =>
+                        key == Guid.Empty.ToString() ||                      // Global request: return all
+                        x.Name.StartsWith(key) ||                            // Workspace ISOs
+                        !x.Name.Contains('#') ||                             // Global ISOs (no prefix)
+                        x.Name.StartsWith(Guid.Empty.ToString())             // Global ISOs (with 00000... prefix)
+                    )
                     .Select(x => x.DisplayName)
                     .ToArray()
             };
@@ -506,6 +511,14 @@ namespace TopoMojo.Hypervisor.Proxmox
         public Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
         {
             throw new NotSupportedException("Proxmox uses local filesystem mounts, not API uploads");
+        }
+
+        public Task DeleteFileFromDatastore(string datastorePath)
+        {
+            // Proxmox uses NFS-mounted local filesystem
+            // Files are deleted directly via File.Delete() in FileController
+            // No datastore API needed
+            return Task.CompletedTask;
         }
 
         [GeneratedRegex("#.*")]

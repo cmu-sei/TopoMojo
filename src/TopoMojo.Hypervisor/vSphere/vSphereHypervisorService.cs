@@ -439,9 +439,14 @@ namespace TopoMojo.Hypervisor.vSphere
             isos.AddRange(
                 await host.GetFiles(host.Options.IsoStore + id + "/*.iso", false)
             );
-            isos.AddRange(
-                await host.GetFiles(host.Options.IsoStore + publicFolder + "/*.iso", false)
-            );
+
+            // Only add public folder if we're not already querying it
+            if (id != publicFolder)
+            {
+                isos.AddRange(
+                    await host.GetFiles(host.Options.IsoStore + publicFolder + "/*.iso", false)
+                );
+            }
 
             //translate actual path to display path
             isos = isos.Select(x => x.Replace(host.Options.IsoStore, "").Trim()).ToList();
@@ -753,6 +758,14 @@ namespace TopoMojo.Hypervisor.vSphere
                 ?? throw new InvalidOperationException("Cannot upload to datastore: no vSphere connections available.");
 
             return await client.UploadFileToDatastore(datastorePath, localFilePath);
+        }
+
+        public async Task DeleteFileFromDatastore(string datastorePath)
+        {
+            var client = _hostCache.Values.FirstOrDefault()
+                ?? throw new InvalidOperationException("Cannot delete from datastore: no vSphere connections available.");
+
+            await client.DeleteFileFromDatastore(datastorePath);
         }
 
         [GeneratedRegex(@"\[[\d-,]*\]")]
