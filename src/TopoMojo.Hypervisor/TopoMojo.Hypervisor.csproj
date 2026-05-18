@@ -13,6 +13,7 @@
     <PackageReference Include="VimClient" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
     <PackageReference Include="Corsinvest.ProxmoxVE.Api" Version="9.1.13" />
     <PackageReference Include="Corsinvest.ProxmoxVE.Api.Extension" Version="9.1.13" />
   </ItemGroup>

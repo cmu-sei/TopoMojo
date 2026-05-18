@@ -58,6 +58,7 @@ namespace TopoMojo.HostedServices
             {
                 periodCount = 0;
                 janitor.Cleanup().Wait();
+                janitor.CleanupStaleTempFiles().Wait();
             }
 
             periodCount += 1;

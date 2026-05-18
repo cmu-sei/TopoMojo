@@ -503,6 +503,11 @@ namespace TopoMojo.Hypervisor.Proxmox
                 DeploymentCollection.Add(ctx);
         }
 
+        public Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
+        {
+            throw new NotSupportedException("Proxmox uses local filesystem mounts, not API uploads");
+        }
+
         [GeneratedRegex("#.*")]
         private static partial Regex MyRegex();
     }

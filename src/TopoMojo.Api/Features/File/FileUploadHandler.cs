@@ -15,7 +15,7 @@ namespace TopoMojo.Api.Services
             Func<NameValueCollection, Stream> getDestinationStream,
             Action<FileUploadStatus> statusUpdate,
             Action<FormOptions> optionsAction,
-            Action<NameValueCollection> postProcess
+            Func<NameValueCollection, Task> postProcess = null
         );
     }
 
@@ -31,7 +31,7 @@ namespace TopoMojo.Api.Services
             Func<NameValueCollection, Stream> getDestinationStream,
             Action<FileUploadStatus> statusUpdate,
             Action<FormOptions> optionsAction,
-            Action<NameValueCollection> postProcess = null
+            Func<NameValueCollection, Task> postProcess = null
         )
         {
             if (!request.ContentType.IsMultipartContentType())
@@ -88,7 +88,8 @@ namespace TopoMojo.Api.Services
 
                             await Save(section.Body, targetStream, status, statusUpdate);
 
-                            postProcess?.Invoke(metadata);
+                            if (postProcess != null)
+                                await postProcess(metadata);
                         }
                         catch (Exception ex)
                         {

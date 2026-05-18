@@ -523,6 +523,11 @@ namespace TopoMojo.Hypervisor.vMock
                 DeploymentCollection.Add(ctx);
         }
 
+        public Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
+        {
+            throw new NotSupportedException("Mock hypervisor does not support datastore uploads");
+        }
+
         [GeneratedRegex("(]|/)$")]
         private static partial Regex DataStoreEndsWithRegex();
     }

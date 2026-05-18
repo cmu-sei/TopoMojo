@@ -20,7 +20,8 @@ public class FileController(
     IFileUploadHandler uploader,
     IFileUploadMonitor monitor,
     FileUploadOptions uploadOptions,
-    WorkspaceService workspaceService
+    WorkspaceService workspaceService,
+    TopoMojo.Hypervisor.IHypervisorService hypervisorService
     ) : BaseController(logger, hub)
 {
     private static class Meta
@@ -30,6 +31,7 @@ public class FileController(
         public const string GroupKey = "group-key";
         public const string Size = "size";
         public const string DestinationPath = "destination-path";
+        public const string DatastorePath = "DatastorePath";
         public const string IsoVolumeId = "UploadedFile";
         public const string IsoFileExtension = ".iso";
     }
@@ -86,8 +88,18 @@ public class FileController(
                 if (key != publicTarget && !workspaceService.CanEdit(key, Actor.Id).Result && !Actor.IsAdmin)
                     throw new InvalidOperationException();
 
-                // Log("uploading", null, filename);
-                string dest = BuildDestinationPath(filename, key);
+                string dest;
+                if (uploadOptions.UseDatastoreApi)
+                {
+                    dest = BuildTempPath(filename, key);
+                    string datastorePath = ConvertToDatastorePath(filename, key);
+                    metadata.Add(Meta.DatastorePath, datastorePath);
+                }
+                else
+                {
+                    dest = BuildDestinationPath(filename, key);
+                }
+
                 metadata.Add(Meta.DestinationPath, dest);
                 Log("uploading", null, dest);
 
@@ -110,20 +122,38 @@ public class FileController(
                 options.MultipartBodyLengthLimit = (long)((uploadOptions.MaxFileBytes > 0) ? uploadOptions.MaxFileBytes : 1E9);
             },
 
-            metadata =>
+            async metadata =>
             {
                 string dp = metadata[Meta.DestinationPath];
 
-                if (!dp.ToLower().EndsWith(Meta.IsoFileExtension) && System.IO.File.Exists(dp))
+                if (uploadOptions.UseDatastoreApi)
                 {
-                    CDBuilder builder = new()
+                    string datastorePath = metadata[Meta.DatastorePath];
+
+                    try
                     {
-                        UseJoliet = true,
-                        VolumeIdentifier = Meta.IsoVolumeId
-                    };
-                    builder.AddFile(Path.GetFileName(dp), dp);
-                    builder.Build(dp + Meta.IsoFileExtension);
-                    System.IO.File.Delete(dp);
+                        await UploadToDatastore(dp, datastorePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("upload failed", null, ex.Message);
+                        CleanupTempFiles(dp);
+                        throw;
+                    }
+                }
+                else
+                {
+                    if (!dp.ToLower().EndsWith(Meta.IsoFileExtension) && System.IO.File.Exists(dp))
+                    {
+                        CDBuilder builder = new()
+                        {
+                            UseJoliet = true,
+                            VolumeIdentifier = Meta.IsoVolumeId
+                        };
+                        builder.AddFile(Path.GetFileName(dp), dp);
+                        builder.Build(dp + Meta.IsoFileExtension);
+                        System.IO.File.Delete(dp);
+                    }
                 }
             }
         );
@@ -153,6 +183,87 @@ public class FileController(
             var fileName = $"{key.SanitizePath()}#{filename.Replace(" ", "").SanitizeFilename()}";
             return Path.Combine(uploadOptions.IsoRoot, fileName);
         }
+    }
+
+    private string BuildTempPath(string filename, string key)
+    {
+        if (!Directory.Exists(uploadOptions.TempRoot))
+            Directory.CreateDirectory(uploadOptions.TempRoot);
+
+        if (uploadOptions.SupportsSubfolders)
+        {
+            string path = Path.Combine(
+                uploadOptions.TempRoot,
+                key.SanitizePath(),
+                Actor.Id
+            );
+
+            if (!Directory.Exists(path))
+                Directory.CreateDirectory(path);
+
+            return Path.Combine(
+                path,
+                filename.Replace(" ", "").SanitizeFilename()
+            );
+        }
+        else
+        {
+            var fileName = $"{key.SanitizePath()}#{Actor.Id}#{filename.Replace(" ", "").SanitizeFilename()}";
+            return Path.Combine(uploadOptions.TempRoot, fileName);
+        }
+    }
+
+    private string ConvertToDatastorePath(string filename, string key)
+    {
+        string isoStore = hypervisorService.Options.IsoStore.TrimEnd('/');
+        string sanitizedFilename = filename.Replace(" ", "").SanitizeFilename();
+
+        if (uploadOptions.SupportsSubfolders)
+        {
+            string sanitizedKey = key.SanitizePath();
+            return $"{isoStore}/{sanitizedKey}/{sanitizedFilename}";
+        }
+        else
+        {
+            string flatName = $"{key.SanitizePath()}#{sanitizedFilename}";
+            return $"{isoStore}/{flatName}";
+        }
+    }
+
+    private async Task UploadToDatastore(string tempFilePath, string datastorePath)
+    {
+        string fileToUpload = tempFilePath;
+
+        if (!tempFilePath.ToLower().EndsWith(Meta.IsoFileExtension))
+        {
+            string isoPath = tempFilePath + Meta.IsoFileExtension;
+
+            CDBuilder builder = new()
+            {
+                UseJoliet = true,
+                VolumeIdentifier = Meta.IsoVolumeId
+            };
+            builder.AddFile(Path.GetFileName(tempFilePath), tempFilePath);
+            builder.Build(isoPath);
+
+            System.IO.File.Delete(tempFilePath);
+            fileToUpload = isoPath;
+            datastorePath += Meta.IsoFileExtension;
+        }
+
+        Log("uploading to datastore", null, datastorePath);
+        await hypervisorService.UploadFileToDatastore(datastorePath, fileToUpload);
+        Log("upload complete", null, datastorePath);
+
+        System.IO.File.Delete(fileToUpload);
+    }
+
+    private void CleanupTempFiles(string tempFilePath)
+    {
+        if (System.IO.File.Exists(tempFilePath))
+            System.IO.File.Delete(tempFilePath);
+        if (System.IO.File.Exists(tempFilePath + Meta.IsoFileExtension))
+            System.IO.File.Delete(tempFilePath + Meta.IsoFileExtension);
     }
 
 }

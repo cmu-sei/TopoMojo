@@ -123,10 +123,29 @@ namespace Microsoft.Extensions.DependencyInjection
 
         public static IServiceCollection AddTopoMojoHypervisor(
             this IServiceCollection services,
-            Func<HypervisorServiceConfiguration> podConfig
+            Func<HypervisorServiceConfiguration> podConfig,
+            FileUploadOptions uploadOptions = null
         )
         {
             var config = podConfig();
+
+            // Configure HttpClient for vSphere datastore uploads
+            var timeoutMinutes = uploadOptions?.UploadTimeoutMinutes ?? 120;
+            services.AddHttpClient("vSphereDatastore")
+                .ConfigurePrimaryHttpMessageHandler(() =>
+                {
+                    var handler = new HttpClientHandler();
+                    if (config.IgnoreCertificateErrors)
+                    {
+                        handler.ServerCertificateCustomValidationCallback =
+                            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+                    }
+                    return handler;
+                })
+                .ConfigureHttpClient(client =>
+                {
+                    client.Timeout = TimeSpan.FromMinutes(timeoutMinutes);
+                });
 
             if (string.IsNullOrWhiteSpace(config.Url))
             {

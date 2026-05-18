@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.ServiceModel;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
@@ -21,11 +22,13 @@ namespace TopoMojo.Hypervisor.vSphere
             HypervisorServiceConfiguration options,
             ConcurrentDictionary<string, Vm> vmCache,
             VlanManager networkManager,
-            ILogger<VimClient> logger
+            ILogger<VimClient> logger,
+            IHttpClientFactory httpClientFactory
         )
         {
             _logger = logger;
             _config = options;
+            _httpClientFactory = httpClientFactory;
             _logger.LogDebug("Constructing, Client {host}", _config.Host);
             _tasks = [];
             _vmCache = vmCache;
@@ -38,6 +41,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private readonly VlanManager _vlanman;
         private readonly ILogger<VimClient> _logger;
+        private readonly IHttpClientFactory _httpClientFactory;
         readonly Dictionary<string, VimHostTask> _tasks;
         private readonly ConcurrentDictionary<string, Vm> _vmCache;
         readonly Dictionary<string, TaskInfo> _taskMap = [];
@@ -49,6 +53,7 @@ namespace TopoMojo.Hypervisor.vSphere
         ManagedObjectReference _props, _vdm, _file;
         ManagedObjectReference _datacenter, _dsns, _vms, _res, _pool;
         string _dvsuuid = "";
+        string _datacenterName = "";
         readonly int _pollInterval = 1000;
         readonly int _syncInterval = 30000;
         readonly int _taskMonitorInterval = 3000;
@@ -775,6 +780,100 @@ namespace TopoMojo.Hypervisor.vSphere
             }
         }
 
+        /// <summary>
+        /// Upload a file to vSphere datastore via HTTP PUT
+        /// </summary>
+        public async Task<string> UploadFileToDatastore(
+            string datastorePath,
+            string localFilePath)
+        {
+            await Connect();
+
+            // Parse datastore path: [datastore] folder/file.iso
+            DatastorePath dsPath = new(datastorePath);
+
+            // Ensure directory exists on datastore
+            if (!string.IsNullOrEmpty(dsPath.Folder))
+            {
+                string dirPath = $"[{dsPath.Datastore}] {dsPath.Folder}";
+                await MakeDirectories(dirPath);
+            }
+
+            // Build HTTP PUT URL for vSphere datastore browser
+            string uploadUrl = BuildDatastoreUploadUrl(dsPath);
+
+            _logger.LogInformation("Uploading file to datastore: {path}", datastorePath);
+            _logger.LogDebug("Upload URL: {url}", uploadUrl);
+
+            var httpClient = CreateAuthenticatedHttpClient();
+
+            // Stream file from disk
+            using var fileStream = File.OpenRead(localFilePath);
+            using var content = new StreamContent(fileStream);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content.Headers.ContentLength = fileStream.Length;
+
+            // Upload via HTTP PUT
+            try
+            {
+                var response = await httpClient.PutAsync(uploadUrl, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string error = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Datastore upload failed ({statusCode}): {error}", response.StatusCode, error);
+                    throw new Exception($"Datastore upload failed ({response.StatusCode}): {error}");
+                }
+
+                _logger.LogInformation("Upload complete: {path}", datastorePath);
+                return datastorePath;
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogError(ex, "Datastore upload timeout for {path}", datastorePath);
+                throw new Exception("Datastore upload timed out", ex);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Failed to upload file to datastore {path}", datastorePath);
+                throw new Exception($"Datastore upload failed: {ex.Message}", ex);
+            }
+        }
+
+        private string BuildDatastoreUploadUrl(DatastorePath dsPath)
+        {
+            // vSphere datastore browser URL format:
+            // https://{host}/folder/{folder}/{file}?dcPath={datacenter}&dsName={datastore}
+
+            string host = new Uri(_config.Url).Authority;
+            string folder = string.IsNullOrEmpty(dsPath.Folder) ? "" : Uri.EscapeDataString(dsPath.Folder) + "/";
+            string file = Uri.EscapeDataString(dsPath.File);
+            string dcPath = Uri.EscapeDataString(GetDatacenterName());
+            string dsName = Uri.EscapeDataString(dsPath.Datastore);
+
+            return $"https://{host}/folder/{folder}{file}?dcPath={dcPath}&dsName={dsName}";
+        }
+
+        private string GetDatacenterName()
+        {
+            return _datacenterName ?? "";
+        }
+
+        private System.Net.Http.HttpClient CreateAuthenticatedHttpClient()
+        {
+            // Use named client configured for vSphere datastore uploads
+            var client = _httpClientFactory.CreateClient("vSphereDatastore");
+
+            // Authenticate with basic auth (username/password)
+            // This is simpler than extracting session cookie and works reliably
+            string credentials = Convert.ToBase64String(
+                System.Text.Encoding.ASCII.GetBytes($"{_config.User}:{_config.Password}")
+            );
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+
+            return client;
+        }
 
         private async Task<TaskInfo> WaitForVimTask(ManagedObjectReference task)
         {
@@ -1052,6 +1151,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             var dcContent = clunkyTree.FindTypeByName("Datacenter", datacenter) ?? clunkyTree.First("Datacenter");
             _datacenter = dcContent.obj;
+            _datacenterName = (string)dcContent.GetProperty("name");
             _vms = (ManagedObjectReference)dcContent.GetProperty("vmFolder");
 
             var clusterContent = clunkyTree.FindTypeByName("ComputeResource", cluster) ?? clunkyTree.First("ComputeResource");
