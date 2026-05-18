@@ -74,7 +74,6 @@ namespace TopoMojo.Api
 
             if (Environment.IsDevelopment().Equals(false))
             {
-                services.AddScoped<JanitorService>();
                 services.AddHostedService<JanitorHostedService>();
             }
 
