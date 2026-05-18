@@ -129,24 +129,7 @@ public class FileController(
                 if (uploadOptions.UseDatastoreApi)
                 {
                     string datastorePath = metadata[Meta.DatastorePath];
-                    long fileSize = long.Parse(metadata[Meta.Size] ?? "0");
-                    bool isLargeFile = fileSize > uploadOptions.AsyncUploadThresholdBytes;
 
-                    if (isLargeFile)
-                    {
-                        _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                await UploadToDatastore(dp, datastorePath);
-                            }
-                            catch (Exception ex)
-                            {
-                                Log("async upload failed", null, ex.Message);
-                            }
-                        });
-                        return;
-                    }
                     try
                     {
                         await UploadToDatastore(dp, datastorePath);

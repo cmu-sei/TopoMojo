@@ -125,11 +125,6 @@ namespace TopoMojo.Api
         public int UploadTimeoutMinutes { get; set; } = 120;
 
         /// <summary>
-        /// Max file size in bytes to block on datastore upload (default: 1GB). Files larger than this will upload async.
-        /// </summary>
-        public long AsyncUploadThresholdBytes { get; set; } = 1_073_741_824; // 1GB
-
-        /// <summary>
         /// Hours after which temp files are considered stale and can be deleted (default: 24 hours)
         /// </summary>
         public int TempFileExpirationHours { get; set; } = 24;
