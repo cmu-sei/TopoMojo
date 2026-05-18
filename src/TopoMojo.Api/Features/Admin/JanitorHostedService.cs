@@ -18,6 +18,9 @@ namespace TopoMojo.HostedServices
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
+            // Randomness here provides some spread in case
+            // the app is being run with multiple replicas.
+
             var rand = new Random();
 
             _timer = new Timer(StaleCheck,
