@@ -457,6 +457,24 @@ namespace TopoMojo.Hypervisor.vSphere
             };
         }
 
+        public async Task<VmOptions> GetAllIsoOptions()
+        {
+            VimClient host = FindHostByRandom();
+
+            List<string> isos = [];
+
+            isos.AddRange(
+                await host.GetFiles(host.Options.IsoStore + "*.iso", true)
+            );
+
+            isos = isos.Select(x => x.Replace(host.Options.IsoStore, "").Trim()).ToList();
+
+            return new VmOptions
+            {
+                Iso = [.. isos]
+            };
+        }
+
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
             await Task.Delay(0);
@@ -694,7 +712,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private async Task DeployBatch(DeploymentContext ctx)
         {
-            DateTimeOffset  st = DateTimeOffset.UtcNow;
+            DateTimeOffset st = DateTimeOffset.UtcNow;
 
             _logger.LogDebug("DeployBatch: start {id}", ctx.Id);
 
@@ -708,7 +726,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (_hostCache.Count == 1 && _hostCache.First().Value.Options.IsNsxNetwork)
             {
-                if (existing.Any()) {
+                if (existing.Any())
+                {
                     await _hostCache.First().Value.Delete(ctx.Id);
                     missing = [.. ctx.Templates];
                 }

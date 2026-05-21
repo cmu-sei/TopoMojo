@@ -475,6 +475,11 @@ namespace TopoMojo.Hypervisor.Proxmox
             };
         }
 
+        public Task<VmOptions> GetAllIsoOptions()
+        {
+            return GetVmIsoOptions(Guid.Empty.ToString());
+        }
+
         public Task ReloadHost(string host)
         {
             throw new NotImplementedException();

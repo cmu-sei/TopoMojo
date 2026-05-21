@@ -438,6 +438,11 @@ namespace TopoMojo.Hypervisor.vMock
             };
             return opt;
         }
+        public Task<VmOptions> GetAllIsoOptions()
+        {
+            return GetVmIsoOptions(Guid.Empty.ToString());
+        }
+
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
             await Task.Delay(0);

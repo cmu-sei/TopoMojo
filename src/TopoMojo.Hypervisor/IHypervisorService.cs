@@ -31,6 +31,7 @@ namespace TopoMojo.Hypervisor
         Task<Vm> Answer(string id, VmAnswer answer);
         // Task<TemplateOptions> GetTemplateOptions(string key);
         Task<VmOptions> GetVmIsoOptions(string key);
+        Task<VmOptions> GetAllIsoOptions();
         Task<VmOptions> GetVmNetOptions(string key);
         string Version { get; }
         Task ReloadHost(string host);

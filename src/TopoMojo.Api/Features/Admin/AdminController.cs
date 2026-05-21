@@ -11,6 +11,7 @@ using TopoMojo.Api.Hubs;
 using TopoMojo.Api.Models;
 using TopoMojo.Api.Features.Theme;
 using TopoMojo.Api.Services;
+using TopoMojo.Hypervisor;
 
 namespace TopoMojo.Api.Controllers;
 
@@ -24,7 +25,8 @@ public class AdminController(
     JanitorService janitor,
     HubCache hubCache,
     IMemoryCache localCache,
-    IWebHostEnvironment env
+    IWebHostEnvironment env,
+    IHypervisorService podService
     ) : BaseController(logger, hub)
 {
 
@@ -219,6 +221,17 @@ public class AdminController(
         }
 
         return Ok(new ThemeInfo { BackgroundUrl = null });
+    }
+
+    /// <summary>
+    /// List all ISOs across all workspaces.
+    /// </summary>
+    /// <returns></returns>
+    [HttpGet("api/admin/isos")]
+    [SwaggerOperation(OperationId = "GetAllIsos")]
+    public async Task<ActionResult<VmOptions>> GetAllIsos()
+    {
+        return Ok(await podService.GetAllIsoOptions());
     }
 
 }
