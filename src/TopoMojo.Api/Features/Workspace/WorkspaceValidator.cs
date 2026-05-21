@@ -64,10 +64,6 @@ namespace TopoMojo.Api.Validators
 
         private async Task Exists(string key, string id)
         {
-            // Allow Guid.Empty for global ISO folder access
-            if (id == Guid.Empty.ToString())
-                return;
-
             var entity = await store.Retrieve(id ?? "invalid");
             if (entity is null)
                 Problems.Add(new Problem(key, Message.ResourceNotFound));
