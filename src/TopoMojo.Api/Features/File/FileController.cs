@@ -178,12 +178,12 @@ public class FileController(
 
             return Path.Combine(
                 path,
-                filename.Replace(" ", "").SanitizeFilename()
+                SanitizeIsoFilename(filename)
             );
         }
         else
         {
-            var fileName = $"{key.SanitizePath()}#{filename.Replace(" ", "").SanitizeFilename()}";
+            var fileName = $"{key.SanitizePath()}#{SanitizeIsoFilename(filename)}";
             return Path.Combine(uploadOptions.IsoRoot, fileName);
         }
     }
@@ -206,12 +206,12 @@ public class FileController(
 
             return Path.Combine(
                 path,
-                filename.Replace(" ", "").SanitizeFilename()
+                SanitizeIsoFilename(filename)
             );
         }
         else
         {
-            var fileName = $"{key.SanitizePath()}#{Actor.Id}#{filename.Replace(" ", "").SanitizeFilename()}";
+            var fileName = $"{key.SanitizePath()}#{Actor.Id}#{SanitizeIsoFilename(filename)}";
             return Path.Combine(uploadOptions.TempRoot, fileName);
         }
     }
@@ -219,7 +219,7 @@ public class FileController(
     private string ConvertToDatastorePath(string filename, string key)
     {
         string isoStore = hypervisorService.Options.IsoStore.TrimEnd('/');
-        string sanitizedFilename = filename.Replace(" ", "").SanitizeFilename();
+        string sanitizedFilename = SanitizeIsoFilename(filename);
 
         if (uploadOptions.SupportsSubfolders)
         {
@@ -312,22 +312,22 @@ public class FileController(
 
         try
         {
-
-            string filePath = BuildIsoFilePath(actualWorkspaceId, filename);
-
-            Logger.LogInformation("Deleting ISO: workspace={workspaceId}, file={filename}, path={filePath}", actualWorkspaceId, filename, filePath);
-
-            if (System.IO.File.Exists(filePath))
-            {
-                System.IO.File.Delete(filePath);
-                Logger.LogInformation("Deleted local ISO: {filePath}", filePath);
-            }
+            Logger.LogInformation("Deleting ISO: workspace={workspaceId}, file={filename}", actualWorkspaceId, filename);
 
             if (uploadOptions.UseDatastoreApi)
             {
                 string datastorePath = ConvertToDatastorePath(filename, actualWorkspaceId);
                 await hypervisorService.DeleteFileFromDatastore(datastorePath);
                 Logger.LogInformation("Deleted datastore ISO: {datastorePath}", datastorePath);
+            }
+            else
+            {
+                string filePath = BuildIsoFilePath(actualWorkspaceId, filename);
+                if (System.IO.File.Exists(filePath))
+                {
+                    System.IO.File.Delete(filePath);
+                    Logger.LogInformation("Deleted local ISO: {filePath}", filePath);
+                }
             }
 
             return Json(true);
@@ -355,7 +355,9 @@ public class FileController(
 
         if (path.Contains('/'))
         {
-            var parts = path.Split('/');
+            var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2)
+                return (null, null, BadRequest("Invalid ISO path format"));
             actualWorkspaceId = parts[0];
             filename = parts[1];
         }
@@ -378,9 +380,12 @@ public class FileController(
         return (actualWorkspaceId, filename, null);
     }
 
+    private static string SanitizeIsoFilename(string filename)
+        => filename.Replace(" ", "").SanitizeFilename();
+
     private string BuildIsoFilePath(string workspaceKey, string filename)
     {
-        string sanitizedFilename = filename.Replace(" ", "").SanitizeFilename();
+        string sanitizedFilename = SanitizeIsoFilename(filename);
 
         if (uploadOptions.SupportsSubfolders)
         {
