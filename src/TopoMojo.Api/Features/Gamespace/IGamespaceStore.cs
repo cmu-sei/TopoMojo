@@ -16,5 +16,6 @@ namespace TopoMojo.Api.Data.Abstractions
         Task<bool> HasValidUserScope(string id, string scope, string subjectId);
         Task<bool> HasValidUserScopeGamespace(string gamespaceId, string scope);
         Task<bool> IsBelowGamespaceLimit(string id, int gamespaceLimit);
+        Task<Gamespace[]> FindActiveByIso(string isoPath);
     }
 }

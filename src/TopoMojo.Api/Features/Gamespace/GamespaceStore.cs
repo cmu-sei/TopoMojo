@@ -167,5 +167,15 @@ namespace TopoMojo.Api.Data
                 await DbContext.SaveChangesAsync();
             }
         }
+
+        public async Task<Gamespace[]> FindActiveByIso(string isoPath)
+        {
+            var now = DateTimeOffset.UtcNow;
+
+            return await DbSet
+                .Where(g => g.StartTime.Year > 1 && g.EndTime.Year <= 1 && g.ExpirationTime >= now)
+                .Where(g => g.Workspace.Templates.Any(t => t.Iso == isoPath))
+                .ToArrayAsync();
+        }
     }
 }

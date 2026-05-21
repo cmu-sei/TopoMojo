@@ -88,5 +88,13 @@ namespace TopoMojo.Api.Data
 
             return null;
         }
+
+        public async Task<Template[]> FindByIso(string isoPath)
+        {
+            return await DbSet
+                .Include(t => t.Workspace)
+                .Where(t => t.Iso == isoPath)
+                .ToArrayAsync();
+        }
     }
 }

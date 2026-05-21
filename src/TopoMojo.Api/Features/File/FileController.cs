@@ -5,6 +5,7 @@ using DiscUtils.Iso9660;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Api.Services;
 using TopoMojo.Api.Hubs;
@@ -21,7 +22,9 @@ public class FileController(
     IFileUploadMonitor monitor,
     FileUploadOptions uploadOptions,
     WorkspaceService workspaceService,
-    TopoMojo.Hypervisor.IHypervisorService hypervisorService
+    TopoMojo.Hypervisor.IHypervisorService hypervisorService,
+    ITemplateStore templateStore,
+    IGamespaceStore gamespaceStore
     ) : BaseController(logger, hub)
 {
     private static class Meta
@@ -266,6 +269,36 @@ public class FileController(
             System.IO.File.Delete(tempFilePath + Meta.IsoFileExtension);
     }
 
+    [HttpGet("api/workspace/{workspaceId}/iso-usage")]
+    [SwaggerOperation(OperationId = "GetIsoUsage")]
+    [Authorize]
+    public async Task<ActionResult<IsoUsageReport>> GetIsoUsage(string workspaceId, [FromQuery] string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return BadRequest("ISO path is required");
+
+        var (actualWorkspaceId, filename, error) = await AuthorizeIsoAccess(workspaceId, path);
+        if (error != null) return error;
+
+        var templates = await templateStore.FindByIso(path);
+        var activeGamespaces = await gamespaceStore.FindActiveByIso(path);
+
+        return Ok(new IsoUsageReport
+        {
+            Templates = templates.Select(t => new IsoUsageReport.TemplateReference
+            {
+                Id = t.Id,
+                Name = t.Name,
+                WorkspaceName = t.Workspace?.Name ?? "(deleted)"
+            }).ToList(),
+            ActiveGamespaces = activeGamespaces.Select(g => new IsoUsageReport.GamespaceReference
+            {
+                Id = g.Id,
+                Name = g.Name
+            }).ToList()
+        });
+    }
+
     [HttpDelete("api/workspace/{workspaceId}/iso")]
     [SwaggerOperation(OperationId = "DeleteWorkspaceIso")]
     [Authorize]
@@ -274,30 +307,8 @@ public class FileController(
         if (string.IsNullOrWhiteSpace(workspaceId) || string.IsNullOrWhiteSpace(path))
             return BadRequest("Workspace ID and ISO path are required");
 
-        string actualWorkspaceId = workspaceId;
-        string filename;
-
-        if (path.Contains('/'))
-        {
-            var parts = path.Split('/');
-            actualWorkspaceId = parts[0];
-            filename = parts[1];
-        }
-        else
-        {
-            filename = path;
-        }
-
-        if (actualWorkspaceId != Guid.Empty.ToString())
-        {
-            if (!await workspaceService.CanEdit(actualWorkspaceId, Actor.Id) && !Actor.IsAdmin)
-                return Forbid();
-        }
-        else
-        {
-            if (!Actor.IsAdmin)
-                return Forbid();
-        }
+        var (actualWorkspaceId, filename, error) = await AuthorizeIsoAccess(workspaceId, path);
+        if (error != null) return error;
 
         try
         {
@@ -335,6 +346,36 @@ public class FileController(
             Logger.LogError(ex, "ISO delete failed: workspace={workspaceId}, path={path}", actualWorkspaceId, path);
             return StatusCode(500, $"Failed to delete ISO: {ex.Message}");
         }
+    }
+
+    private async Task<(string actualWorkspaceId, string filename, ActionResult error)> AuthorizeIsoAccess(string workspaceId, string path)
+    {
+        string actualWorkspaceId = workspaceId;
+        string filename;
+
+        if (path.Contains('/'))
+        {
+            var parts = path.Split('/');
+            actualWorkspaceId = parts[0];
+            filename = parts[1];
+        }
+        else
+        {
+            filename = path;
+        }
+
+        if (actualWorkspaceId != Guid.Empty.ToString())
+        {
+            if (!await workspaceService.CanEdit(actualWorkspaceId, Actor.Id) && !Actor.IsAdmin)
+                return (actualWorkspaceId, filename, Forbid());
+        }
+        else
+        {
+            if (!Actor.IsAdmin)
+                return (actualWorkspaceId, filename, Forbid());
+        }
+
+        return (actualWorkspaceId, filename, null);
     }
 
     private string BuildIsoFilePath(string workspaceKey, string filename)
