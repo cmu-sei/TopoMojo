@@ -16,3 +16,5 @@ jobs:
           github_app_private_key: ${{ secrets.CRUCIBLE_HELM_UPDATE_PRIVATE_KEY }}
           chart_file: charts/topomojo/charts/topomojo-api/Chart.yaml
           parent_chart_file: charts/topomojo/Chart.yaml
+          settings_file: src/TopoMojo.Api/appsettings.conf
+          settings_file_kind: dotnet-conf
