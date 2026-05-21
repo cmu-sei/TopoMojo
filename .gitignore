@@ -244,3 +244,6 @@ _Pvt_Extensions
 
 # FAKE - F# Make
 .fake/
+
+# Visual Studio language service cache
+*.csproj.lscache
