@@ -532,22 +532,14 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             var node = await GetRandomNode();
 
-            var storageContent = await _pveClient
+            var task = await _pveClient
                 .Nodes[node]
                 .Storage[_config.IsoStore]
                 .Content
-                .GetAsync();
+                .Index(content: "iso");
+            await _pveClient.WaitForTaskToFinish(task);
 
-            var isos = storageContent
-                .Where(x => x.Content == "iso")
-                .Select(x => new PveIso
-                {
-                    Volid = $"{_config.IsoStore}:{x.FileName}",
-                    Format = x.Format,
-                    Content = x.Content,
-                    Size = x.Size
-                })
-                .ToArray();
+            var isos = task.ToModel<PveIso[]>();
 
             return isos;
         }

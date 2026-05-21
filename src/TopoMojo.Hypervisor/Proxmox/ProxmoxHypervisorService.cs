@@ -115,7 +115,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (template.Iso.HasValue())
             {
                 var isoPath = template.Iso.Replace('/', '#');
-                isoPath = $"{option.IsoStore.Replace("/", string.Empty)}:{isoPath}";
+                isoPath = $"{option.IsoStore.Replace("/", string.Empty)}:iso/{isoPath}";
                 template.Iso = isoPath;
             }
 
