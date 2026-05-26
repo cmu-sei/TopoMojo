@@ -61,7 +61,6 @@ Pod__PoolPath: <datacenter>/<cluster>
  
 #### Optional Settings
 
-Pod__ConsoleUrl:
 ## range of vlan id's available to topomojo; i.e. [200-399]
 # Pod__Vlan__Range =
 Pod__Vlan__Range: [100-200]
