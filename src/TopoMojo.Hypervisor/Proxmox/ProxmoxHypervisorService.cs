@@ -520,10 +520,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public Task DeleteFileFromDatastore(string datastorePath)
         {
-            // Proxmox uses NFS-mounted local filesystem
-            // Files are deleted directly via File.Delete() in FileController
-            // No datastore API needed
-            return Task.CompletedTask;
+            throw new NotSupportedException("Proxmox does not support datastore API operations");
         }
 
         [GeneratedRegex("#.*")]

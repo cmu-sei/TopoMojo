@@ -328,6 +328,10 @@ public class FileController(
                     System.IO.File.Delete(filePath);
                     Logger.LogInformation("Deleted local ISO: {filePath}", filePath);
                 }
+                else
+                {
+                    return NotFound($"ISO file not found: {path}");
+                }
             }
 
             return Json(true);
@@ -338,8 +342,8 @@ public class FileController(
         }
         catch (UnauthorizedAccessException ex)
         {
-            Logger.LogError(ex, "ISO delete failed - access denied: workspace={workspaceId}, path={path}", actualWorkspaceId, path);
-            return StatusCode(403, "Access denied");
+            Logger.LogError(ex, "ISO delete failed - filesystem access denied: workspace={workspaceId}, path={path}", actualWorkspaceId, path);
+            return StatusCode(500, "Server cannot access file");
         }
         catch (Exception ex)
         {
@@ -358,6 +362,8 @@ public class FileController(
             var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length != 2)
                 return (null, null, BadRequest("Invalid ISO path format"));
+            if (parts[0] != workspaceId)
+                return (null, null, BadRequest("Path workspace ID does not match route"));
             actualWorkspaceId = parts[0];
             filename = parts[1];
         }
@@ -365,6 +371,9 @@ public class FileController(
         {
             filename = path;
         }
+
+        if (!Guid.TryParse(actualWorkspaceId, out _))
+            return (null, null, BadRequest("Invalid workspace ID format"));
 
         if (actualWorkspaceId != Guid.Empty.ToString())
         {
