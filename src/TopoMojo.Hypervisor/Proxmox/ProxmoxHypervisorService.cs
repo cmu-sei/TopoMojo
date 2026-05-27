@@ -464,11 +464,11 @@ namespace TopoMojo.Hypervisor.Proxmox
             return new VmOptions
             {
                 Iso = isos
+                    .Where(x => x.Name.Contains('#') || x.Name.StartsWith(Guid.Empty.ToString())) // Exclude root-level ISOs
                     .Where(x =>
                         key == Guid.Empty.ToString() ||                      // Global request: return all
                         x.Name.StartsWith(key) ||                            // Workspace ISOs
-                        !x.Name.Contains('#') ||                             // Global ISOs (no prefix)
-                        x.Name.StartsWith(Guid.Empty.ToString())             // Global ISOs (with 00000... prefix)
+                        x.Name.StartsWith(Guid.Empty.ToString())             // Global ISOs
                     )
                     .Select(x => x.DisplayName)
                     .ToArray()

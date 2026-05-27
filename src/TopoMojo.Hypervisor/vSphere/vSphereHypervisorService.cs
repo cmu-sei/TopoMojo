@@ -467,7 +467,10 @@ namespace TopoMojo.Hypervisor.vSphere
                 await host.GetFiles(host.Options.IsoStore + "*.iso", true)
             );
 
-            isos = isos.Select(x => x.Replace(host.Options.IsoStore, "").Trim()).ToList();
+            isos = isos
+                .Select(x => x.Replace(host.Options.IsoStore, "").Trim())
+                .Where(x => x.Contains('/'))
+                .ToList();
 
             return new VmOptions
             {
