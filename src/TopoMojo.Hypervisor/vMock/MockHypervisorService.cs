@@ -438,6 +438,11 @@ namespace TopoMojo.Hypervisor.vMock
             };
             return opt;
         }
+        public Task<VmOptions> GetAllIsoOptions()
+        {
+            return GetVmIsoOptions(Guid.Empty.ToString());
+        }
+
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
             await Task.Delay(0);
@@ -526,6 +531,11 @@ namespace TopoMojo.Hypervisor.vMock
         public Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
         {
             throw new NotSupportedException("Mock hypervisor does not support datastore uploads");
+        }
+
+        public Task DeleteFileFromDatastore(string datastorePath)
+        {
+            throw new NotSupportedException("Mock hypervisor does not support datastore operations");
         }
 
         [GeneratedRegex("(]|/)$")]

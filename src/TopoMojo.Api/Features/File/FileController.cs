@@ -5,6 +5,7 @@ using DiscUtils.Iso9660;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Api.Services;
 using TopoMojo.Api.Hubs;
@@ -21,7 +22,9 @@ public class FileController(
     IFileUploadMonitor monitor,
     FileUploadOptions uploadOptions,
     WorkspaceService workspaceService,
-    TopoMojo.Hypervisor.IHypervisorService hypervisorService
+    TopoMojo.Hypervisor.IHypervisorService hypervisorService,
+    ITemplateStore templateStore,
+    IGamespaceStore gamespaceStore
     ) : BaseController(logger, hub)
 {
     private static class Meta
@@ -175,12 +178,12 @@ public class FileController(
 
             return Path.Combine(
                 path,
-                filename.Replace(" ", "").SanitizeFilename()
+                SanitizeIsoFilename(filename)
             );
         }
         else
         {
-            var fileName = $"{key.SanitizePath()}#{filename.Replace(" ", "").SanitizeFilename()}";
+            var fileName = $"{key.SanitizePath()}#{SanitizeIsoFilename(filename)}";
             return Path.Combine(uploadOptions.IsoRoot, fileName);
         }
     }
@@ -203,12 +206,12 @@ public class FileController(
 
             return Path.Combine(
                 path,
-                filename.Replace(" ", "").SanitizeFilename()
+                SanitizeIsoFilename(filename)
             );
         }
         else
         {
-            var fileName = $"{key.SanitizePath()}#{Actor.Id}#{filename.Replace(" ", "").SanitizeFilename()}";
+            var fileName = $"{key.SanitizePath()}#{Actor.Id}#{SanitizeIsoFilename(filename)}";
             return Path.Combine(uploadOptions.TempRoot, fileName);
         }
     }
@@ -216,7 +219,7 @@ public class FileController(
     private string ConvertToDatastorePath(string filename, string key)
     {
         string isoStore = hypervisorService.Options.IsoStore.TrimEnd('/');
-        string sanitizedFilename = filename.Replace(" ", "").SanitizeFilename();
+        string sanitizedFilename = SanitizeIsoFilename(filename);
 
         if (uploadOptions.SupportsSubfolders)
         {
@@ -264,6 +267,148 @@ public class FileController(
             System.IO.File.Delete(tempFilePath);
         if (System.IO.File.Exists(tempFilePath + Meta.IsoFileExtension))
             System.IO.File.Delete(tempFilePath + Meta.IsoFileExtension);
+    }
+
+    [HttpGet("api/workspace/{workspaceId}/iso-usage")]
+    [SwaggerOperation(OperationId = "GetIsoUsage")]
+    [Authorize]
+    public async Task<ActionResult<IsoUsageReport>> GetIsoUsage(string workspaceId, [FromQuery] string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return BadRequest("ISO path is required");
+
+        var (actualWorkspaceId, filename, error) = await AuthorizeIsoAccess(workspaceId, path);
+        if (error != null) return error;
+
+        var templates = await templateStore.FindByIso(path);
+        var activeGamespaces = await gamespaceStore.FindActiveByIso(path);
+
+        return Ok(new IsoUsageReport
+        {
+            Templates = templates.Select(t => new IsoUsageReport.TemplateReference
+            {
+                Id = t.Id,
+                Name = t.Name,
+                WorkspaceName = t.Workspace?.Name ?? "(deleted)"
+            }).ToList(),
+            ActiveGamespaces = activeGamespaces.Select(g => new IsoUsageReport.GamespaceReference
+            {
+                Id = g.Id,
+                Name = g.Name
+            }).ToList()
+        });
+    }
+
+    [HttpDelete("api/workspace/{workspaceId}/iso")]
+    [SwaggerOperation(OperationId = "DeleteWorkspaceIso")]
+    [Authorize]
+    public async Task<ActionResult<bool>> DeleteWorkspaceIso(string workspaceId, [FromQuery] string path)
+    {
+        if (string.IsNullOrWhiteSpace(workspaceId) || string.IsNullOrWhiteSpace(path))
+            return BadRequest("Workspace ID and ISO path are required");
+
+        var (actualWorkspaceId, filename, error) = await AuthorizeIsoAccess(workspaceId, path);
+        if (error != null) return error;
+
+        try
+        {
+            Logger.LogInformation("Deleting ISO: workspace={workspaceId}, file={filename}", actualWorkspaceId, filename);
+
+            if (uploadOptions.UseDatastoreApi)
+            {
+                string datastorePath = ConvertToDatastorePath(filename, actualWorkspaceId);
+                await hypervisorService.DeleteFileFromDatastore(datastorePath);
+                Logger.LogInformation("Deleted datastore ISO: {datastorePath}", datastorePath);
+            }
+            else
+            {
+                string filePath = BuildIsoFilePath(actualWorkspaceId, filename);
+                if (System.IO.File.Exists(filePath))
+                {
+                    System.IO.File.Delete(filePath);
+                    Logger.LogInformation("Deleted local ISO: {filePath}", filePath);
+                }
+                else
+                {
+                    return NotFound($"ISO file not found: {path}");
+                }
+            }
+
+            return Json(true);
+        }
+        catch (FileNotFoundException)
+        {
+            return NotFound($"ISO file not found: {path}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Logger.LogError(ex, "ISO delete failed - filesystem access denied: workspace={workspaceId}, path={path}", actualWorkspaceId, path);
+            return StatusCode(500, "Server cannot access file");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ISO delete failed: workspace={workspaceId}, path={path}", actualWorkspaceId, path);
+            return StatusCode(500, $"Failed to delete ISO: {ex.Message}");
+        }
+    }
+
+    private async Task<(string actualWorkspaceId, string filename, ActionResult error)> AuthorizeIsoAccess(string workspaceId, string path)
+    {
+        string actualWorkspaceId = workspaceId;
+        string filename;
+
+        if (path.Contains('/'))
+        {
+            var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2)
+                return (null, null, BadRequest("Invalid ISO path format"));
+            if (parts[0] != workspaceId)
+                return (null, null, BadRequest("Path workspace ID does not match route"));
+            actualWorkspaceId = parts[0];
+            filename = parts[1];
+        }
+        else
+        {
+            filename = path;
+        }
+
+        if (!Guid.TryParse(actualWorkspaceId, out _))
+            return (null, null, BadRequest("Invalid workspace ID format"));
+
+        if (actualWorkspaceId != Guid.Empty.ToString())
+        {
+            if (!await workspaceService.CanEdit(actualWorkspaceId, Actor.Id) && !Actor.IsAdmin)
+                return (actualWorkspaceId, filename, Forbid());
+        }
+        else
+        {
+            if (!Actor.IsAdmin)
+                return (actualWorkspaceId, filename, Forbid());
+        }
+
+        return (actualWorkspaceId, filename, null);
+    }
+
+    private static string SanitizeIsoFilename(string filename)
+        => filename.Replace(" ", "").SanitizeFilename();
+
+    private string BuildIsoFilePath(string workspaceKey, string filename)
+    {
+        string sanitizedFilename = SanitizeIsoFilename(filename);
+
+        if (uploadOptions.SupportsSubfolders)
+        {
+            return Path.Combine(
+                uploadOptions.IsoRoot,
+                workspaceKey.SanitizePath(),
+                sanitizedFilename
+            );
+        }
+        else
+        {
+            string flatName = $"{workspaceKey.SanitizePath()}#{sanitizedFilename}";
+            return Path.Combine(uploadOptions.IsoRoot, flatName);
+        }
     }
 
 }
