@@ -464,10 +464,20 @@ namespace TopoMojo.Hypervisor.Proxmox
             return new VmOptions
             {
                 Iso = isos
-                    .Where(x => x.Name.StartsWith(key) || x.Name.StartsWith(Guid.Empty.ToString()))
+                    .Where(x => x.Name.Contains('#') || x.Name.StartsWith(Guid.Empty.ToString())) // Exclude root-level ISOs
+                    .Where(x =>
+                        key == Guid.Empty.ToString() ||                      // Global request: return all
+                        x.Name.StartsWith(key) ||                            // Workspace ISOs
+                        x.Name.StartsWith(Guid.Empty.ToString())             // Global ISOs
+                    )
                     .Select(x => x.DisplayName)
                     .ToArray()
             };
+        }
+
+        public Task<VmOptions> GetAllIsoOptions()
+        {
+            return GetVmIsoOptions(Guid.Empty.ToString());
         }
 
         public Task ReloadHost(string host)
@@ -506,6 +516,11 @@ namespace TopoMojo.Hypervisor.Proxmox
         public Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
         {
             throw new NotSupportedException("Proxmox uses local filesystem mounts, not API uploads");
+        }
+
+        public Task DeleteFileFromDatastore(string datastorePath)
+        {
+            throw new NotSupportedException("Proxmox does not support datastore API operations");
         }
 
         [GeneratedRegex("#.*")]

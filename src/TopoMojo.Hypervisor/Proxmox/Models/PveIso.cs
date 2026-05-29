@@ -15,7 +15,10 @@ namespace TopoMojo.Hypervisor.Proxmox.Models
         {
             get
             {
-                return this.Volid.Split('/')[1];
+                // Volid format: "storage:iso/filename.iso" or "storage:/iso/filename.iso"
+                // Extract just the filename (last part after final /)
+                var parts = this.Volid.Split('/');
+                return parts[parts.Length - 1];
             }
         }
 

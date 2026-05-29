@@ -11,5 +11,6 @@ namespace TopoMojo.Api.Data.Abstractions
         Task<bool> AtTemplateLimit(string workspaceId);
         Task<Template[]> ListChildren(string parentId);
         Task<string> ResolveKey(string key);
+        Task<Template[]> FindByIso(string isoPath);
     }
 }

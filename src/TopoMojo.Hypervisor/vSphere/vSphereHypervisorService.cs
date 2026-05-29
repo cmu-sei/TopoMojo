@@ -439,12 +439,38 @@ namespace TopoMojo.Hypervisor.vSphere
             isos.AddRange(
                 await host.GetFiles(host.Options.IsoStore + id + "/*.iso", false)
             );
-            isos.AddRange(
-                await host.GetFiles(host.Options.IsoStore + publicFolder + "/*.iso", false)
-            );
+
+            // Only add public folder if we're not already querying it
+            if (id != publicFolder)
+            {
+                isos.AddRange(
+                    await host.GetFiles(host.Options.IsoStore + publicFolder + "/*.iso", false)
+                );
+            }
 
             //translate actual path to display path
             isos = isos.Select(x => x.Replace(host.Options.IsoStore, "").Trim()).ToList();
+
+            return new VmOptions
+            {
+                Iso = [.. isos]
+            };
+        }
+
+        public async Task<VmOptions> GetAllIsoOptions()
+        {
+            VimClient host = FindHostByRandom();
+
+            List<string> isos = [];
+
+            isos.AddRange(
+                await host.GetFiles(host.Options.IsoStore + "*.iso", true)
+            );
+
+            isos = isos
+                .Select(x => x.Replace(host.Options.IsoStore, "").Trim())
+                .Where(x => x.Contains('/'))
+                .ToList();
 
             return new VmOptions
             {
@@ -689,7 +715,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         private async Task DeployBatch(DeploymentContext ctx)
         {
-            DateTimeOffset  st = DateTimeOffset.UtcNow;
+            DateTimeOffset st = DateTimeOffset.UtcNow;
 
             _logger.LogDebug("DeployBatch: start {id}", ctx.Id);
 
@@ -703,7 +729,8 @@ namespace TopoMojo.Hypervisor.vSphere
 
             if (_hostCache.Count == 1 && _hostCache.First().Value.Options.IsNsxNetwork)
             {
-                if (existing.Any()) {
+                if (existing.Any())
+                {
                     await _hostCache.First().Value.Delete(ctx.Id);
                     missing = [.. ctx.Templates];
                 }
@@ -753,6 +780,14 @@ namespace TopoMojo.Hypervisor.vSphere
                 ?? throw new InvalidOperationException("Cannot upload to datastore: no vSphere connections available.");
 
             return await client.UploadFileToDatastore(datastorePath, localFilePath);
+        }
+
+        public async Task DeleteFileFromDatastore(string datastorePath)
+        {
+            var client = _hostCache.Values.FirstOrDefault()
+                ?? throw new InvalidOperationException("Cannot delete from datastore: no vSphere connections available.");
+
+            await client.DeleteFileFromDatastore(datastorePath);
         }
 
         [GeneratedRegex(@"\[[\d-,]*\]")]

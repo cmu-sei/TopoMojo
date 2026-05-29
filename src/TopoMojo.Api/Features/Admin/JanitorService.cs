@@ -121,12 +121,28 @@ namespace TopoMojo.Api.Services
                 );
             }
 
-            return workspaces.Select(g => new JanitorReport
+            // Load full workspace details with workers and templates to get owner and VM count
+            var workspaceIds = workspaces.Select(w => w.Id).ToArray();
+            var workspacesWithDetails = await _workspaceStore.List()
+                .Where(w => workspaceIds.Contains(w.Id))
+                .Include(w => w.Workers)
+                .Include(w => w.Templates)
+                .ToListAsync();
+
+            return workspaces.Select(g =>
             {
-                Reason = reason,
-                Id = g.Id,
-                Name = g.Name,
-                Age = g.LastActivity
+                var details = workspacesWithDetails.FirstOrDefault(w => w.Id == g.Id);
+                var owner = details?.Workers.FirstOrDefault(w => w.CanManage);
+
+                return new JanitorReport
+                {
+                    Reason = reason,
+                    Id = g.Id,
+                    Name = g.Name,
+                    Age = g.LastActivity,
+                    OwnerName = owner?.SubjectName ?? "Unknown",
+                    VmCount = details?.Templates.Count ?? 0
+                };
             }).ToArray();
         }
 
@@ -138,6 +154,8 @@ namespace TopoMojo.Api.Services
             );
 
             var workspaces = await _workspaceStore.List()
+                .Include(w => w.Workers)
+                .Include(w => w.Templates)
                 .Where(w =>
                     w.LastActivity > previousWindow
                     && w.LastActivity < keepAliveDate
@@ -152,12 +170,19 @@ namespace TopoMojo.Api.Services
                 );
             }
 
-            return workspaces.Select(g => new JanitorReport
+            return workspaces.Select(g =>
             {
-                Reason = "IdleWorkspaceVms",
-                Id = g.Id,
-                Name = g.Name,
-                Age = g.LastActivity
+                var owner = g.Workers.FirstOrDefault(w => w.CanManage);
+
+                return new JanitorReport
+                {
+                    Reason = "IdleWorkspaceVms",
+                    Id = g.Id,
+                    Name = g.Name,
+                    Age = g.LastActivity,
+                    OwnerName = owner?.SubjectName ?? "Unknown",
+                    VmCount = g.Templates.Count
+                };
             }).ToArray();
         }
 
