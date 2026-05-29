@@ -9,5 +9,7 @@ namespace TopoMojo.Api.Models
         public string Name { get; set; }
         public string Reason { get; set; }
         public DateTimeOffset Age { get; set; }
+        public string OwnerName { get; set; }
+        public int VmCount { get; set; }
     }
 }
