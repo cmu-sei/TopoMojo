@@ -975,12 +975,9 @@ namespace TopoMojo.Api.Services
 
         private ChallengeView MapChallengeView(ChallengeSpec spec, int variantIndex, int sectionIndex)
         {
-            if (variantIndex > spec.Variants.Count)
-            {
-                variantIndex = 0;
-            }
-
-            var variant = spec.Variants.ElementAt(variantIndex);
+            // Note: variantIndex parameter is unused. Challenge data comes from spec.Challenge (the selected variant),
+            // not from spec.Variants array. Removed dead code that accessed spec.Variants.ElementAt(variantIndex)
+            // to fix NullReferenceException when loading imported gamespaces with empty Variants arrays.
             var section = spec.Challenge.Sections?.ElementAtOrDefault(sectionIndex) ?? new SectionSpec();
 
             var challenge = new ChallengeView
