@@ -610,7 +610,7 @@ namespace TopoMojo.Api.Services
                     .FirstOrDefault()?.SetIndex ?? 0;
 
                 // map challenge to safe model
-                state.Challenge = MapChallengeView(spec, gamespace.Variant, activeSectionIndex);
+                state.Challenge = MapChallengeView(spec, activeSectionIndex);
             }
 
             return state;
@@ -973,14 +973,8 @@ namespace TopoMojo.Api.Services
 
         }
 
-        private ChallengeView MapChallengeView(ChallengeSpec spec, int variantIndex, int sectionIndex)
+        private ChallengeView MapChallengeView(ChallengeSpec spec, int sectionIndex)
         {
-            if (variantIndex > spec.Variants.Count)
-            {
-                variantIndex = 0;
-            }
-
-            var variant = spec.Variants.ElementAt(variantIndex);
             var section = spec.Challenge.Sections?.ElementAtOrDefault(sectionIndex) ?? new SectionSpec();
 
             var challenge = new ChallengeView
