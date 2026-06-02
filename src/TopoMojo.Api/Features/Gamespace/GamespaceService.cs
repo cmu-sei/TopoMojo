@@ -610,7 +610,7 @@ namespace TopoMojo.Api.Services
                     .FirstOrDefault()?.SetIndex ?? 0;
 
                 // map challenge to safe model
-                state.Challenge = MapChallengeView(spec, gamespace.Variant, activeSectionIndex);
+                state.Challenge = MapChallengeView(spec, activeSectionIndex);
             }
 
             return state;
@@ -973,11 +973,8 @@ namespace TopoMojo.Api.Services
 
         }
 
-        private ChallengeView MapChallengeView(ChallengeSpec spec, int variantIndex, int sectionIndex)
+        private ChallengeView MapChallengeView(ChallengeSpec spec, int sectionIndex)
         {
-            // Note: variantIndex parameter is unused. Challenge data comes from spec.Challenge (the selected variant),
-            // not from spec.Variants array. Removed dead code that accessed spec.Variants.ElementAt(variantIndex)
-            // to fix NullReferenceException when loading imported gamespaces with empty Variants arrays.
             var section = spec.Challenge.Sections?.ElementAtOrDefault(sectionIndex) ?? new SectionSpec();
 
             var challenge = new ChallengeView
