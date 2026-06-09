@@ -182,7 +182,7 @@ namespace TopoMojo.Api.Services
                 MaxPoints = spec.MaxPoints,
                 NextSectionPreReqThisSection = nextSectionPreReqThisSection,
                 NextSectionPreReqTotal = nextSectionPreReqTotal,
-                Score = WeightToPoints(spec.Score, spec.MaxPoints),
+                Score = spec.Score * spec.MaxPoints,
                 Text = string.Join("\n\n", spec.Text, spec.Challenge.Text),
                 Variant = mappedVariant
             };
