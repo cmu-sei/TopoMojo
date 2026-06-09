@@ -60,6 +60,7 @@ namespace TopoMojo.Api.Models
         public bool Hidden { get; set; }
         public bool IsCorrect { get; set; }
         public bool IsGraded { get; set; }
+        public bool HasIncorrectSubmission { get; set; }
     }
 
     public enum AnswerGrader

@@ -46,6 +46,10 @@ namespace TopoMojo.Api.Models
                 _ => a.First().Equals(c),
             };
             question.IsGraded = true;
+
+            // Track if this question was ever answered incorrectly for penalty calculation
+            if (!question.IsCorrect)
+                question.HasIncorrectSubmission = true;
         }
 
         public static void SetQuestionWeights(this VariantSpec spec)
