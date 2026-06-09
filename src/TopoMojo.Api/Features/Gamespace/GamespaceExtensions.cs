@@ -63,7 +63,10 @@ namespace TopoMojo.Api.Models
                 float total = Math.Max(max, 100);
 
                 foreach (var q in questions)
+                {
                     q.Weight /= total;
+                    q.Penalty /= total;  // normalize penalty to match weight scale
+                }
 
                 max = questions.Sum(q => q.Weight);
             }
