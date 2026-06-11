@@ -731,7 +731,7 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 if (existing.Any())
                 {
-                    await _hostCache.First().Value.Delete(ctx.Id);
+                    await DeleteAll(ctx.Id);
                     missing = [.. ctx.Templates];
                 }
 
