@@ -32,7 +32,8 @@ namespace TopoMojo.Hypervisor.vSphere
             }
 
             //can't actually be applied via ExtraConfig on 6.7
-            if (template.GuestSettings.Any(c => c.Key == "firmware" && c.Value == "efi"))
+            //match bare "firmware" or prefixed "guestinfo.firmware" since AddGuestSettings prepends "guestinfo." to keys entered via the Guest Settings field
+            if (template.GuestSettings.Any(c => (c.Key == "firmware" || c.Key == "guestinfo.firmware") && c.Value == "efi"))
                 vmcs.firmware = "efi";
 
             //can't actually be applied via ExtraConfig
