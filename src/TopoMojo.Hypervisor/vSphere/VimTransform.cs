@@ -309,7 +309,14 @@ namespace TopoMojo.Hypervisor.vSphere
                 options.Add(option);
             }
 
-            return [.. options];
+            // De-duplicate by key so the same setting supplied in both the Detail
+            // GuestSettings and the Guestinfo field doesn't emit a duplicate
+            // OptionValue, which vSphere rejects. Later entries win.
+            var deduped = new Dictionary<string, OptionValue>();
+            foreach (var option in options)
+                deduped[option.key] = option;
+
+            return [.. deduped.Values];
         }
 
         private static VirtualDeviceConfigSpec GetVideoController(ref int key, int ramKB)
