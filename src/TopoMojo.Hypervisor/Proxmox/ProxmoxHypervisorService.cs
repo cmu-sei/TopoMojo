@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Net.Http;
 using Microsoft.Extensions.Logging;
 using TopoMojo.Hypervisor.Extensions;
 
@@ -19,7 +20,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             IProxmoxNameService nameService,
             IProxmoxVlanManager vlanManager,
             ILoggerFactory mill,
-            Random random
+            Random random,
+            IHttpClientFactory httpClientFactory
         )
         {
             _options = options;
@@ -36,7 +38,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                 _mill.CreateLogger<ProxmoxClient>(),
                 nameService,
                 vlanManager,
-                random);
+                random,
+                httpClientFactory);
 
             _ = Task.Run(DeploymentHandler);
         }

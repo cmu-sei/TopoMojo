@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -29,7 +30,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             ILogger<ProxmoxClient> logger,
             IProxmoxNameService nameService,
             IProxmoxVlanManager vnetService,
-            Random random
+            Random random,
+            IHttpClientFactory httpClientFactory
         )
         {
             _logger = logger;
@@ -50,12 +52,12 @@ namespace TopoMojo.Hypervisor.Proxmox
             _config.Host = host;
             _hostPrefix = host.Split('.').FirstOrDefault();
 
-            _pveClient = new PveClient(host, port)
+            _pveClient = new PveClient(host, port, httpClientFactory.CreateClient("proxmox"))
             {
                 ApiToken = options.AccessToken
             };
 
-            _rootPveClient = new PveClient(host, port);
+            _rootPveClient = new PveClient(host, port, httpClientFactory.CreateClient("proxmox"));
 
             _nameService = nameService;
             _vlanManager = vnetService;

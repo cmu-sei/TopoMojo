@@ -2,6 +2,8 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
 using System.Reflection;
+using System.Net;
+using System.Net.Http;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using TopoMojo.Api;
@@ -145,6 +147,18 @@ namespace Microsoft.Extensions.DependencyInjection
                 .ConfigureHttpClient(client =>
                 {
                     client.Timeout = TimeSpan.FromMinutes(timeoutMinutes);
+                });
+
+            // Named HttpClient for Corsinvest's PveClient. Supplying no client causes the SDK to
+            // create its own HttpClient and handler, which prevents handler pooling and can
+            // exhaust sockets when Proxmox clients are recreated.
+            services.AddHttpClient("proxmox")
+                .ConfigurePrimaryHttpMessageHandler(() =>
+                {
+                    return new HttpClientHandler
+                    {
+                        AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+                    };
                 });
 
             if (string.IsNullOrWhiteSpace(config.Url))
