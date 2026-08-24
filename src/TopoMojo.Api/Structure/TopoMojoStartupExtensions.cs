@@ -155,10 +155,18 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddHttpClient("proxmox")
                 .ConfigurePrimaryHttpMessageHandler(() =>
                 {
-                    return new HttpClientHandler
+                    var handler = new HttpClientHandler
                     {
                         AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
                     };
+
+                    if (config.IgnoreCertificateErrors)
+                    {
+                        handler.ServerCertificateCustomValidationCallback =
+                            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+                    }
+
+                    return handler;
                 });
 
             if (string.IsNullOrWhiteSpace(config.Url))
