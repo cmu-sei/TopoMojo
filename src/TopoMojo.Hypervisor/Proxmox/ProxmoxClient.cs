@@ -61,7 +61,6 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             _nameService = nameService;
             _vlanManager = vnetService;
-            _enableHA = _config.EnableHA;
             _ = MonitorSession();
             _ = MonitorTasks();
         }
@@ -80,7 +79,6 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly PveClient _pveClient;
         private readonly PveClient _rootPveClient;
         private readonly Random _random;
-        private readonly bool _enableHA;
         private readonly object _lock = new();
         private const string deleteTag = "delete"; // tags are always lower-case
 
@@ -335,9 +333,17 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
 
-            if (_enableHA)
+            if (_config.EnableHA && !await RegisterHA(nextId, template.Name) && _config.RequireHA)
             {
-                await RegisterHA(nextId, template.Name);
+                // the create call may have failed after the resource was created, and a vm cannot
+                // be destroyed while it is an HA resource
+                await UnregisterHA(nextId);
+                _vmCache.TryRemove(vm.Id, out _);
+
+                var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
+                await _pveClient.WaitForTaskToFinish(destroyTask);
+
+                throw new HypervisorException($"Could not register vm {template.Name} ({nextId}) as a Proxmox HA resource, and Pod__RequireHA is set.");
             }
 
             if (template.AutoStart)
@@ -355,7 +361,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             // when a vm is HA managed, the HA manager owns its power state and will revert a
             // direct qemu start, so request the state change from it instead
-            if (!_enableHA || !await SetHAState(vm.Id, "started"))
+            if (!_config.EnableHA || !await SetHAState(vm.Id, "started"))
             {
                 var task = await _pveClient.Nodes[await GetCurrentNode(vm)].Qemu[vm.GetId()].Status.Start.VmStart();
                 await _pveClient.WaitForTaskToFinish(task);
@@ -372,7 +378,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             Vm vm = _vmCache[id];
 
-            if (!_enableHA || !await SetHAState(vm.Id, "stopped"))
+            if (!_config.EnableHA || !await SetHAState(vm.Id, "stopped"))
             {
                 var task = await _pveClient.Nodes[await GetCurrentNode(vm)].Qemu[vm.GetId()].Status.Stop.VmStop();
                 await _pveClient.WaitForTaskToFinish(task);
@@ -427,7 +433,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             var status = await _pveClient.Nodes[node].Qemu[pveId].Status.Current.GetAsync();
 
             // a vm cannot be destroyed while it is an HA resource, so this has to come first
-            if (_enableHA)
+            if (_config.EnableHA)
             {
                 await UnregisterHA(vm.Id);
             }
@@ -691,10 +697,11 @@ namespace TopoMojo.Hypervisor.Proxmox
         /// qemu power operations on resources it manages.
         /// </summary>
         /// <remarks>
-        /// A failure here is logged but not thrown. An unmanaged vm still works; it just won't be
-        /// rebalanced, which is better than failing the whole deployment.
+        /// A failure is logged rather than thrown, and the caller decides what to do with it. An
+        /// unmanaged vm still works; it just won't be rebalanced. See RequireHA.
         /// </remarks>
-        private async Task RegisterHA(string id, string comment)
+        /// <returns>False if the vm could not be registered.</returns>
+        private async Task<bool> RegisterHA(string id, string comment)
         {
             try
             {
@@ -709,10 +716,14 @@ namespace TopoMojo.Hypervisor.Proxmox
                 await _pveClient.WaitForTaskToFinish(task);
 
                 _logger.LogDebug("registered ha resource {sid} (auto_rebalance: {rebalance})", GetSid(id), _config.HaAutoRebalance);
+
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to register ha resource {sid}. The vm is deployed but will not be managed by the Proxmox HA manager or rebalanced by CRS.", GetSid(id));
+                _logger.LogError(ex, "Failed to register ha resource {sid}. The vm will not be managed by the Proxmox HA manager or rebalanced by CRS.", GetSid(id));
+
+                return false;
             }
         }
 
@@ -834,7 +845,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         /// </summary>
         private async Task<string> GetCurrentNode(Vm vm)
         {
-            if (!_enableHA)
+            if (!_config.EnableHA)
                 return vm.Host;
 
             try

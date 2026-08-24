@@ -39,6 +39,12 @@ namespace TopoMojo.Hypervisor
         public bool EnableHA { get; set; }
 
         /// <summary>
+        /// Proxmox only. Fail a deployment when a vm cannot be registered as an HA resource, rather
+        /// than deploying it un-managed. Has no effect unless EnableHA is set.
+        /// </summary>
+        public bool RequireHA { get; set; }
+
+        /// <summary>
         /// Proxmox only. Allow CRS to migrate HA managed vms during automatic rebalancing.
         /// Has no effect unless EnableHA is set.
         /// </summary>

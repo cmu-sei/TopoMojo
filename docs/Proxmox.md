@@ -122,6 +122,8 @@ This section describes the appsettings that will need to be set to configure Top
   - Set this to `true` to skip TLS certificate validation when talking to the Proxmox API. Debug use only.
 - Pod__EnableHA
   - Set this to `true` to deploy virtual machines as cluster HA resources. See [High Availability and CRS](#high-availability-and-crs) below.
+- Pod__RequireHA
+  - Set this to `true` to fail a deployment when a virtual machine cannot be registered as an HA resource, rather than deploying it un-managed. Has no effect unless `Pod__EnableHA` is set.
 - Pod__HaAutoRebalance
   - Defaults to `true`. Allows CRS to migrate HA managed virtual machines during automatic rebalancing. Has no effect unless `Pod__EnableHA` is set.
 - Pod__HaMaxRestart
@@ -169,7 +171,7 @@ Setting `Pod__EnableHA = true` registers each deployed virtual machine as an HA 
 - **Power state is owned by the HA manager.** TopoMojo requests `started`/`stopped` on the HA resource rather than calling QEMU directly.
 - Restarting a virtual machine from TopoMojo issues a QEMU reset rather than a stop followed by a start, because the HA manager would collapse two state requests made in quick succession.
 - A virtual machine may not be on the node it was cloned to. TopoMojo resolves the current node before console, save, reconfigure, and delete operations, so this is transparent.
-- If registering an HA resource fails, the deployment still succeeds; the virtual machine simply will not be HA managed or rebalanced. This is logged as an error.
+- If registering an HA resource fails, the deployment still succeeds by default; the virtual machine simply will not be HA managed or rebalanced, and the failure is logged as an error. Such a virtual machine is otherwise fully usable, since power operations fall back to calling QEMU directly. Set `Pod__RequireHA = true` to treat this as a fatal error instead, in which case the clone is destroyed and the deployment fails.
 
 ## Guest Settings
 
