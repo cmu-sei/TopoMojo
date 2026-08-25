@@ -268,6 +268,12 @@ namespace TopoMojo.Hypervisor.Proxmox
             return await _pveClient.Stop(vm.Id);
         }
 
+        private async Task<Vm> Reset(string id)
+        {
+            var vm = await LoadVm(id);
+            return await _pveClient.Reset(vm.Id);
+        }
+
         public async Task<Vm> Save(string id)
         {
             var vm = await LoadVm(id);
@@ -326,8 +332,16 @@ namespace TopoMojo.Hypervisor.Proxmox
                     break;
 
                 case VmOperationType.Reset:
-                    _ = await Stop(op.Id);
-                    vm = await Start(op.Id);
+                    if (Options.EnableHA)
+                    {
+                        // a stop/start pair would be collapsed into a no-op by the HA manager
+                        vm = await Reset(op.Id);
+                    }
+                    else
+                    {
+                        _ = await Stop(op.Id);
+                        vm = await Start(op.Id);
+                    }
                     break;
 
                 case VmOperationType.Stop:
@@ -387,9 +401,21 @@ namespace TopoMojo.Hypervisor.Proxmox
             return await _pveClient.PushVmConfigUpdate(vmId, configUpdate);
         }
 
-        public Task SetAffinity(string isolationTag, Vm[] vms, bool start)
+        public async Task SetAffinity(string isolationTag, Vm[] vms, bool start)
         {
-            throw new NotImplementedException();
+            // affinity is expressed as an HA resource-affinity rule, so the vms have to be HA resources
+            if (Options.EnableHA)
+            {
+                _logger.LogDebug("setaffinity: setting affinity for {tag}", isolationTag);
+                await _pveClient.SetPositiveAffinity(isolationTag, vms);
+            }
+            else
+            {
+                _logger.LogWarning("setaffinity: host affinity on Proxmox requires Pod__EnableHA, ignoring for {tag}", isolationTag);
+            }
+
+            if (start)
+                await Task.WhenAll(vms.Select(vm => Start(vm.Id)));
         }
 
         public async Task<Vm> Refresh(VmTemplate template)
@@ -506,6 +532,13 @@ namespace TopoMojo.Hypervisor.Proxmox
                 tasks.Add(Deploy(template, ctx.Privileged));
 
             await Task.WhenAll(tasks.ToArray());
+
+            if (ctx.Affinity)
+            {
+                // templates with host affinity are deployed with AutoStart off, so SetAffinity
+                // starts them after the rule is in place
+                await SetAffinity(ctx.Id, [.. tasks.Select(t => t.Result).Where(vm => vm != null)], true);
+            }
         }
 
         public async Task Deploy(DeploymentContext ctx, bool wait = false)

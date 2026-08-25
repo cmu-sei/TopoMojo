@@ -30,6 +30,38 @@ namespace TopoMojo.Hypervisor
         public bool DebugVerbose { get; set; }
         public bool IgnoreCertificateErrors { get; set; }
         public string SDNZone { get; set; } = "topomojo";
+
+        /// <summary>
+        /// Proxmox only. Register deployed vms as cluster HA resources, which is what allows
+        /// Proxmox's Cluster Resource Scheduler (CRS) to place and rebalance them.
+        /// Requires PVE 9 and shared vm storage. See docs/Proxmox.md.
+        /// </summary>
+        public bool EnableHA { get; set; }
+
+        /// <summary>
+        /// Proxmox only. Fail a deployment when a vm cannot be registered as an HA resource, rather
+        /// than deploying it un-managed. Has no effect unless EnableHA is set.
+        /// </summary>
+        public bool RequireHA { get; set; }
+
+        /// <summary>
+        /// Proxmox only. Allow CRS to migrate HA managed vms during automatic rebalancing.
+        /// Has no effect unless EnableHA is set.
+        /// </summary>
+        public bool HaAutoRebalance { get; set; } = true;
+
+        /// <summary>
+        /// Proxmox only. Maximum tries to restart an HA resource on a node after a failed start.
+        /// Null uses the Proxmox default. Has no effect unless EnableHA is set.
+        /// </summary>
+        public int? HaMaxRestart { get; set; }
+
+        /// <summary>
+        /// Proxmox only. Maximum tries to relocate an HA resource that fails to start.
+        /// Null uses the Proxmox default. Has no effect unless EnableHA is set.
+        /// </summary>
+        public int? HaMaxRelocate { get; set; }
+
         public SddcConfiguration Sddc { get; set; } = new SddcConfiguration();
     }
 

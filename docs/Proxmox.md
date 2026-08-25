@@ -90,7 +90,7 @@ server {
     - The certificate location `/etc/pve/local` gets mounted by proxmox and the nginx service may fail with the indication nginx.conf is invalid if it tries to start before the pve-cluster.service loads.
     - Add `pve-cluster.service` at the end of the `After=` line.
     - At the bottom of the `[Unit]` section, add `Requires=pve-cluster.service`.
-    - After saving the file and exiting, type `systemctl daemon-reload` and press Enter.    
+    - After saving the file and exiting, type `systemctl daemon-reload` and press Enter.
 
 ## TopoMojo Setup
 
@@ -118,6 +118,18 @@ This section describes the appsettings that will need to be set to configure Top
   - The integer number of milliseconds TopoMojo will wait after a virtual network operation is initiated before reloading Proxmox's SDN. As reloading is a synchronous process that can take up 10 seconds, we offer this setting to reduce aggregate wait times by debouncing changes into batches.
 - Pod__Vlan__ResetDebounceMaxDuration
   - The integer number of milliseconds that describes the maximum amount of time TopoMojo will debounce before it reloads Proxmox's SDN following a network operation.
+- Pod__IgnoreCertificateErrors
+  - Set this to `true` to skip TLS certificate validation when talking to the Proxmox API. Debug use only.
+- Pod__EnableHA
+  - Set this to `true` to deploy virtual machines as cluster HA resources. See [High Availability and CRS](#high-availability-and-crs) below.
+- Pod__RequireHA
+  - Set this to `true` to fail a deployment when a virtual machine cannot be registered as an HA resource, rather than deploying it un-managed. Has no effect unless `Pod__EnableHA` is set.
+- Pod__HaAutoRebalance
+  - Defaults to `true`. Allows CRS to migrate HA managed virtual machines during automatic rebalancing. Has no effect unless `Pod__EnableHA` is set.
+- Pod__HaMaxRestart
+  - The maximum number of times the HA manager will try to restart a virtual machine on a node after a failed start. Leave unset to use the Proxmox default. Has no effect unless `Pod__EnableHA` is set.
+- Pod__HaMaxRelocate
+  - The maximum number of times the HA manager will try to relocate a virtual machine that fails to start. Leave unset to use the Proxmox default. Has no effect unless `Pod__EnableHA` is set.
 
 #### ISOs
 
@@ -133,6 +145,33 @@ TopoMojo can optionally allow uploading of ISO files that can be mounted to virt
     - e.g. `/mnt/isos/template/iso`
 - FileUpload_SupportsSubFolders
     - Set this to `false` for Proxmox since Proxmox does not allow sub folders in it's ISO stores
+
+## High Availability and CRS
+
+By default TopoMojo picks a node itself when it deploys a virtual machine, and the virtual machine stays on that node for its lifetime. Proxmox's [Cluster Resource Scheduler (CRS)](https://pve.proxmox.com/wiki/High_Availability#ha_manager_crs) only places and rebalances virtual machines that are registered as cluster HA resources, so it has no effect on a default TopoMojo installation.
+
+Setting `Pod__EnableHA = true` registers each deployed virtual machine as an HA resource (`vm:<vmid>`) with `auto_rebalance` enabled, which lets CRS choose the node a virtual machine starts on and move it later as cluster load changes.
+
+### Prerequisites
+
+- A Proxmox **9** cluster. HA rules and the per-resource `auto_rebalance` option are PVE 9 features.
+- At least three nodes, so the cluster can hold quorum. The HA manager will fence resources on a node that loses quorum.
+- Virtual machine disks on **shared** storage (Ceph, NFS, iSCSI). TopoMojo deploys workspace and gamespace virtual machines as linked clones of a Proxmox template, and a linked clone on node-local storage cannot be migrated, so CRS will be unable to rebalance it.
+- CRS itself is configured on the Proxmox side, in `/etc/pve/datacenter.cfg`. For example:
+
+    ```
+    crs: ha=static,ha-rebalance-on-start=1
+    ```
+
+    `ha-rebalance-on-start=1` is what makes CRS pick the best node at the moment a virtual machine is started, rather than only on recovery.
+- Virtual machines with the VNC clipboard enabled (see [Clipboard Support](#clipboard-support)) can only be live migrated as of PVE 9.1, and only when the virtual machine's QEMU machine version is 10.1 or later. A virtual machine pinned to an older machine version will not be moved by CRS. See [Updating Existing Templates for Migration](#updating-existing-templates-for-migration) if you have templates created before PVE 9.1.
+
+### Behavior changes when HA is enabled
+
+- **Power state is owned by the HA manager.** TopoMojo requests `started`/`stopped` on the HA resource rather than calling QEMU directly.
+- Restarting a virtual machine from TopoMojo issues a QEMU reset rather than a stop followed by a start, because the HA manager would collapse two state requests made in quick succession.
+- A virtual machine may not be on the node it was cloned to. TopoMojo resolves the current node before console, save, reconfigure, and delete operations, so this is transparent.
+- If registering an HA resource fails, the deployment still succeeds by default; the virtual machine simply will not be HA managed or rebalanced, and the failure is logged as an error. Such a virtual machine is otherwise fully usable, since power operations fall back to calling QEMU directly. Set `Pod__RequireHA = true` to treat this as a fatal error instead, in which case the clone is destroyed and the deployment fails.
 
 ## Guest Settings
 
@@ -160,7 +199,40 @@ TopoMojo supports clipboard access to Proxmox Virtual machines, if the appropria
 
 - On the Proxmox template, the VNC Clipboard must be enabled.
     - To do this, in the template's Hardware tab, Edit the Display and set Clipboard to VNC
-        - There is currently a known QEMU limitation where a virtual machine with the Clipboard set to VNC cannot be migrated to another Node. You may need to temporarily disable the VNC clipboard, perform the migration, and re-enable it if you need to move a vm to another Node.
+        - Before PVE 9.1, a virtual machine with the Clipboard set to VNC could not be migrated to another Node. PVE 9.1 allows live migration of these virtual machines, but only when the virtual machine's QEMU machine version is 10.1 or later. On older versions, or with an older machine version, you may need to temporarily disable the VNC clipboard, perform the migration, and re-enable it if you need to move a vm to another Node. See [Updating Existing Templates for Migration](#updating-existing-templates-for-migration).
 - The [SPICE Guest Tools](https://www.spice-space.org/download.html) must be installed in the virtual machines
     - This is installed by default on some Linux distributions.
     - This must be installed manually in Windows and has been tested and works the same as Linux clipboard support.
+
+### Updating Existing Templates for Migration
+
+If you are enabling [High Availability and CRS](#high-availability-and-crs) on a cluster with templates that predate PVE 9.1, those templates may produce clones that CRS cannot migrate. Live migration of a virtual machine with the VNC clipboard enabled requires a QEMU machine version of 10.1 or later, and a template's machine version is inherited by every clone made from it.
+
+Check what a template is currently using:
+
+```
+qm config <template_vmid> | grep machine
+```
+
+- If there is no `machine` line, the template is unpinned and clones will boot with the newest machine version the node's QEMU supports. Nothing needs to change, as long as every node in the cluster is on PVE 9.1 or later.
+- If the line names an older version, e.g. `machine: pc-q35-8.1`, clones are pinned to that version and will not be migratable with the VNC clipboard enabled.
+
+To move a pinned template forward:
+
+```
+qm set <template_vmid> --machine pc-q35-10.1
+```
+
+Alternatively, for non-Windows templates, remove the pin so clones always use the newest machine version available on the node they start on:
+
+```
+qm set <template_vmid> --delete machine
+```
+
+Caveats:
+
+- Proxmox pins the machine version at creation time for Windows guests because Windows is sensitive to virtual hardware changes, even across cold boots. Do not unpin a Windows template. Raising the pinned version on a Windows template can require driver reinstallation and may trigger reactivation, so back the template up first and boot a clone to verify it before publishing workspaces that use it.
+- Changing the template only affects clones made afterward. Virtual machines already deployed from the old template keep the old machine version; redeploy the workspace or gamespace to pick up the change.
+- The machine version of an existing snapshot cannot be changed.
+
+See [Machine Type](https://pve.proxmox.com/pve-docs/chapter-qm.html#qm_machine_type) in the Proxmox documentation for details.
