@@ -773,10 +773,14 @@ namespace TopoMojo.Hypervisor.vSphere
                 DeploymentCollection.Add(ctx);
         }
 
-        public bool SupportsSubfolders => true;
+        public string GetIsoStorePath(string scopeId, string fileName)
+            => $"{SanitizeDatastoreSegment(scopeId)}/{SanitizeIsoFilename(fileName)}";
+
+        public IReadOnlyList<string> GetIsoStorePathCandidates(string scopeId, string fileName)
+            => [GetIsoStorePath(scopeId, fileName)];
 
         public string GetIsoDatastorePath(string scopeId, string fileName)
-            => $"{_options.IsoStore.TrimEnd('/')}/{SanitizeDatastoreSegment(scopeId)}/{SanitizeIsoFilename(fileName)}";
+            => $"{_options.IsoStore.TrimEnd('/')}/{GetIsoStorePath(scopeId, fileName)}";
 
         public async Task<string> UploadFileToDatastore(
             string datastorePath,

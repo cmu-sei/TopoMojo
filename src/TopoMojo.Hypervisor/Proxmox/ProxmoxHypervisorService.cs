@@ -544,7 +544,15 @@ namespace TopoMojo.Hypervisor.Proxmox
         }
 
         // PVE storages are flat; ProxmoxIsoNaming encodes the scope into the filename.
-        public bool SupportsSubfolders => false;
+        public string GetIsoStorePath(string scopeId, string fileName)
+            => ProxmoxIsoNaming.Encode(scopeId, fileName, _options.IsoScopeSeparator);
+
+        public IReadOnlyList<string> GetIsoStorePathCandidates(string scopeId, string fileName)
+        {
+            var current = GetIsoStorePath(scopeId, fileName);
+            var legacy = ProxmoxIsoNaming.EncodeLegacy(scopeId, fileName);
+            return string.Equals(current, legacy, StringComparison.Ordinal) ? [current] : [current, legacy];
+        }
 
         public string GetIsoDatastorePath(string scopeId, string fileName)
             => ProxmoxIsoNaming.BuildDatastorePath(_options.IsoStore, scopeId, fileName);

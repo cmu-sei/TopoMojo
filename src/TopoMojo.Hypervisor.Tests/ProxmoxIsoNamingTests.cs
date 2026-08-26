@@ -1,3 +1,4 @@
+using System;
 using TopoMojo.Hypervisor.Exceptions;
 using TopoMojo.Hypervisor.Proxmox;
 using Xunit;
@@ -74,6 +75,22 @@ public class ProxmoxIsoNamingTests
         Assert.Equal(
             $"{WorkspaceId}-My_File.iso",
             ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", "-"));
+    }
+
+    [Fact]
+    public void EncodeLegacy_ReproducesThePreConfigurableFlatName()
+    {
+        var legacy = ProxmoxIsoNaming.EncodeLegacy(WorkspaceId, "sub/My File.iso");
+
+        Assert.Equal($"{WorkspaceId}#MyFile.iso", legacy);
+        Assert.NotEqual(ProxmoxIsoNaming.Encode(WorkspaceId, "sub/My File.iso", Sep), legacy);
+
+        Assert.True(ProxmoxIsoNaming.TryDecode(legacy, Sep, out var scopeId, out var fileName));
+        Assert.Equal(WorkspaceId, scopeId);
+        Assert.Equal("MyFile.iso", fileName);
+
+        Assert.Throws<ArgumentException>(() => ProxmoxIsoNaming.EncodeLegacy("not a scope", "x.iso"));
+        Assert.Throws<ArgumentException>(() => ProxmoxIsoNaming.EncodeLegacy(WorkspaceId, "sub/ "));
     }
 
     [Fact]

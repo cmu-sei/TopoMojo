@@ -528,10 +528,13 @@ namespace TopoMojo.Hypervisor.vMock
                 DeploymentCollection.Add(ctx);
         }
 
-        public bool SupportsSubfolders => true;
+        public string GetIsoStorePath(string scopeId, string fileName) => $"{scopeId}/{fileName}";
+
+        public IReadOnlyList<string> GetIsoStorePathCandidates(string scopeId, string fileName)
+            => [GetIsoStorePath(scopeId, fileName)];
 
         public string GetIsoDatastorePath(string scopeId, string fileName)
-            => $"{_optPod.IsoStore.TrimEnd('/')}/{scopeId}/{fileName}";
+            => $"{_optPod.IsoStore.TrimEnd('/')}/{GetIsoStorePath(scopeId, fileName)}";
 
         public Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
         {

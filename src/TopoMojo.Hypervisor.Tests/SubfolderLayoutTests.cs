@@ -13,14 +13,17 @@ public class SubfolderLayoutTests
     private const string WorkspaceId = "0123456789abcdef0123456789abcdef";
 
     [Fact]
-    public void VSphere_SupportsSubfolders_AndBuildsScopedPath()
+    public void VSphere_UsesScopeFolders_AndBuildsScopedPath()
     {
         var svc = new VSphereHypervisorService(
             new HypervisorServiceConfiguration { IsoStore = "[datastore] iso/" },
             new LoggerFactory(),
             new StubHttpClientFactory());
 
-        Assert.True(svc.SupportsSubfolders);
+        Assert.Equal(
+            "0123456789abcdef0123456789abcdef/MyFile.iso",
+            svc.GetIsoStorePath(WorkspaceId, "My File.iso"));
+        Assert.Single(svc.GetIsoStorePathCandidates(WorkspaceId, "My File.iso"));
         Assert.Equal(
             "[datastore] iso/0123456789abcdef0123456789abcdef/MyFile.iso",
             svc.GetIsoDatastorePath(WorkspaceId, "My File.iso"));

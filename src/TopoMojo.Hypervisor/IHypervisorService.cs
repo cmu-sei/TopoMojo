@@ -2,6 +2,7 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace TopoMojo.Hypervisor
@@ -37,11 +38,17 @@ namespace TopoMojo.Hypervisor
         Task ReloadHost(string host);
         HypervisorServiceConfiguration Options { get; }
         /// <summary>
-        /// True when this hypervisor's file stores keep one folder per workspace or public bin.
-        /// False when a store is flat and the scope has to be encoded into the stored filename.
-        /// This is a property of the hypervisor's storage, not a deployment choice.
+        /// Path, relative to the ISO store root, where an ISO for the given scope must be written.
+        /// Stores with per-scope folders return "{scopeId}/{fileName}"; flat stores return a single
+        /// filename with the scope encoded into it. The hypervisor owns storage layout and filename
+        /// semantics.
         /// </summary>
-        bool SupportsSubfolders { get; }
+        string GetIsoStorePath(string scopeId, string fileName);
+        /// <summary>
+        /// Every relative path under the ISO store root at which an ISO for this scope may already
+        /// exist, current naming first, followed by superseded namings. Readers probe in order.
+        /// </summary>
+        IReadOnlyList<string> GetIsoStorePathCandidates(string scopeId, string fileName);
         /// <summary>
         /// Builds the logical datastore path for an ISO in the given workspace or public bin.
         /// The hypervisor owns storage layout and filename semantics.

@@ -35,6 +35,27 @@ namespace TopoMojo.Hypervisor.Proxmox
             return $"{scopeId}{separator}{NormalizeFilename(filename)}";
         }
 
+        /// <summary>
+        /// Reproduces the stored filename TopoMojo wrote into a mounted flat ISO share before the scope
+        /// separator became configurable: '{scopeId}#{filename with directories and spaces removed}'.
+        /// Kept so ISOs uploaded by an earlier build stay readable and deletable.
+        /// </summary>
+        public static string EncodeLegacy(string scopeId, string filename)
+        {
+            if (string.IsNullOrWhiteSpace(scopeId) || InvalidScopeCharsRegex().IsMatch(scopeId))
+                throw new ArgumentException("The ISO scope id contains invalid characters.", nameof(scopeId));
+
+            if (string.IsNullOrWhiteSpace(filename))
+                throw new ArgumentException("An ISO filename is required.", nameof(filename));
+
+            var start = filename.LastIndexOfAny(['/', '\\']) + 1;
+            var name = filename[start..].Replace(" ", string.Empty);
+            if (name.Length == 0)
+                throw new ArgumentException("An ISO filename is required.", nameof(filename));
+
+            return $"{scopeId}{LegacyScopeSeparator}{name}";
+        }
+
 
         public static bool TryDecode(string storedName, string separator, out string scopeId, out string fileName)
         {
