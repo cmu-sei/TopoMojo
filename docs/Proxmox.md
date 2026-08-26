@@ -138,6 +138,9 @@ TopoMojo can optionally allow uploading of ISO files that can be mounted to virt
 - Pod__IsoStore
     - Set this to the name of the shared storage in your Proxmox cluster that ISOs will be sourced from for mounting to virtual machines.
     - e.g. `iso`
+- Pod__IsoScopeSeparator
+    - Optional. Defaults to `__`. A Proxmox ISO store is flat, so TopoMojo folds the owning workspace id into the uploaded filename as `{workspaceId}{separator}{filename}`. The value must consist of `[-a-zA-Z0-9_.]`, because PVE rewrites every other character to `_`.
+    - ISOs already uploaded under the previous separator will no longer be listed or mountable, apart from the historical `#` separator, which is always decoded.
 - FileUpload_IsoRoot
     - Set this to a path that is mounted to the TopoMojo API container that ISOs uploaded through TopoMojo will be saved to.
     - This should map to the same underlying storage as `Pod_IsoStore` above.

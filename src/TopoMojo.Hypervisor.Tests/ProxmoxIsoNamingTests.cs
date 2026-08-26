@@ -1,3 +1,4 @@
+using TopoMojo.Hypervisor.Exceptions;
 using TopoMojo.Hypervisor.Proxmox;
 using Xunit;
 
@@ -7,6 +8,7 @@ public class ProxmoxIsoNamingTests
 {
     private const string WorkspaceId = "0123456789abcdef0123456789abcdef";
     private const string PublicId = "00000000-0000-0000-0000-000000000000";
+    private const string Sep = ProxmoxIsoNaming.DefaultScopeSeparator;
 
     [Fact]
     public void NormalizeFilename_MirrorsProxmoxSafeNaming()
@@ -31,7 +33,7 @@ public class ProxmoxIsoNamingTests
     {
         Assert.Equal(
             $"{WorkspaceId}__My_File.iso",
-            ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso"));
+            ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", Sep));
     }
 
     [Fact]
@@ -40,6 +42,7 @@ public class ProxmoxIsoNamingTests
         Assert.True(
             ProxmoxIsoNaming.TryDecode(
                 $"{WorkspaceId}__My_File.iso",
+                Sep,
                 out var scopeId,
                 out var fileName));
         Assert.Equal(WorkspaceId, scopeId);
@@ -48,6 +51,7 @@ public class ProxmoxIsoNamingTests
         Assert.True(
             ProxmoxIsoNaming.TryDecode(
                 $"{WorkspaceId}#My File.iso",
+                Sep,
                 out scopeId,
                 out fileName));
         Assert.Equal(WorkspaceId, scopeId);
@@ -57,11 +61,43 @@ public class ProxmoxIsoNamingTests
     [Fact]
     public void TryDecode_RejectsUnscopedNames()
     {
-        Assert.True(ProxmoxIsoNaming.TryDecode($"{PublicId}__x.iso", out var scopeId, out var fileName));
+        Assert.True(ProxmoxIsoNaming.TryDecode($"{PublicId}__x.iso", Sep, out var scopeId, out var fileName));
         Assert.Equal(PublicId, scopeId);
         Assert.Equal("x.iso", fileName);
-        Assert.False(ProxmoxIsoNaming.TryDecode("ubuntu__24.iso", out _, out _));
-        Assert.False(ProxmoxIsoNaming.TryDecode("ubuntu.iso", out _, out _));
+        Assert.False(ProxmoxIsoNaming.TryDecode("ubuntu__24.iso", Sep, out _, out _));
+        Assert.False(ProxmoxIsoNaming.TryDecode("ubuntu.iso", Sep, out _, out _));
+    }
+
+    [Fact]
+    public void Encode_UsesTheConfiguredSeparator()
+    {
+        Assert.Equal(
+            $"{WorkspaceId}-My_File.iso",
+            ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", "-"));
+    }
+
+    [Fact]
+    public void TryDecode_RoundTripsANonDefaultSeparator()
+    {
+        var encoded = ProxmoxIsoNaming.Encode(PublicId, "My File.iso", "-");
+
+        Assert.True(ProxmoxIsoNaming.TryDecode(encoded, "-", out var scopeId, out var fileName));
+        Assert.Equal(PublicId, scopeId);
+        Assert.Equal("My_File.iso", fileName);
+        Assert.False(ProxmoxIsoNaming.TryDecode($"{WorkspaceId}__x.iso", "-", out _, out _));
+    }
+
+    [Fact]
+    public void ValidateScopeSeparator_RejectsEmptyAndNonPveSafeValues()
+    {
+        Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator(null));
+        Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator(""));
+        Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator(" "));
+        Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator("#"));
+
+        ProxmoxIsoNaming.ValidateScopeSeparator("__");
+        ProxmoxIsoNaming.ValidateScopeSeparator("-");
+        ProxmoxIsoNaming.ValidateScopeSeparator(".");
     }
 
     [Fact]

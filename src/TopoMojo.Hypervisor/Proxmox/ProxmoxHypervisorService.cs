@@ -210,6 +210,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (!regex.IsMatch(options.IsoStore))
                 options.IsoStore += "/";
+            ProxmoxIsoNaming.ValidateScopeSeparator(options.IsoScopeSeparator);
         }
 
         public async Task<Vm> Load(string id)
@@ -556,7 +557,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             try
             {
                 await _pveClient.UploadIso(scopeId, fileName, localFilePath);
-                var volid = ProxmoxIsoNaming.BuildVolumeId(storage, ProxmoxIsoNaming.Encode(scopeId, fileName));
+                var volid = ProxmoxIsoNaming.BuildVolumeId(storage, ProxmoxIsoNaming.Encode(scopeId, fileName, _options.IsoScopeSeparator));
+
                 _logger.LogInformation("Uploaded Proxmox ISO {volid}", volid);
                 return volid;
             }

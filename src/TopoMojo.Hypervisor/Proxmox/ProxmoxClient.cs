@@ -579,7 +579,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
         }
 
-        public async Task<PveIso[]> GetFiles()
+        public async Task<ProxmoxIsoFile[]> GetFiles()
         {
             var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
             var node = await GetIsoStorageNode();
@@ -593,8 +593,11 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             var isos = task.ToModel<PveIso[]>();
 
-            return isos;
+            return isos
+                .Select(x => ProxmoxIsoFile.From(x, _config.IsoScopeSeparator))
+                .ToArray();
         }
+
 
         private async Task<string> GetIsoStorageNode()
         {
@@ -634,7 +637,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             try
             {
-                storedName = ProxmoxIsoNaming.Encode(scopeId, fileName);
+                storedName = ProxmoxIsoNaming.Encode(scopeId, fileName, _config.IsoScopeSeparator);
                 if (!storedName.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
                     && !storedName.EndsWith(".img", StringComparison.OrdinalIgnoreCase))
                 {

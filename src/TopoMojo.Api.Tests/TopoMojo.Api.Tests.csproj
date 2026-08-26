@@ -11,10 +11,9 @@
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.5" />
+    <PackageReference Include="DiscUtils.Iso9660" Version="0.16.13" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\TopoMojo.Hypervisor\TopoMojo.Hypervisor.csproj" />
+    <ProjectReference Include="..\TopoMojo.Api\TopoMojo.Api.csproj" />
   </ItemGroup>
 </Project>

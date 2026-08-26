@@ -225,13 +225,7 @@ public class FileController(
         {
             string isoPath = tempFilePath + Meta.IsoFileExtension;
 
-            CDBuilder builder = new()
-            {
-                UseJoliet = true,
-                VolumeIdentifier = Meta.IsoVolumeId
-            };
-            builder.AddFile(Path.GetFileName(tempFilePath), tempFilePath);
-            builder.Build(isoPath);
+            BuildIso(tempFilePath, isoPath, datastorePath);
 
             System.IO.File.Delete(tempFilePath);
             fileToUpload = isoPath;
@@ -375,6 +369,20 @@ public class FileController(
 
     private static string SanitizeIsoFilename(string filename)
         => filename.Replace(" ", "").SanitizeFilename();
+
+    internal static string GetIsoEntryName(string datastorePath)
+        => SanitizeIsoFilename(Path.GetFileName(datastorePath));
+
+    internal static void BuildIso(string sourcePath, string isoPath, string datastorePath)
+    {
+        CDBuilder builder = new()
+        {
+            UseJoliet = true,
+            VolumeIdentifier = Meta.IsoVolumeId
+        };
+        builder.AddFile(GetIsoEntryName(datastorePath), sourcePath);
+        builder.Build(isoPath);
+    }
 
     private string BuildIsoFilePath(string workspaceKey, string filename)
     {

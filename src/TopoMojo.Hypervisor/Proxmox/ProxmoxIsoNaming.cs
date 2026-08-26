@@ -10,7 +10,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 {
     public static partial class ProxmoxIsoNaming
     {
-        public const string ScopeSeparator = "__";
+        public const string DefaultScopeSeparator = "__";
         public const char LegacyScopeSeparator = '#';
 
         public static string NormalizeFilename(string filename)
@@ -24,46 +24,72 @@ namespace TopoMojo.Hypervisor.Proxmox
             return RepeatedUnderscoresRegex().Replace(name, "_");
         }
 
-        public static string Encode(string scopeId, string filename)
+        public static string Encode(string scopeId, string filename, string separator)
         {
+            if (string.IsNullOrEmpty(separator))
+                throw new ArgumentException("An ISO scope separator is required.", nameof(separator));
+
             if (string.IsNullOrWhiteSpace(scopeId) || InvalidScopeCharsRegex().IsMatch(scopeId))
                 throw new ArgumentException("The ISO scope id contains invalid characters.", nameof(scopeId));
 
-            return $"{scopeId}{ScopeSeparator}{NormalizeFilename(filename)}";
+            return $"{scopeId}{separator}{NormalizeFilename(filename)}";
         }
 
-        public static bool TryDecode(string storedName, out string scopeId, out string fileName)
+
+        public static bool TryDecode(string storedName, string separator, out string scopeId, out string fileName)
         {
             scopeId = null;
             fileName = null;
 
-            if (string.IsNullOrEmpty(storedName))
+            if (string.IsNullOrEmpty(storedName) || string.IsNullOrEmpty(separator))
                 return false;
 
-            var separatorIndex = storedName.IndexOf(ScopeSeparator, StringComparison.Ordinal);
-            var legacyIndex = storedName.IndexOf(LegacyScopeSeparator);
-            var index = separatorIndex < 0
-                ? legacyIndex
-                : legacyIndex < 0
-                    ? separatorIndex
-                    : Math.Min(separatorIndex, legacyIndex);
-            var separatorLength = index == separatorIndex ? ScopeSeparator.Length : 1;
+            var start = 0;
+            while (start < storedName.Length)
+            {
+                var separatorIndex = storedName.IndexOf(separator, start, StringComparison.Ordinal);
+                var legacyIndex = storedName.IndexOf(LegacyScopeSeparator, start);
+                var useLegacy = legacyIndex >= 0 && (separatorIndex < 0 || legacyIndex < separatorIndex);
+                var index = useLegacy ? legacyIndex : separatorIndex;
 
-            if (index < 0)
-                return false;
+                if (index < 0)
+                    return false;
 
-            var prefix = storedName[..index];
-            if (!Guid.TryParse(prefix, out _))
-                return false;
+                var separatorLength = useLegacy ? 1 : separator.Length;
+                var prefix = storedName[..index];
+                var decodedFileName = storedName[(index + separatorLength)..];
+                if (Guid.TryParse(prefix, out _) && decodedFileName.Length > 0)
+                {
+                    scopeId = prefix;
+                    fileName = decodedFileName;
+                    return true;
+                }
 
-            var decodedFileName = storedName[(index + separatorLength)..];
-            if (decodedFileName.Length == 0)
-                return false;
+                start = index + separatorLength;
+            }
 
-            scopeId = prefix;
-            fileName = decodedFileName;
-            return true;
+            return false;
         }
+
+        /// <summary>
+        /// Throws when the configured scope separator would not survive PVE's storage upload API, which
+        /// rewrites every character outside [-a-zA-Z0-9_.] to '_'.
+        /// </summary>
+        public static void ValidateScopeSeparator(string separator)
+        {
+            if (string.IsNullOrEmpty(separator))
+            {
+                throw new HypervisorException(
+                    "Pod__IsoScopeSeparator cannot be empty - it is what carries the workspace scope in a Proxmox ISO filename.");
+            }
+
+            if (InvalidSeparatorCharsRegex().IsMatch(separator))
+            {
+                throw new HypervisorException(
+                    $"Pod__IsoScopeSeparator '{separator}' cannot be used, because Proxmox's storage upload API rewrites any character outside [-a-zA-Z0-9_.] to '_'. Use '__'.");
+            }
+        }
+
 
         public static string BuildVolumeId(string storage, string storedName)
             => $"{storage}:iso/{storedName}";
@@ -123,5 +149,8 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         [GeneratedRegex("[^a-zA-Z0-9.-]")]
         private static partial Regex InvalidScopeCharsRegex();
+
+        [GeneratedRegex("[^-a-zA-Z0-9_.]")]
+        private static partial Regex InvalidSeparatorCharsRegex();
     }
 }
