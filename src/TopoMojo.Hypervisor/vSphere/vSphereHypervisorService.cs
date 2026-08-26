@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -772,6 +773,9 @@ namespace TopoMojo.Hypervisor.vSphere
                 DeploymentCollection.Add(ctx);
         }
 
+        public string GetIsoDatastorePath(string scopeId, string fileName)
+            => $"{_options.IsoStore.TrimEnd('/')}/{SanitizeDatastoreSegment(scopeId)}/{SanitizeIsoFilename(fileName)}";
+
         public async Task<string> UploadFileToDatastore(
             string datastorePath,
             string localFilePath)
@@ -788,6 +792,18 @@ namespace TopoMojo.Hypervisor.vSphere
                 ?? throw new InvalidOperationException("Cannot delete from datastore: no vSphere connections available.");
 
             await client.DeleteFileFromDatastore(datastorePath);
+        }
+
+        private static string SanitizeDatastoreSegment(string value)
+        {
+            var invalid = Path.GetInvalidPathChars();
+            return string.Concat(value.Where(c => !invalid.Contains(c))).Replace(" ", "_");
+        }
+
+        private static string SanitizeIsoFilename(string value)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            return string.Concat(value.Replace(" ", "").Where(c => !invalid.Contains(c)));
         }
 
         [GeneratedRegex(@"\[[\d-,]*\]")]

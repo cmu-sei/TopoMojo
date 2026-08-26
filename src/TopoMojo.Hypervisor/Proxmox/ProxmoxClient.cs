@@ -4,10 +4,12 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Corsinvest.ProxmoxVE.Api;
@@ -40,6 +42,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             _tasks = [];
             _vmCache = vmCache;
             _random = random;
+            _httpClientFactory = httpClientFactory;
             _config.Tenant ??= "";
 
             int port = 443;
@@ -50,6 +53,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 port = result.Port;
             }
             _config.Host = host;
+            _port = port;
             _hostPrefix = host.Split('.').FirstOrDefault();
 
             _pveClient = new PveClient(host, port, httpClientFactory.CreateClient("proxmox"))
@@ -71,6 +75,8 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly IProxmoxNameService _nameService;
         private readonly IProxmoxVlanManager _vlanManager;
         private readonly HypervisorServiceConfiguration _config = null;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly int _port;
         // int _pollInterval = 1000;
         readonly int _syncInterval = 30000;
         readonly int _taskMonitorInterval = 3000;
@@ -575,11 +581,12 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<PveIso[]> GetFiles()
         {
-            var node = await GetRandomNode();
+            var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
+            var node = await GetIsoStorageNode();
 
             var task = await _pveClient
                 .Nodes[node]
-                .Storage[_config.IsoStore]
+                .Storage[storage]
                 .Content
                 .Index(content: "iso");
             await _pveClient.WaitForTaskToFinish(task);
@@ -588,6 +595,141 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             return isos;
         }
+
+        private async Task<string> GetIsoStorageNode()
+        {
+            var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
+            var resources = await _pveClient.GetResourcesAsync(ClusterResourceType.Storage);
+            var candidates = resources
+                .Where(x => x.ResourceType == ClusterResourceType.Storage
+                    && string.Equals(x.Storage, storage, StringComparison.Ordinal)
+                    && x.IsAvailable
+                    && !string.IsNullOrWhiteSpace(x.Node))
+                .ToList();
+            var nodes = candidates
+                .Select(x => x.Node)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            if (nodes.Count == 0)
+                throw new HypervisorException($"No online Proxmox node currently offers ISO storage '{storage}'.");
+
+            if (nodes.Count == 1)
+                return nodes[0];
+
+            if (!candidates.All(x => x.Shared))
+            {
+                throw new HypervisorException(
+                    $"Pod__IsoStore '{storage}' is available on multiple nodes but is not shared; "
+                    + "an ISO written through one node would not be mountable from the others.");
+            }
+
+            return nodes[_random.Next(nodes.Count)];
+        }
+
+        public async Task UploadIso(string scopeId, string fileName, string localFilePath)
+        {
+            var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
+            string storedName = null;
+
+            try
+            {
+                storedName = ProxmoxIsoNaming.Encode(scopeId, fileName);
+                if (!storedName.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
+                    && !storedName.EndsWith(".img", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new HypervisorException($"Proxmox ISO filename must end with .iso or .img: {storedName}");
+                }
+
+                var node = await GetIsoStorageNode();
+                _logger.LogInformation(
+                    "Uploading Proxmox ISO {storedName} to storage {storage} on node {node}",
+                    storedName,
+                    storage,
+                    node);
+
+                using var fileStream = File.OpenRead(localFilePath);
+                var uploadClient = CreateIsoUploadClient();
+                var result = await uploadClient.UploadFileToStorageAsync(
+                    node,
+                    storage,
+                    "iso",
+                    fileStream,
+                    storedName,
+                    CancellationToken.None,
+                    secondsTimeout: Math.Max(1, _config.IsoUploadTimeoutMinutes) * 60);
+
+                await _pveClient.WaitForTaskToFinish(result);
+                _logger.LogInformation(
+                    "Uploaded Proxmox ISO {storedName} to storage {storage} on node {node}",
+                    storedName,
+                    storage,
+                    node);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to upload Proxmox ISO {storedName} to storage {storage}",
+                    storedName ?? fileName,
+                    storage);
+                throw;
+            }
+        }
+
+        public async Task DeleteIso(string scopeId, string fileName)
+        {
+            var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
+
+            try
+            {
+                var isos = await GetFiles();
+                var normalized = ProxmoxIsoNaming.NormalizeFilename(fileName);
+                var match = isos.FirstOrDefault(x =>
+                    string.Equals(x.ScopeId, scopeId, StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(x.ScopedFileName, fileName, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(x.ScopedFileName, normalized, StringComparison.OrdinalIgnoreCase)));
+
+                if (match is null)
+                    throw new FileNotFoundException($"ISO not found in Proxmox storage: {scopeId}/{fileName}");
+
+                var node = await GetIsoStorageNode();
+                _logger.LogInformation(
+                    "Deleting Proxmox ISO {volid} from storage {storage} on node {node}",
+                    match.Volid,
+                    storage,
+                    node);
+
+                var result = await _pveClient
+                    .Nodes[node]
+                    .Storage[storage]
+                    .Content[match.Volid]
+                    .Delete();
+                await _pveClient.WaitForTaskToFinish(result);
+
+                _logger.LogInformation(
+                    "Deleted Proxmox ISO {volid} from storage {storage} on node {node}",
+                    match.Volid,
+                    storage,
+                    node);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to delete Proxmox ISO {scopeId}/{fileName} from storage {storage}",
+                    scopeId,
+                    fileName,
+                    storage);
+                throw;
+            }
+        }
+
+        private PveClient CreateIsoUploadClient()
+            => new(_config.Host, _port, _httpClientFactory.CreateClient("proxmox"))
+            {
+                ApiToken = _config.AccessToken
+            };
 
         public async Task<PveVmConfig> GetVmConfig(Vm vm)
             => await GetVmConfig(await GetCurrentNode(vm), vm.GetId());
@@ -942,10 +1084,13 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (string.IsNullOrEmpty(template.Iso)) return null;
 
             var isos = await GetFiles();
-            return isos
-                .Where(x => x.Volid == template.Iso)
-                .FirstOrDefault()
-                ?.Volid;
+            var match = isos.FirstOrDefault(x =>
+                string.Equals(x.DisplayName, template.Iso, StringComparison.OrdinalIgnoreCase));
+
+            if (match is null)
+                _logger.LogWarning("No ISO matching {iso} on storage {storage}", template.Iso, _config.IsoStore);
+
+            return match?.Volid;
         }
 
         private static string GetMemory(VmTemplate template)

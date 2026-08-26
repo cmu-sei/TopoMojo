@@ -61,6 +61,13 @@ namespace TopoMojo.Hypervisor
         /// Null uses the Proxmox default. Has no effect unless EnableHA is set.
         /// </summary>
         public int? HaMaxRelocate { get; set; }
+        /// <summary>
+        /// Proxmox only. Timeout for an ISO push through PVE's storage upload API. Populated from
+        /// FileUpload__UploadTimeoutMinutes, the same setting the vSphere datastore upload uses;
+        /// it has to live here because FileUploadOptions is declared in TopoMojo.Api, which
+        /// TopoMojo.Hypervisor cannot reference.
+        /// </summary>
+        public int IsoUploadTimeoutMinutes { get; set; } = 120;
 
         public SddcConfiguration Sddc { get; set; } = new SddcConfiguration();
     }

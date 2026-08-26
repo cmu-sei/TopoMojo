@@ -95,7 +95,7 @@ public class FileController(
                 if (uploadOptions.UseDatastoreApi)
                 {
                     dest = BuildTempPath(filename, key);
-                    string datastorePath = ConvertToDatastorePath(filename, key);
+                    string datastorePath = hypervisorService.GetIsoDatastorePath(key, filename);
                     metadata.Add(Meta.DatastorePath, datastorePath);
                 }
                 else
@@ -216,22 +216,6 @@ public class FileController(
         }
     }
 
-    private string ConvertToDatastorePath(string filename, string key)
-    {
-        string isoStore = hypervisorService.Options.IsoStore.TrimEnd('/');
-        string sanitizedFilename = SanitizeIsoFilename(filename);
-
-        if (uploadOptions.SupportsSubfolders)
-        {
-            string sanitizedKey = key.SanitizePath();
-            return $"{isoStore}/{sanitizedKey}/{sanitizedFilename}";
-        }
-        else
-        {
-            string flatName = $"{key.SanitizePath()}#{sanitizedFilename}";
-            return $"{isoStore}/{flatName}";
-        }
-    }
 
     private async Task UploadToDatastore(string tempFilePath, string datastorePath)
     {
@@ -316,7 +300,7 @@ public class FileController(
 
             if (uploadOptions.UseDatastoreApi)
             {
-                string datastorePath = ConvertToDatastorePath(filename, actualWorkspaceId);
+                string datastorePath = hypervisorService.GetIsoDatastorePath(actualWorkspaceId, filename);
                 await hypervisorService.DeleteFileFromDatastore(datastorePath);
                 Logger.LogInformation("Deleted datastore ISO: {datastorePath}", datastorePath);
             }

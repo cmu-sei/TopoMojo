@@ -168,6 +168,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
                     return handler;
                 });
+            config.IsoUploadTimeoutMinutes = timeoutMinutes;
 
             if (string.IsNullOrWhiteSpace(config.Url))
             {

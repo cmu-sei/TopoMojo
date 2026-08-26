@@ -36,19 +36,24 @@ namespace TopoMojo.Hypervisor
         string Version { get; }
         Task ReloadHost(string host);
         HypervisorServiceConfiguration Options { get; }
+        /// <summary>
+        /// Builds the logical datastore path for an ISO in the given workspace or public bin.
+        /// The hypervisor owns storage layout and filename semantics.
+        /// </summary>
+        string GetIsoDatastorePath(string scopeId, string fileName);
 
         /// <summary>
-        /// Upload a file to datastore via API (for VMware Cloud environments where NFS is not available)
+        /// Upload a file to datastore via API.
         /// </summary>
-        /// <param name="datastorePath">vSphere datastore path in format: [datastore] folder/file.iso</param>
+        /// <param name="datastorePath">Hypervisor-specific logical datastore path.</param>
         /// <param name="localFilePath">Local filesystem path to file to upload</param>
         /// <returns>The datastore path where file was uploaded</returns>
         Task<string> UploadFileToDatastore(string datastorePath, string localFilePath);
 
         /// <summary>
-        /// Delete a file from datastore via API (for VMware Cloud environments)
+        /// Delete a file from datastore via API.
         /// </summary>
-        /// <param name="datastorePath">Datastore path in format: [datastore] folder/file.iso</param>
+        /// <param name="datastorePath">Hypervisor-specific logical datastore path.</param>
         Task DeleteFileFromDatastore(string datastorePath);
     }
 

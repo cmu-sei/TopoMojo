@@ -22,11 +22,18 @@ namespace TopoMojo.Hypervisor.Proxmox.Models
             }
         }
 
-        public string DisplayName
+        public string ScopeId => Decoded.scopeId;
+
+        public string ScopedFileName => Decoded.fileName ?? Name;
+
+        public string DisplayName => ScopeId is null ? Name : $"{ScopeId}/{ScopedFileName}";
+
+        private (string scopeId, string fileName) Decoded
         {
             get
             {
-                return this.Name.Replace('#', '/');
+                ProxmoxIsoNaming.TryDecode(Name, out var scopeId, out var fileName);
+                return (scopeId, fileName);
             }
         }
     }
