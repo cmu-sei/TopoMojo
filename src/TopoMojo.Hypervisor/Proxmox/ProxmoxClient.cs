@@ -582,7 +582,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<ProxmoxIsoFile[]> GetFiles()
         {
             var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
-            var node = await GetIsoStorageNode();
+            var node = await GetIsoStorageNode(requireAvailable: false);
 
             var task = await _pveClient
                 .Nodes[node]
@@ -599,16 +599,19 @@ namespace TopoMojo.Hypervisor.Proxmox
         }
 
 
-        private async Task<string> GetIsoStorageNode()
+        private async Task<string> GetIsoStorageNode(bool requireAvailable = true)
         {
             var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
             var resources = await _pveClient.GetResourcesAsync(ClusterResourceType.Storage);
             var candidates = resources
                 .Where(x => x.ResourceType == ClusterResourceType.Storage
                     && string.Equals(x.Storage, storage, StringComparison.Ordinal)
-                    && x.IsAvailable
                     && !string.IsNullOrWhiteSpace(x.Node))
                 .ToList();
+
+            if (requireAvailable)
+                candidates = candidates.Where(x => x.IsAvailable).ToList();
+
             var nodes = candidates
                 .Select(x => x.Node)
                 .Distinct(StringComparer.Ordinal)
@@ -630,7 +633,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             return nodes[_random.Next(nodes.Count)];
         }
 
-        public async Task UploadIso(string scopeId, string fileName, string localFilePath)
+        public async Task UploadIso(string scopeId, string fileName, string localFilePath, CancellationToken cancellationToken = default)
         {
             var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
             string storedName = null;
@@ -659,10 +662,12 @@ namespace TopoMojo.Hypervisor.Proxmox
                     "iso",
                     fileStream,
                     storedName,
-                    CancellationToken.None,
+                    cancellationToken,
                     secondsTimeout: Math.Max(1, _config.IsoUploadTimeoutMinutes) * 60);
 
-                await _pveClient.WaitForTaskToFinish(result);
+                var timeoutMs = (long)Math.Max(1, _config.IsoUploadTimeoutMinutes) * 60 * 1000;
+                if (!await _pveClient.WaitForTaskToFinish(result, timeout: timeoutMs))
+                    throw new HypervisorException($"Proxmox ISO upload task did not finish within {Math.Max(1, _config.IsoUploadTimeoutMinutes)} minutes: {storedName}");
                 _logger.LogInformation(
                     "Uploaded Proxmox ISO {storedName} to storage {storage} on node {node}",
                     storedName,
@@ -687,11 +692,24 @@ namespace TopoMojo.Hypervisor.Proxmox
             try
             {
                 var isos = await GetFiles();
-                var normalized = ProxmoxIsoNaming.NormalizeFilename(fileName);
-                var match = isos.FirstOrDefault(x =>
-                    string.Equals(x.ScopeId, scopeId, StringComparison.OrdinalIgnoreCase)
-                    && (string.Equals(x.ScopedFileName, fileName, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(x.ScopedFileName, normalized, StringComparison.OrdinalIgnoreCase)));
+                string[] candidates;
+                try
+                {
+                    candidates =
+                    [
+                        ProxmoxIsoNaming.Encode(scopeId, fileName, _config.IsoScopeSeparator),
+                        ProxmoxIsoNaming.EncodeLegacy(scopeId, fileName)
+                    ];
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new FileNotFoundException($"ISO not found in Proxmox storage: {scopeId}/{fileName}", ex);
+                }
+
+                var match = candidates
+                    .Select(name => isos.FirstOrDefault(x =>
+                        string.Equals(x.Name, name, StringComparison.Ordinal)))
+                    .FirstOrDefault(x => x is not null);
 
                 if (match is null)
                     throw new FileNotFoundException($"ISO not found in Proxmox storage: {scopeId}/{fileName}");
@@ -708,7 +726,8 @@ namespace TopoMojo.Hypervisor.Proxmox
                     .Storage[storage]
                     .Content[match.Volid]
                     .Delete();
-                await _pveClient.WaitForTaskToFinish(result);
+                if (!await _pveClient.WaitForTaskToFinish(result))
+                    throw new HypervisorException($"Proxmox ISO delete task did not finish: {match.Volid}");
 
                 _logger.LogInformation(
                     "Deleted Proxmox ISO {volid} from storage {storage} on node {node}",
@@ -728,6 +747,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
         }
 
+        // Use a per-upload client so the request timeout can differ without mutating the shared client.
         private PveClient CreateIsoUploadClient()
             => new(_config.Host, _port, _httpClientFactory.CreateClient("proxmox"))
             {
@@ -1089,6 +1109,9 @@ namespace TopoMojo.Hypervisor.Proxmox
             var isos = await GetFiles();
             var match = isos.FirstOrDefault(x =>
                 string.Equals(x.DisplayName, template.Iso, StringComparison.OrdinalIgnoreCase));
+
+            match ??= isos.FirstOrDefault(x =>
+                string.Equals(x.Name.Replace('#', '/'), template.Iso, StringComparison.OrdinalIgnoreCase));
 
             if (match is null)
                 _logger.LogWarning("No ISO matching {iso} on storage {storage}", template.Iso, _config.IsoStore);

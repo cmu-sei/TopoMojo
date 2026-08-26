@@ -35,6 +35,21 @@ public class ProxmoxIsoFileTests
     }
 
     [Fact]
+    public void DisplayName_LegacyMultiSeparatorName()
+    {
+        var iso = ProxmoxIsoFile.From(
+            new PveIso
+            {
+                Volid = "iso:iso/0123456789abcdef0123456789abcdef#9b3b331c-10c1-448b-8114-21b2586d8e38#file.iso"
+            },
+            ProxmoxIsoNaming.DefaultScopeSeparator);
+
+        Assert.Equal(
+            "0123456789abcdef0123456789abcdef/9b3b331c-10c1-448b-8114-21b2586d8e38#file.iso",
+            iso.DisplayName);
+    }
+
+    [Fact]
     public void UnscopedIso_RetainsStoredName()
     {
         var iso = ProxmoxIsoFile.From(

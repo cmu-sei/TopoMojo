@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Http;
 using Microsoft.Extensions.Logging;
@@ -564,7 +565,8 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             try
             {
-                await _pveClient.UploadIso(scopeId, fileName, localFilePath);
+                // IHypervisorService exposes no ambient request token at this layer.
+                await _pveClient.UploadIso(scopeId, fileName, localFilePath, CancellationToken.None);
                 var volid = ProxmoxIsoNaming.BuildVolumeId(storage, ProxmoxIsoNaming.Encode(scopeId, fileName, _options.IsoScopeSeparator));
 
                 _logger.LogInformation("Uploaded Proxmox ISO {volid}", volid);

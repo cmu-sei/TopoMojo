@@ -338,14 +338,14 @@ public class FileController(
     internal static string GetIsoEntryName(string datastorePath)
         => SanitizeIsoFilename(Path.GetFileName(datastorePath));
 
-    internal static void BuildIso(string sourcePath, string isoPath, string datastorePath)
+    internal static void BuildIso(string sourcePath, string isoPath, string entryNameSource)
     {
         CDBuilder builder = new()
         {
             UseJoliet = true,
             VolumeIdentifier = Meta.IsoVolumeId
         };
-        builder.AddFile(GetIsoEntryName(datastorePath), sourcePath);
+        builder.AddFile(GetIsoEntryName(entryNameSource), sourcePath);
         builder.Build(isoPath);
     }
 

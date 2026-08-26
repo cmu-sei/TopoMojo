@@ -1,6 +1,7 @@
 using System;
 using TopoMojo.Hypervisor.Exceptions;
 using TopoMojo.Hypervisor.Proxmox;
+using TopoMojo.Hypervisor.Proxmox.Models;
 using Xunit;
 
 namespace TopoMojo.Hypervisor.Tests;
@@ -73,8 +74,8 @@ public class ProxmoxIsoNamingTests
     public void Encode_UsesTheConfiguredSeparator()
     {
         Assert.Equal(
-            $"{WorkspaceId}-My_File.iso",
-            ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", "-"));
+            $"{WorkspaceId}_x_My_File.iso",
+            ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", "_x_"));
     }
 
     [Fact]
@@ -94,14 +95,32 @@ public class ProxmoxIsoNamingTests
     }
 
     [Fact]
+    public void DeleteCandidates_PreferCurrentThenLegacy()
+    {
+        var candidates = new[]
+        {
+            ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", Sep),
+            ProxmoxIsoNaming.EncodeLegacy(WorkspaceId, "My File.iso")
+        };
+
+        Assert.Equal(
+            new[] { $"{WorkspaceId}__My_File.iso", $"{WorkspaceId}#MyFile.iso" },
+            candidates);
+
+        var legacy = ProxmoxIsoFile.From(
+            new PveIso { Volid = $"iso:iso/{candidates[1]}" }, Sep);
+        Assert.Equal(candidates[1], legacy.Name);
+    }
+
+    [Fact]
     public void TryDecode_RoundTripsANonDefaultSeparator()
     {
-        var encoded = ProxmoxIsoNaming.Encode(PublicId, "My File.iso", "-");
+        var encoded = ProxmoxIsoNaming.Encode(PublicId, "My File.iso", "_x_");
 
-        Assert.True(ProxmoxIsoNaming.TryDecode(encoded, "-", out var scopeId, out var fileName));
+        Assert.True(ProxmoxIsoNaming.TryDecode(encoded, "_x_", out var scopeId, out var fileName));
         Assert.Equal(PublicId, scopeId);
         Assert.Equal("My_File.iso", fileName);
-        Assert.False(ProxmoxIsoNaming.TryDecode($"{WorkspaceId}__x.iso", "-", out _, out _));
+        Assert.False(ProxmoxIsoNaming.TryDecode($"{WorkspaceId}__x.iso", "_x_", out _, out _));
     }
 
     [Fact]
@@ -113,8 +132,17 @@ public class ProxmoxIsoNamingTests
         Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator("#"));
 
         ProxmoxIsoNaming.ValidateScopeSeparator("__");
-        ProxmoxIsoNaming.ValidateScopeSeparator("-");
-        ProxmoxIsoNaming.ValidateScopeSeparator(".");
+        ProxmoxIsoNaming.ValidateScopeSeparator("_x_");
+    }
+
+    [Fact]
+    public void ValidateScopeSeparator_RejectsGuidAmbiguousSeparators()
+    {
+        Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator("."));
+        Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator("-"));
+
+        ProxmoxIsoNaming.ValidateScopeSeparator("__");
+        ProxmoxIsoNaming.ValidateScopeSeparator("_x_");
     }
 
     [Fact]

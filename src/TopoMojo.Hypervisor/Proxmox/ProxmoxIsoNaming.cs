@@ -65,6 +65,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             if (string.IsNullOrEmpty(storedName) || string.IsNullOrEmpty(separator))
                 return false;
 
+            // Try successive separator occurrences because a configured separator can occur inside a GUID.
             var start = 0;
             while (start < storedName.Length)
             {
@@ -104,6 +105,12 @@ namespace TopoMojo.Hypervisor.Proxmox
                     "Pod__IsoScopeSeparator cannot be empty - it is what carries the workspace scope in a Proxmox ISO filename.");
             }
 
+            if (!separator.Contains('_'))
+            {
+                throw new HypervisorException(
+                    $"Pod__IsoScopeSeparator '{separator}' cannot be used, because it can occur inside a workspace id and would make unscoped filenames decode as scoped. Use '__'.");
+            }
+
             if (InvalidSeparatorCharsRegex().IsMatch(separator))
             {
                 throw new HypervisorException(
@@ -119,8 +126,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             => isoStore?.Trim('/') ?? string.Empty;
 
         /// <summary>
-        /// Builds the logical Proxmox ISO path <c>{storage}/{scopeId}/{fileName}</c>. The display
-        /// filename is preserved here; PVE-safe normalization happens at upload time.
+        /// Builds the logical Proxmox ISO path <c>{storage}/{scopeId}/{fileName}</c>. The basename is
+        /// normalized to the PVE-safe value that will be stored.
         /// </summary>
         public static string BuildDatastorePath(string isoStore, string scopeId, string fileName)
         {
@@ -132,8 +139,10 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             var separator = fileName.LastIndexOfAny(['/', '\\']);
             var safeFileName = fileName[(separator + 1)..];
-            if (safeFileName.Length == 0)
+            if (string.IsNullOrWhiteSpace(safeFileName))
                 throw new HypervisorException($"Unsupported Proxmox ISO filename: {fileName}");
+
+            safeFileName = NormalizeFilename(safeFileName);
 
             return $"{StorageName(isoStore)}/{scopeId}/{safeFileName}";
         }

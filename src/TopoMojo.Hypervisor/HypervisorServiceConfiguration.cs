@@ -65,14 +65,16 @@ namespace TopoMojo.Hypervisor
         /// Proxmox only. Timeout for an ISO push through PVE's storage upload API. Populated from
         /// FileUpload__UploadTimeoutMinutes, the same setting the vSphere datastore upload uses;
         /// it has to live here because FileUploadOptions is declared in TopoMojo.Api, which
-        /// TopoMojo.Hypervisor cannot reference.
+        /// TopoMojo.Hypervisor cannot reference. Not operator-configurable under Pod__; always
+        /// assigned from FileUpload__UploadTimeoutMinutes during startup.
         /// </summary>
         public int IsoUploadTimeoutMinutes { get; set; } = 120;
         /// <summary>
         /// Separator folded into a Proxmox ISO filename to carry the workspace scope, since a PVE ISO
         /// storage is flat and '/' is not a legal filename character. Configurable so a change in how PVE
         /// normalizes uploaded filenames is a config fix rather than a code change.
-        /// Must consist of [-a-zA-Z0-9_.]: PVE's storage upload API rewrites every other character to '_'.
+        /// Must contain '_' and consist of [-a-zA-Z0-9_.]: PVE's storage upload API rewrites every other character to '_',
+        /// and separators without '_' can occur inside a workspace id.
         /// Only used by the Proxmox hypervisor; vSphere scopes ISOs with datastore folders.
         /// </summary>
         public string IsoScopeSeparator { get; set; } = "__";

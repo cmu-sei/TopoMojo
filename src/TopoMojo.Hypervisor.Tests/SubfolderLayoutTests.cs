@@ -30,16 +30,21 @@ public class SubfolderLayoutTests
     }
 
     [Fact]
-    public void Proxmox_BuildsScopedPathWithoutConstructingService()
+    public void BuildDatastorePath_NormalizesFilename()
     {
         Assert.Equal(
-            "iso/0123456789abcdef0123456789abcdef/My File.iso",
+            "iso/0123456789abcdef0123456789abcdef/foo._iso",
             ProxmoxIsoNaming.BuildDatastorePath(
-                "iso/", WorkspaceId, "sub/My File.iso"));
+                "iso/", WorkspaceId, "sub/foo. iso"));
+
+        var normalized = ProxmoxIsoNaming.NormalizeFilename("foo._iso");
+        Assert.Equal("foo._iso", normalized);
+        Assert.Equal(normalized, ProxmoxIsoNaming.NormalizeFilename(normalized));
+
         Assert.Throws<HypervisorException>(
             () => ProxmoxIsoNaming.BuildDatastorePath("iso/", "not-a-guid", "f.iso"));
-    }
 
+    }
     private sealed class StubHttpClientFactory : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new();
