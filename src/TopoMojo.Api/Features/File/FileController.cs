@@ -166,7 +166,7 @@ public class FileController(
 
     private string BuildDestinationPath(string filename, string key)
     {
-        if (uploadOptions.SupportsSubfolders)
+        if (hypervisorService.SupportsSubfolders)
         {
             string path = Path.Combine(
                 uploadOptions.IsoRoot,
@@ -193,7 +193,7 @@ public class FileController(
         if (!Directory.Exists(uploadOptions.TempRoot))
             Directory.CreateDirectory(uploadOptions.TempRoot);
 
-        if (uploadOptions.SupportsSubfolders)
+        if (hypervisorService.SupportsSubfolders)
         {
             string path = Path.Combine(
                 uploadOptions.TempRoot,
@@ -380,7 +380,7 @@ public class FileController(
     {
         string sanitizedFilename = SanitizeIsoFilename(filename);
 
-        if (uploadOptions.SupportsSubfolders)
+        if (hypervisorService.SupportsSubfolders)
         {
             return Path.Combine(
                 uploadOptions.IsoRoot,

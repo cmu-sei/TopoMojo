@@ -37,6 +37,12 @@ namespace TopoMojo.Hypervisor
         Task ReloadHost(string host);
         HypervisorServiceConfiguration Options { get; }
         /// <summary>
+        /// True when this hypervisor's file stores keep one folder per workspace or public bin.
+        /// False when a store is flat and the scope has to be encoded into the stored filename.
+        /// This is a property of the hypervisor's storage, not a deployment choice.
+        /// </summary>
+        bool SupportsSubfolders { get; }
+        /// <summary>
         /// Builds the logical datastore path for an ISO in the given workspace or public bin.
         /// The hypervisor owns storage layout and filename semantics.
         /// </summary>

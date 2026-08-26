@@ -143,8 +143,6 @@ TopoMojo can optionally allow uploading of ISO files that can be mounted to virt
     - This should map to the same underlying storage as `Pod_IsoStore` above.
     - Proxmox creates a particular directory structure for ISO stores, so this path needs to end in /template/iso.
     - e.g. `/mnt/isos/template/iso`
-- FileUpload_SupportsSubFolders
-    - Set this to `false` for Proxmox since Proxmox does not allow sub folders in it's ISO stores
 
 ## High Availability and CRS
 

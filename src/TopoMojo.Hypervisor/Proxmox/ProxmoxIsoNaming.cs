@@ -4,6 +4,7 @@
 using System;
 using System.Linq;
 using System.Text.RegularExpressions;
+using TopoMojo.Hypervisor.Exceptions;
 
 namespace TopoMojo.Hypervisor.Proxmox
 {
@@ -69,6 +70,26 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public static string StorageName(string isoStore)
             => isoStore?.Trim('/') ?? string.Empty;
+
+        /// <summary>
+        /// Builds the logical Proxmox ISO path <c>{storage}/{scopeId}/{fileName}</c>. The display
+        /// filename is preserved here; PVE-safe normalization happens at upload time.
+        /// </summary>
+        public static string BuildDatastorePath(string isoStore, string scopeId, string fileName)
+        {
+            if (!Guid.TryParse(scopeId, out _))
+                throw new HypervisorException($"Unsupported Proxmox ISO scope: {scopeId}");
+
+            if (string.IsNullOrWhiteSpace(fileName))
+                throw new HypervisorException("An ISO filename is required.");
+
+            var separator = fileName.LastIndexOfAny(['/', '\\']);
+            var safeFileName = fileName[(separator + 1)..];
+            if (safeFileName.Length == 0)
+                throw new HypervisorException($"Unsupported Proxmox ISO filename: {fileName}");
+
+            return $"{StorageName(isoStore)}/{scopeId}/{safeFileName}";
+        }
 
         public static bool TrySplitDatastorePath(
             string datastorePath,

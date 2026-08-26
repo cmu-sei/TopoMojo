@@ -542,21 +542,11 @@ namespace TopoMojo.Hypervisor.Proxmox
                 DeploymentCollection.Add(ctx);
         }
 
+        // PVE storages are flat; ProxmoxIsoNaming encodes the scope into the filename.
+        public bool SupportsSubfolders => false;
+
         public string GetIsoDatastorePath(string scopeId, string fileName)
-        {
-            if (!Guid.TryParse(scopeId, out _))
-                throw new HypervisorException($"Unsupported Proxmox ISO scope: {scopeId}");
-
-            if (string.IsNullOrWhiteSpace(fileName))
-                throw new HypervisorException("An ISO filename is required.");
-
-            var separator = fileName.LastIndexOfAny(['/', '\\']);
-            var safeFileName = fileName[(separator + 1)..];
-            if (safeFileName.Length == 0)
-                throw new HypervisorException($"Unsupported Proxmox ISO filename: {fileName}");
-
-            return $"{ProxmoxIsoNaming.StorageName(_options.IsoStore)}/{scopeId}/{safeFileName}";
-        }
+            => ProxmoxIsoNaming.BuildDatastorePath(_options.IsoStore, scopeId, fileName);
 
         public async Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
         {
