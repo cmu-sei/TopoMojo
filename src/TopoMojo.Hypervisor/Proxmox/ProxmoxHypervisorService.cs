@@ -561,39 +561,19 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
         {
             var (storage, scopeId, fileName) = SplitIsoPath(datastorePath);
-            _logger.LogInformation("Uploading Proxmox ISO {scopeId}/{fileName} to storage {storage}", scopeId, fileName, storage);
 
-            try
-            {
-                // IHypervisorService exposes no ambient request token at this layer.
-                await _pveClient.UploadIso(scopeId, fileName, localFilePath, CancellationToken.None);
-                var volid = ProxmoxIsoNaming.BuildVolumeId(storage, ProxmoxIsoNaming.Encode(scopeId, fileName, _options.IsoScopeSeparator));
+            // IHypervisorService exposes no ambient request token at this layer.
+            await _pveClient.UploadIso(scopeId, fileName, localFilePath, CancellationToken.None);
 
-                _logger.LogInformation("Uploaded Proxmox ISO {volid}", volid);
-                return volid;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to upload Proxmox ISO {scopeId}/{fileName} to storage {storage}", scopeId, fileName, storage);
-                throw;
-            }
+            return ProxmoxIsoNaming.BuildVolumeId(
+                storage,
+                ProxmoxIsoNaming.Encode(scopeId, fileName, _options.IsoScopeSeparator));
         }
 
         public async Task DeleteFileFromDatastore(string datastorePath)
         {
-            var (storage, scopeId, fileName) = SplitIsoPath(datastorePath);
-            _logger.LogInformation("Deleting Proxmox ISO {scopeId}/{fileName} from storage {storage}", scopeId, fileName, storage);
-
-            try
-            {
-                await _pveClient.DeleteIso(scopeId, fileName);
-                _logger.LogInformation("Deleted Proxmox ISO {scopeId}/{fileName} from storage {storage}", scopeId, fileName, storage);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to delete Proxmox ISO {scopeId}/{fileName} from storage {storage}", scopeId, fileName, storage);
-                throw;
-            }
+            var (_, scopeId, fileName) = SplitIsoPath(datastorePath);
+            await _pveClient.DeleteIso(scopeId, fileName);
         }
 
         private (string storage, string scopeId, string fileName) SplitIsoPath(string datastorePath)

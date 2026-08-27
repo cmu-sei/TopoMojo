@@ -77,4 +77,24 @@ public class ProxmoxIsoFileTests
         Assert.Equal("0123456789abcdef0123456789abcdef", iso.ScopeId);
         Assert.Equal("x.iso", iso.ScopedFileName);
     }
+
+    [Fact]
+    public void MatchIso_MatchesDecodedScopedDisplayName()
+    {
+        const string scopeId = "44444444-4444-4444-4444-444444444444";
+        var current = ProxmoxIsoFile.From(new PveIso { Volid = $"iso:iso/{scopeId}__x.iso" }, "__");
+        var legacy = ProxmoxIsoFile.From(new PveIso { Volid = $"iso:iso/{scopeId}#y.iso" }, "__");
+
+        Assert.Equal(current.Volid, ProxmoxClient.MatchIso([current, legacy], $"{scopeId}/x.iso")?.Volid);
+        Assert.Equal(legacy.Volid, ProxmoxClient.MatchIso([current, legacy], $"{scopeId}/y.iso")?.Volid);
+    }
+
+    [Fact]
+    public void MatchIso_DoesNotFabricateScopeFromAnUnscopedHashName()
+    {
+        var unscoped = ProxmoxIsoFile.From(new PveIso { Volid = "iso:iso/ubuntu#24.iso" }, "__");
+
+        Assert.Equal(unscoped.Volid, ProxmoxClient.MatchIso([unscoped], "ubuntu#24.iso")?.Volid);
+        Assert.Null(ProxmoxClient.MatchIso([unscoped], "ubuntu/24.iso"));
+    }
 }

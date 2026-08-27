@@ -135,7 +135,7 @@ public class FileController(
 
                     try
                     {
-                        await UploadToDatastore(dp, datastorePath);
+                        await UploadToDatastore(dp, datastorePath, metadata[Meta.Name] ?? metadata[Meta.OriginalName]);
                     }
                     catch (Exception ex)
                     {
@@ -183,7 +183,7 @@ public class FileController(
     }
 
 
-    private async Task UploadToDatastore(string tempFilePath, string datastorePath)
+    private async Task UploadToDatastore(string tempFilePath, string datastorePath, string entryFileName)
     {
         string fileToUpload = tempFilePath;
 
@@ -191,7 +191,7 @@ public class FileController(
         {
             string isoPath = tempFilePath + Meta.IsoFileExtension;
 
-            BuildIso(tempFilePath, isoPath, datastorePath);
+            BuildIso(tempFilePath, isoPath, entryFileName);
 
             System.IO.File.Delete(tempFilePath);
             fileToUpload = isoPath;
@@ -335,8 +335,15 @@ public class FileController(
     private static string SanitizeIsoFilename(string filename)
         => filename.Replace(" ", "").SanitizeFilename();
 
-    internal static string GetIsoEntryName(string datastorePath)
-        => SanitizeIsoFilename(Path.GetFileName(datastorePath));
+    // Clients can submit a full path as the filename (e.g. "C:\fakepath\file.txt"). Path.GetFileName
+    // only honors the host separator, and Path.GetInvalidFileNameChars() is just { '\0', '/' } on
+    // Linux, so a surviving backslash would become a directory separator inside the generated ISO.
+    internal static string GetIsoEntryName(string fileName)
+    {
+        int cut = fileName.LastIndexOfAny(['/', '\\']);
+
+        return SanitizeIsoFilename(cut < 0 ? fileName : fileName[(cut + 1)..]);
+    }
 
     internal static void BuildIso(string sourcePath, string isoPath, string entryNameSource)
     {
