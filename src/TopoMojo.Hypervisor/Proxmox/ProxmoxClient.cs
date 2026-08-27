@@ -582,7 +582,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<ProxmoxIsoFile[]> GetFiles()
         {
             var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
-            var node = await GetIsoStorageNode(requireAvailable: false);
+            var node = await GetIsoStorageNode();
 
             var task = await _pveClient
                 .Nodes[node]
@@ -599,19 +599,24 @@ namespace TopoMojo.Hypervisor.Proxmox
         }
 
 
-        private async Task<string> GetIsoStorageNode(bool requireAvailable = true)
+        private async Task<string> GetIsoStorageNode()
         {
             var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
             var resources = await _pveClient.GetResourcesAsync(ClusterResourceType.Storage);
+            return SelectIsoStorageNode(resources, storage, _random);
+        }
+
+        internal static string SelectIsoStorageNode(
+            IEnumerable<ClusterResource> resources,
+            string storage,
+            Random random)
+        {
             var candidates = resources
                 .Where(x => x.ResourceType == ClusterResourceType.Storage
                     && string.Equals(x.Storage, storage, StringComparison.Ordinal)
+                    && x.IsAvailable
                     && !string.IsNullOrWhiteSpace(x.Node))
                 .ToList();
-
-            if (requireAvailable)
-                candidates = candidates.Where(x => x.IsAvailable).ToList();
-
             var nodes = candidates
                 .Select(x => x.Node)
                 .Distinct(StringComparer.Ordinal)
@@ -630,7 +635,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                     + "an ISO written through one node would not be mountable from the others.");
             }
 
-            return nodes[_random.Next(nodes.Count)];
+            return nodes[random.Next(nodes.Count)];
         }
 
         public async Task UploadIso(string scopeId, string fileName, string localFilePath, CancellationToken cancellationToken = default)
