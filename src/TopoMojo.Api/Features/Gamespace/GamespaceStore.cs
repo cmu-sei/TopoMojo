@@ -173,7 +173,10 @@ namespace TopoMojo.Api.Data
             var now = DateTimeOffset.UtcNow;
 
             return await DbSet
-                .Where(g => g.StartTime.Year > 1 && g.EndTime.Year <= 1 && g.ExpirationTime >= now)
+                .Where(g =>
+                    g.StartTime > DateTimeOffset.MinValue &&
+                    g.EndTime <= DateTimeOffset.MinValue &&
+                    g.ExpirationTime >= now)
                 .Where(g => g.Workspace.Templates.Any(t => t.Iso == isoPath))
                 .ToArrayAsync();
         }
