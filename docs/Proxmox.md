@@ -141,8 +141,6 @@ TopoMojo can optionally allow uploading of ISO files that can be mounted to virt
 - Pod__IsoScopeSeparator
     - Optional. Defaults to `__`. A Proxmox ISO store is flat, so TopoMojo folds the owning workspace id into the uploaded filename as `{workspaceId}{separator}{filename}`. The value must contain `_` and consist of `[-a-zA-Z0-9_.]`, because PVE rewrites every other character to `_` and a separator that can occur inside a workspace id makes unscoped filenames decode as scoped. Use `__` or another separator such as `_x_`.
     - Proxmox layout is `{workspaceId}__{filename}`. The previous `{workspaceId}#{filename}` layout remains readable and deletable. Names without a recognized scope separator are not offered as workspace ISO options.
-- FileUpload__SupportsSubFolders
-    - Removed and ignored. Proxmox owns the flat filename layout; do not configure this setting.
 - FileUpload_IsoRoot
     - Set this to a path that is mounted to the TopoMojo API container that ISOs uploaded through TopoMojo will be saved to.
     - This should map to the same underlying storage as `Pod_IsoStore` above.
