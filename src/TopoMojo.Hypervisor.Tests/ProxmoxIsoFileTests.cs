@@ -6,76 +6,31 @@ namespace TopoMojo.Hypervisor.Tests;
 
 public class ProxmoxIsoFileTests
 {
-    [Fact]
-    public void PublicIso_UsesDecodedDisplayName()
+    private const string WorkspaceId = "0123456789abcdef0123456789abcdef";
+    private const string PublicId = "00000000-0000-0000-0000-000000000000";
+    private const string VolidPrefix = "iso:iso/";
+
+    [Theory]
+    [InlineData("__", PublicId + "__x.iso", PublicId + "/x.iso", PublicId, "x.iso")]
+    [InlineData("__", WorkspaceId + "#My File.iso", WorkspaceId + "/My File.iso", WorkspaceId, "My File.iso")]
+    [InlineData("__", WorkspaceId + "#9b3b331c-10c1-448b-8114-21b2586d8e38#file.iso",
+        WorkspaceId + "/9b3b331c-10c1-448b-8114-21b2586d8e38#file.iso",
+        WorkspaceId, "9b3b331c-10c1-448b-8114-21b2586d8e38#file.iso")]
+    [InlineData("__", "ubuntu-24.04.iso", "ubuntu-24.04.iso", null, "ubuntu-24.04.iso")]
+    [InlineData("-", WorkspaceId + "-x.iso", WorkspaceId + "/x.iso", WorkspaceId, "x.iso")]
+    public void From_DecodesVolidIntoNameScopeAndDisplayName(
+        string separator,
+        string storedName,
+        string expectedDisplayName,
+        string expectedScopeId,
+        string expectedScopedFileName)
     {
-        var iso = ProxmoxIsoFile.From(
-            new PveIso
-            {
-                Volid = "iso:iso/00000000-0000-0000-0000-000000000000__x.iso"
-            },
-            ProxmoxIsoNaming.DefaultScopeSeparator);
+        var iso = ProxmoxIsoFile.From(new PveIso { Volid = VolidPrefix + storedName }, separator);
 
-        Assert.Equal("00000000-0000-0000-0000-000000000000/x.iso", iso.DisplayName);
-        Assert.Equal("00000000-0000-0000-0000-000000000000", iso.ScopeId);
-    }
-
-    [Fact]
-    public void LegacyIso_UsesDecodedDisplayName()
-    {
-        var iso = ProxmoxIsoFile.From(
-            new PveIso
-            {
-                Volid = "iso:iso/0123456789abcdef0123456789abcdef#My File.iso"
-            },
-            ProxmoxIsoNaming.DefaultScopeSeparator);
-
-        Assert.Equal("0123456789abcdef0123456789abcdef/My File.iso", iso.DisplayName);
-        Assert.Equal("0123456789abcdef0123456789abcdef", iso.ScopeId);
-    }
-
-    [Fact]
-    public void DisplayName_LegacyMultiSeparatorName()
-    {
-        var iso = ProxmoxIsoFile.From(
-            new PveIso
-            {
-                Volid = "iso:iso/0123456789abcdef0123456789abcdef#9b3b331c-10c1-448b-8114-21b2586d8e38#file.iso"
-            },
-            ProxmoxIsoNaming.DefaultScopeSeparator);
-
-        Assert.Equal(
-            "0123456789abcdef0123456789abcdef/9b3b331c-10c1-448b-8114-21b2586d8e38#file.iso",
-            iso.DisplayName);
-    }
-
-    [Fact]
-    public void UnscopedIso_RetainsStoredName()
-    {
-        var iso = ProxmoxIsoFile.From(
-            new PveIso
-            {
-                Volid = "iso:iso/ubuntu-24.04.iso"
-            },
-            ProxmoxIsoNaming.DefaultScopeSeparator);
-
-        Assert.Equal("ubuntu-24.04.iso", iso.DisplayName);
-        Assert.Null(iso.ScopeId);
-        Assert.Equal("ubuntu-24.04.iso", iso.ScopedFileName);
-    }
-
-    [Fact]
-    public void Iso_DecodesWithANonDefaultSeparator()
-    {
-        var iso = ProxmoxIsoFile.From(
-            new PveIso
-            {
-                Volid = "iso:iso/0123456789abcdef0123456789abcdef-x.iso"
-            },
-            "-");
-
-        Assert.Equal("0123456789abcdef0123456789abcdef", iso.ScopeId);
-        Assert.Equal("x.iso", iso.ScopedFileName);
+        Assert.Equal(storedName, iso.Name);
+        Assert.Equal(expectedDisplayName, iso.DisplayName);
+        Assert.Equal(expectedScopeId, iso.ScopeId);
+        Assert.Equal(expectedScopedFileName, iso.ScopedFileName);
     }
 
     [Fact]

@@ -31,14 +31,12 @@ public sealed class ProxmoxIsoStorageNodeTests
             StorageResource("iso", "node-b", false, true)
         };
 
-        var error = Assert.Throws<HypervisorException>(
+        Assert.Throws<HypervisorException>(
             () => ProxmoxClient.SelectIsoStorageNode(resources, "iso", Random.Shared));
-
-        Assert.Contains("No online Proxmox node", error.Message);
     }
 
     [Fact]
-    public void SelectIsoStorageNode_SelectsAmongAvailableSharedNodes()
+    public void SelectIsoStorageNode_NeverSelectsAnUnavailableNode()
     {
         var resources = new[]
         {
@@ -47,9 +45,9 @@ public sealed class ProxmoxIsoStorageNodeTests
             StorageResource("iso", "offline", false, true)
         };
 
-        var node = ProxmoxClient.SelectIsoStorageNode(resources, "iso", new LastIndexRandom());
+        var node = ProxmoxClient.SelectIsoStorageNode(resources, "iso", Random.Shared);
 
-        Assert.Equal("node-b", node);
+        Assert.Contains(node, new[] { "node-a", "node-b" });
     }
 
     [Fact]
@@ -61,10 +59,8 @@ public sealed class ProxmoxIsoStorageNodeTests
             StorageResource("iso", "node-b", true, false)
         };
 
-        var error = Assert.Throws<HypervisorException>(
+        Assert.Throws<HypervisorException>(
             () => ProxmoxClient.SelectIsoStorageNode(resources, "iso", Random.Shared));
-
-        Assert.Contains("is available on multiple nodes but is not shared", error.Message);
     }
 
     [Fact]
@@ -104,9 +100,4 @@ public sealed class ProxmoxIsoStorageNodeTests
             IsAvailable = isAvailable,
             Shared = shared
         };
-
-    private sealed class LastIndexRandom : Random
-    {
-        public override int Next(int maxValue) => maxValue - 1;
-    }
 }

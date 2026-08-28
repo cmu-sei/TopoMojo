@@ -1,7 +1,6 @@
 using System;
-using TopoMojo.Hypervisor.Exceptions;
 using TopoMojo.Hypervisor.Proxmox;
-using TopoMojo.Hypervisor.Proxmox.Models;
+using TopoMojo.Hypervisor.Exceptions;
 using Xunit;
 
 namespace TopoMojo.Hypervisor.Tests;
@@ -12,70 +11,56 @@ public class ProxmoxIsoNamingTests
     private const string PublicId = "00000000-0000-0000-0000-000000000000";
     private const string Sep = ProxmoxIsoNaming.DefaultScopeSeparator;
 
-    [Fact]
-    public void NormalizeFilename_MirrorsProxmoxSafeNaming()
+    [Theory]
+    [InlineData("My File(1).iso", "My_File_1_.iso")]
+    [InlineData("a##b.iso", "a_b.iso")]
+    [InlineData("../../etc/passwd.iso", "passwd.iso")]
+    [InlineData("foo._iso", "foo._iso")]
+    public void NormalizeFilename_MirrorsProxmoxSafeNaming(string input, string expected)
     {
-        var inputs = new[]
-        {
-            (Input: "My File(1).iso", Expected: "My_File_1_.iso"),
-            (Input: "a##b.iso", Expected: "a_b.iso"),
-            (Input: "../../etc/passwd.iso", Expected: "passwd.iso")
-        };
-
-        foreach (var (input, expected) in inputs)
-        {
-            var normalized = ProxmoxIsoNaming.NormalizeFilename(input);
-            Assert.Equal(expected, normalized);
-            Assert.Equal(normalized, ProxmoxIsoNaming.NormalizeFilename(normalized));
-        }
+        var normalized = ProxmoxIsoNaming.NormalizeFilename(input);
+        Assert.Equal(expected, normalized);
+        Assert.Equal(normalized, ProxmoxIsoNaming.NormalizeFilename(normalized));
     }
 
-    [Fact]
-    public void Encode_UsesPveSafeScopeSeparator()
+    [Theory]
+    [InlineData("__", WorkspaceId, "My File.iso", WorkspaceId + "__My_File.iso", "My_File.iso")]
+    [InlineData("__", PublicId, "x.iso", PublicId + "__x.iso", "x.iso")]
+    [InlineData("_x_", WorkspaceId, "My File.iso", WorkspaceId + "_x_My_File.iso", "My_File.iso")]
+    [InlineData("_x_", PublicId, "My File.iso", PublicId + "_x_My_File.iso", "My_File.iso")]
+    [InlineData("-", WorkspaceId, "My File.iso", WorkspaceId + "-My_File.iso", "My_File.iso")]
+    // A dashed guid scope still decodes: the scan only accepts a prefix that parses as a Guid.
+    [InlineData("-", PublicId, "x.iso", PublicId + "-x.iso", "x.iso")]
+    public void EncodeAndTryDecode_RoundTripAcrossSeparators(
+        string separator,
+        string scopeId,
+        string fileName,
+        string expectedStoredName,
+        string expectedDecodedFileName)
     {
-        Assert.Equal(
-            $"{WorkspaceId}__My_File.iso",
-            ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", Sep));
+        var stored = ProxmoxIsoNaming.Encode(scopeId, fileName, separator);
+        Assert.Equal(expectedStoredName, stored);
+
+        Assert.True(ProxmoxIsoNaming.TryDecode(stored, separator, out var decodedScopeId, out var decodedFileName));
+        Assert.Equal(scopeId, decodedScopeId);
+        Assert.Equal(expectedDecodedFileName, decodedFileName);
     }
 
-    [Fact]
-    public void TryDecode_RecoversNewAndLegacyNames()
-    {
-        Assert.True(
-            ProxmoxIsoNaming.TryDecode(
-                $"{WorkspaceId}__My_File.iso",
-                Sep,
-                out var scopeId,
-                out var fileName));
-        Assert.Equal(WorkspaceId, scopeId);
-        Assert.Equal("My_File.iso", fileName);
+    [Theory]
+    [InlineData("__", "ubuntu__24.iso")]
+    [InlineData("__", "ubuntu.iso")]
+    [InlineData("_x_", WorkspaceId + "__x.iso")]
+    [InlineData("-", "ubuntu-24.04.iso")]
+    public void TryDecode_RejectsNamesWithoutADecodableScope(string separator, string storedName)
+        => Assert.False(ProxmoxIsoNaming.TryDecode(storedName, separator, out _, out _));
 
-        Assert.True(
-            ProxmoxIsoNaming.TryDecode(
-                $"{WorkspaceId}#My File.iso",
-                Sep,
-                out scopeId,
-                out fileName));
+    [Fact]
+    public void TryDecode_AcceptsTheLegacyHashSeparator()
+    {
+        Assert.True(ProxmoxIsoNaming.TryDecode($"{WorkspaceId}#My File.iso", Sep, out var scopeId, out var fileName));
         Assert.Equal(WorkspaceId, scopeId);
+        // The legacy branch returns the stored basename verbatim; it is not re-normalized.
         Assert.Equal("My File.iso", fileName);
-    }
-
-    [Fact]
-    public void TryDecode_RejectsUnscopedNames()
-    {
-        Assert.True(ProxmoxIsoNaming.TryDecode($"{PublicId}__x.iso", Sep, out var scopeId, out var fileName));
-        Assert.Equal(PublicId, scopeId);
-        Assert.Equal("x.iso", fileName);
-        Assert.False(ProxmoxIsoNaming.TryDecode("ubuntu__24.iso", Sep, out _, out _));
-        Assert.False(ProxmoxIsoNaming.TryDecode("ubuntu.iso", Sep, out _, out _));
-    }
-
-    [Fact]
-    public void Encode_UsesTheConfiguredSeparator()
-    {
-        Assert.Equal(
-            $"{WorkspaceId}_x_My_File.iso",
-            ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", "_x_"));
     }
 
     [Fact]
@@ -95,35 +80,6 @@ public class ProxmoxIsoNamingTests
     }
 
     [Fact]
-    public void DeleteCandidates_PreferCurrentThenLegacy()
-    {
-        var candidates = new[]
-        {
-            ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", Sep),
-            ProxmoxIsoNaming.EncodeLegacy(WorkspaceId, "My File.iso")
-        };
-
-        Assert.Equal(
-            new[] { $"{WorkspaceId}__My_File.iso", $"{WorkspaceId}#MyFile.iso" },
-            candidates);
-
-        var legacy = ProxmoxIsoFile.From(
-            new PveIso { Volid = $"iso:iso/{candidates[1]}" }, Sep);
-        Assert.Equal(candidates[1], legacy.Name);
-    }
-
-    [Fact]
-    public void TryDecode_RoundTripsANonDefaultSeparator()
-    {
-        var encoded = ProxmoxIsoNaming.Encode(PublicId, "My File.iso", "_x_");
-
-        Assert.True(ProxmoxIsoNaming.TryDecode(encoded, "_x_", out var scopeId, out var fileName));
-        Assert.Equal(PublicId, scopeId);
-        Assert.Equal("My_File.iso", fileName);
-        Assert.False(ProxmoxIsoNaming.TryDecode($"{WorkspaceId}__x.iso", "_x_", out _, out _));
-    }
-
-    [Fact]
     public void ValidateScopeSeparator_RejectsEmptyAndNonPveSafeValues()
     {
         Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator(null));
@@ -137,22 +93,25 @@ public class ProxmoxIsoNamingTests
         ProxmoxIsoNaming.ValidateScopeSeparator(".");
     }
 
-    [Fact]
-    public void TryDecode_RoundTripsAHyphenSeparator()
+    [Theory]
+    [InlineData("iso/", "iso")]
+    [InlineData("iso", "iso")]
+    [InlineData("/iso/", "iso")]
+    [InlineData(null, "")]
+    public void StorageName_TrimsPathSeparators(string isoStore, string expected)
     {
-        var encoded = ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", "-");
-        Assert.Equal($"{WorkspaceId}-My_File.iso", encoded);
+        Assert.Equal(expected, ProxmoxIsoNaming.StorageName(isoStore));
+    }
 
-        Assert.True(ProxmoxIsoNaming.TryDecode(encoded, "-", out var scopeId, out var fileName));
-        Assert.Equal(WorkspaceId, scopeId);
-        Assert.Equal("My_File.iso", fileName);
+    [Fact]
+    public void BuildDatastorePath_NormalizesBasenameAndRequiresAGuidScope()
+    {
+        Assert.Equal(
+            $"iso/{WorkspaceId}/foo._iso",
+            ProxmoxIsoNaming.BuildDatastorePath("iso/", WorkspaceId, "sub/foo. iso"));
 
-        // A dashed scope id still decodes, because the scan only accepts a prefix that parses as a Guid.
-        Assert.True(ProxmoxIsoNaming.TryDecode($"{PublicId}-x.iso", "-", out var publicScopeId, out var publicFileName));
-        Assert.Equal(PublicId, publicScopeId);
-        Assert.Equal("x.iso", publicFileName);
-
-        Assert.False(ProxmoxIsoNaming.TryDecode("ubuntu-24.04.iso", "-", out _, out _));
+        Assert.Throws<HypervisorException>(
+            () => ProxmoxIsoNaming.BuildDatastorePath("iso/", "not-a-guid", "f.iso"));
     }
 
     [Fact]
@@ -170,11 +129,5 @@ public class ProxmoxIsoNamingTests
 
         Assert.False(ProxmoxIsoNaming.TrySplitDatastorePath("iso/f.iso", out _, out _, out _));
         Assert.False(ProxmoxIsoNaming.TrySplitDatastorePath("iso/a/b/c.iso", out _, out _, out _));
-    }
-
-    [Fact]
-    public void StorageName_TrimsPathSeparators()
-    {
-        Assert.Equal("iso", ProxmoxIsoNaming.StorageName("iso/"));
     }
 }

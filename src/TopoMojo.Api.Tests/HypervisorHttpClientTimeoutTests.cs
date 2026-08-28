@@ -12,6 +12,7 @@ public sealed class HypervisorHttpClientTimeoutTests
     [Theory]
     [InlineData(7, 7)]
     [InlineData(0, HypervisorServiceConfiguration.DefaultUploadTimeoutMinutes)]
+    [InlineData(-5, HypervisorServiceConfiguration.DefaultUploadTimeoutMinutes)]
     public void AddTopoMojoHypervisor_ConfiguresStorageUploadClients(
         int configuredMinutes,
         int expectedMinutes)
