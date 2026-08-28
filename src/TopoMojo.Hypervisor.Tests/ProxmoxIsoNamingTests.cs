@@ -133,16 +133,26 @@ public class ProxmoxIsoNamingTests
 
         ProxmoxIsoNaming.ValidateScopeSeparator("__");
         ProxmoxIsoNaming.ValidateScopeSeparator("_x_");
+        ProxmoxIsoNaming.ValidateScopeSeparator("-");
+        ProxmoxIsoNaming.ValidateScopeSeparator(".");
     }
 
     [Fact]
-    public void ValidateScopeSeparator_RejectsGuidAmbiguousSeparators()
+    public void TryDecode_RoundTripsAHyphenSeparator()
     {
-        Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator("."));
-        Assert.Throws<HypervisorException>(() => ProxmoxIsoNaming.ValidateScopeSeparator("-"));
+        var encoded = ProxmoxIsoNaming.Encode(WorkspaceId, "My File.iso", "-");
+        Assert.Equal($"{WorkspaceId}-My_File.iso", encoded);
 
-        ProxmoxIsoNaming.ValidateScopeSeparator("__");
-        ProxmoxIsoNaming.ValidateScopeSeparator("_x_");
+        Assert.True(ProxmoxIsoNaming.TryDecode(encoded, "-", out var scopeId, out var fileName));
+        Assert.Equal(WorkspaceId, scopeId);
+        Assert.Equal("My_File.iso", fileName);
+
+        // A dashed scope id still decodes, because the scan only accepts a prefix that parses as a Guid.
+        Assert.True(ProxmoxIsoNaming.TryDecode($"{PublicId}-x.iso", "-", out var publicScopeId, out var publicFileName));
+        Assert.Equal(PublicId, publicScopeId);
+        Assert.Equal("x.iso", publicFileName);
+
+        Assert.False(ProxmoxIsoNaming.TryDecode("ubuntu-24.04.iso", "-", out _, out _));
     }
 
     [Fact]

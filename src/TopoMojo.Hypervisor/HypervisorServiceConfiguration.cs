@@ -70,12 +70,8 @@ namespace TopoMojo.Hypervisor
         /// </summary>
         public int IsoUploadTimeoutMinutes { get; set; } = 120;
         /// <summary>
-        /// Separator folded into a Proxmox ISO filename to carry the workspace scope, since a PVE ISO
-        /// storage is flat and '/' is not a legal filename character. Configurable so a change in how PVE
-        /// normalizes uploaded filenames is a config fix rather than a code change.
-        /// Must contain '_' and consist of [-a-zA-Z0-9_.]: PVE's storage upload API rewrites every other character to '_',
-        /// and separators without '_' can occur inside a workspace id.
-        /// Only used by the Proxmox hypervisor; vSphere scopes ISOs with datastore folders.
+        /// Proxmox only. Separator folded into flat ISO filenames to carry workspace scope.
+        /// Must consist of [-a-zA-Z0-9_.]; defaults to "__".
         /// </summary>
         public string IsoScopeSeparator { get; set; } = "__";
 

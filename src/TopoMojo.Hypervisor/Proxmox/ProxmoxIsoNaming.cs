@@ -105,11 +105,6 @@ namespace TopoMojo.Hypervisor.Proxmox
                     "Pod__IsoScopeSeparator cannot be empty - it is what carries the workspace scope in a Proxmox ISO filename.");
             }
 
-            if (!separator.Contains('_'))
-            {
-                throw new HypervisorException(
-                    $"Pod__IsoScopeSeparator '{separator}' cannot be used, because it can occur inside a workspace id and would make unscoped filenames decode as scoped. Use '__'.");
-            }
 
             if (InvalidSeparatorCharsRegex().IsMatch(separator))
             {
