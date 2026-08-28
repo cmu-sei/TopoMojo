@@ -150,7 +150,7 @@ Choose one of the following upload modes:
 - Set `FileUpload__TempRoot` to a writable local directory used to stage each upload, such as `/var/topomojo/isostage`.
 - TopoMojo converts non-ISO uploads into ISO files, uploads them to the Proxmox storage identified by `Pod__IsoStore`, and removes the local staging file after the upload completes.
 - `FileUpload__IsoRoot` is not used for upload or delete operations in this mode, so no mounted ISO share is required.
-- `FileUpload__UploadTimeoutMinutes` controls the datastore upload timeout.
+- `FileUpload__UploadTimeoutMinutes` controls the ISO upload timeout.
 
 **Mounted-share mode**
 

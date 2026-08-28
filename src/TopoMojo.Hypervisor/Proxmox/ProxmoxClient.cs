@@ -658,6 +658,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             using var fileStream = File.OpenRead(localFilePath);
             var uploadClient = CreateIsoUploadClient();
+            var uploadTimeout = ResolveIsoUploadTimeout(uploadClient.GetHttpClient().Timeout);
             var result = await uploadClient.UploadFileToStorageAsync(
                 node,
                 storage,
@@ -665,11 +666,13 @@ namespace TopoMojo.Hypervisor.Proxmox
                 fileStream,
                 storedName,
                 cancellationToken,
-                secondsTimeout: Math.Max(1, _config.IsoUploadTimeoutMinutes) * 60);
+                // Passed explicitly because the SDK assigns HttpClient.Timeout from this argument and would
+                // otherwise apply its own 600 second default.
+                secondsTimeout: (int)uploadTimeout.TotalSeconds);
 
-            var timeoutMs = (long)Math.Max(1, _config.IsoUploadTimeoutMinutes) * 60 * 1000;
-            if (!await _pveClient.WaitForTaskToFinish(result, timeout: timeoutMs))
-                throw new HypervisorException($"Proxmox ISO upload task did not finish within {Math.Max(1, _config.IsoUploadTimeoutMinutes)} minutes: {storedName}");
+            if (!await _pveClient.WaitForTaskToFinish(result, timeout: (long)uploadTimeout.TotalMilliseconds))
+                throw new HypervisorException(
+                    $"Proxmox ISO upload task did not finish within {uploadTimeout.TotalMinutes:0.##} minutes: {storedName}");
 
             _logger.LogInformation(
                 "Uploaded Proxmox ISO {storedName} to storage {storage} on node {node}",
@@ -727,12 +730,18 @@ namespace TopoMojo.Hypervisor.Proxmox
                 node);
         }
 
-        // Use a per-upload client so the request timeout can differ without mutating the shared client.
         private PveClient CreateIsoUploadClient()
-            => new(_config.Host, _port, _httpClientFactory.CreateClient("proxmox"))
+            => new(_config.Host, _port, _httpClientFactory.CreateClient("proxmoxIsoUpload"))
             {
                 ApiToken = _config.AccessToken
             };
+
+        // Guards the two values HttpClient allows but the PVE upload cannot use: Timeout.InfiniteTimeSpan
+        // (-1ms) and any non-positive span. Falls back to the FileUpload__UploadTimeoutMinutes default.
+        internal static TimeSpan ResolveIsoUploadTimeout(TimeSpan configured)
+            => configured > TimeSpan.Zero
+                ? configured
+                : TimeSpan.FromMinutes(HypervisorServiceConfiguration.DefaultUploadTimeoutMinutes);
 
         public async Task<PveVmConfig> GetVmConfig(Vm vm)
             => await GetVmConfig(await GetCurrentNode(vm), vm.GetId());

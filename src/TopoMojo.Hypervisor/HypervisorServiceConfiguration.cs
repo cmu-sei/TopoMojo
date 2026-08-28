@@ -7,6 +7,7 @@ namespace TopoMojo.Hypervisor
 {
     public class HypervisorServiceConfiguration
     {
+        public const int DefaultUploadTimeoutMinutes = 60;
         public bool IsVCenter { get; set; }
         public HypervisorType HypervisorType { get; set; }
         public string Type { get; set; }
@@ -61,14 +62,6 @@ namespace TopoMojo.Hypervisor
         /// Null uses the Proxmox default. Has no effect unless EnableHA is set.
         /// </summary>
         public int? HaMaxRelocate { get; set; }
-        /// <summary>
-        /// Proxmox only. Timeout for an ISO push through PVE's storage upload API. Populated from
-        /// FileUpload__UploadTimeoutMinutes, the same setting the vSphere datastore upload uses;
-        /// it has to live here because FileUploadOptions is declared in TopoMojo.Api, which
-        /// TopoMojo.Hypervisor cannot reference. Not operator-configurable under Pod__; always
-        /// assigned from FileUpload__UploadTimeoutMinutes during startup.
-        /// </summary>
-        public int IsoUploadTimeoutMinutes { get; set; } = 120;
         /// <summary>
         /// Proxmox only. Separator folded into flat ISO filenames to carry workspace scope.
         /// Must consist of [-a-zA-Z0-9_.]; defaults to "__".
