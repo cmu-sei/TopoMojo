@@ -119,7 +119,7 @@ namespace TopoMojo.Api
         public string TempRoot { get; set; } = Path.Combine(Path.GetTempPath(), "topoiso");
 
         /// <summary>
-        /// Timeout in minutes for vSphere datastore uploads and the Proxmox ISO push (default: 60 minutes / 1 hour)
+        /// Timeout in minutes for uploads when UseDatastoreApi is enabled
         /// </summary>
         public int UploadTimeoutMinutes { get; set; } = HypervisorServiceConfiguration.DefaultUploadTimeoutMinutes;
 
