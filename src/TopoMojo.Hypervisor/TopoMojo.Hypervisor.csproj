@@ -18,4 +18,8 @@
     <PackageReference Include="Corsinvest.ProxmoxVE.Api.Extension" Version="9.2.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="TopoMojo.Hypervisor.Tests" />
+  </ItemGroup>
+
 </Project>

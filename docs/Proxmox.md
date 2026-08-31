@@ -133,18 +133,32 @@ This section describes the appsettings that will need to be set to configure Top
 
 #### ISOs
 
-TopoMojo can optionally allow uploading of ISO files that can be mounted to virtual machines. You will need to set these settings to enable this feature.
+TopoMojo can optionally allow uploading ISO files that can be mounted to virtual machines. Both upload modes require `Pod__IsoStore`, which identifies the Proxmox storage used for ISO files.
 
 - Pod__IsoStore
-    - Set this to the name of the shared storage in your Proxmox cluster that ISOs will be sourced from for mounting to virtual machines.
+    - Set this to the name of the Proxmox storage where ISOs will be stored and mounted to virtual machines.
     - e.g. `iso`
-- FileUpload_IsoRoot
-    - Set this to a path that is mounted to the TopoMojo API container that ISOs uploaded through TopoMojo will be saved to.
-    - This should map to the same underlying storage as `Pod_IsoStore` above.
-    - Proxmox creates a particular directory structure for ISO stores, so this path needs to end in /template/iso.
-    - e.g. `/mnt/isos/template/iso`
-- FileUpload_SupportsSubFolders
-    - Set this to `false` for Proxmox since Proxmox does not allow sub folders in it's ISO stores
+- Pod__IsoScopeSeparator
+    - Optional. Defaults to `__`. A Proxmox ISO store is flat, so TopoMojo folds the owning workspace id into the uploaded filename as `{workspaceId}{separator}{filename}`. The value must consist of `[-a-zA-Z0-9_.]`, because PVE rewrites every other character to `_`. Use `__` as the recommended separator; a separator such as `-` or `.` can make a foreign ISO whose name starts with a workspace-id-shaped token list as workspace-scoped.
+    - Proxmox layout is `{workspaceId}__{filename}`. The previous `{workspaceId}#{filename}` layout remains readable and deletable. Names without a recognized scope separator are not offered as workspace ISO options.
+
+Choose one of the following upload modes:
+
+**Direct Proxmox API mode**
+
+- `FileUpload__UseDatastoreApi = true`
+- Set `FileUpload__TempRoot` to a writable local directory used to stage each upload, such as `/var/topomojo/isostage`.
+- TopoMojo converts non-ISO uploads into ISO files, uploads them to the Proxmox storage identified by `Pod__IsoStore`, and removes the local staging file after the upload completes.
+- `FileUpload__IsoRoot` is not used for upload or delete operations in this mode, so no mounted ISO share is required.
+- `FileUpload__UploadTimeoutMinutes` controls the ISO upload timeout.
+
+**Mounted-share mode**
+
+- Leave `FileUpload__UseDatastoreApi = false`.
+- Set `FileUpload__IsoRoot` to the path where the Proxmox ISO storage is mounted inside the TopoMojo API container.
+- The mounted path must map to the same underlying storage as `Pod__IsoStore`. Proxmox ISO storage uses the `/template/iso` directory, so the path should end in `/template/iso`.
+- e.g. `/mnt/isos/template/iso`
+- In this mode, TopoMojo writes and deletes ISO files directly through the mounted filesystem; `FileUpload__TempRoot` is not used for the upload.
 
 ## High Availability and CRS
 

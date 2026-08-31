@@ -6,9 +6,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Http;
 using Microsoft.Extensions.Logging;
+using TopoMojo.Hypervisor.Exceptions;
 using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.Proxmox
@@ -115,13 +117,6 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private void NormalizeTemplate(VmTemplate template, HypervisorServiceConfiguration option, bool privileged = false)
         {
-            if (template.Iso.HasValue())
-            {
-                var isoPath = template.Iso.Replace('/', '#');
-                isoPath = $"{option.IsoStore.Replace("/", string.Empty)}:iso/{isoPath}";
-                template.Iso = isoPath;
-            }
-
             foreach (VmDisk disk in template.Disks)
             {
                 if (!disk.Path.StartsWith(option.DiskStore)
@@ -216,6 +211,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (!regex.IsMatch(options.IsoStore))
                 options.IsoStore += "/";
+            ProxmoxIsoNaming.ValidateScopeSeparator(options.IsoScopeSeparator);
         }
 
         public async Task<Vm> Load(string id)
@@ -489,16 +485,15 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<VmOptions> GetVmIsoOptions(string key)
         {
             var isos = await this._pveClient.GetFiles();
+            var publicKey = Guid.Empty.ToString();
 
             return new VmOptions
             {
                 Iso = isos
-                    .Where(x => x.Name.Contains('#') || x.Name.StartsWith(Guid.Empty.ToString())) // Exclude root-level ISOs
-                    .Where(x =>
-                        key == Guid.Empty.ToString() ||                      // Global request: return all
-                        x.Name.StartsWith(key) ||                            // Workspace ISOs
-                        x.Name.StartsWith(Guid.Empty.ToString())             // Global ISOs
-                    )
+                    .Where(x => x.ScopeId is not null)
+                    .Where(x => string.Equals(key, publicKey, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(x.ScopeId, key, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(x.ScopeId, publicKey, StringComparison.OrdinalIgnoreCase))
                     .Select(x => x.DisplayName)
                     .ToArray()
             };
@@ -549,14 +544,47 @@ namespace TopoMojo.Hypervisor.Proxmox
                 DeploymentCollection.Add(ctx);
         }
 
-        public Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
+        // PVE storages are flat; ProxmoxIsoNaming encodes the scope into the filename.
+        public string GetIsoStorePath(string scopeId, string fileName)
+            => ProxmoxIsoNaming.Encode(scopeId, fileName, _options.IsoScopeSeparator);
+
+        public IReadOnlyList<string> GetIsoStorePathCandidates(string scopeId, string fileName)
         {
-            throw new NotSupportedException("Proxmox uses local filesystem mounts, not API uploads");
+            var current = GetIsoStorePath(scopeId, fileName);
+            var legacy = ProxmoxIsoNaming.EncodeLegacy(scopeId, fileName);
+            return string.Equals(current, legacy, StringComparison.Ordinal) ? [current] : [current, legacy];
         }
 
-        public Task DeleteFileFromDatastore(string datastorePath)
+        public string GetIsoDatastorePath(string scopeId, string fileName)
+            => ProxmoxIsoNaming.BuildDatastorePath(_options.IsoStore, scopeId, fileName);
+
+        public async Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
         {
-            throw new NotSupportedException("Proxmox does not support datastore API operations");
+            var (storage, scopeId, fileName) = SplitIsoPath(datastorePath);
+
+            // IHypervisorService exposes no ambient request token at this layer.
+            await _pveClient.UploadIso(scopeId, fileName, localFilePath, CancellationToken.None);
+
+            return ProxmoxIsoNaming.BuildVolumeId(
+                storage,
+                ProxmoxIsoNaming.Encode(scopeId, fileName, _options.IsoScopeSeparator));
+        }
+
+        public async Task DeleteFileFromDatastore(string datastorePath)
+        {
+            var (_, scopeId, fileName) = SplitIsoPath(datastorePath);
+            await _pveClient.DeleteIso(scopeId, fileName);
+        }
+
+        private (string storage, string scopeId, string fileName) SplitIsoPath(string datastorePath)
+        {
+            if (!ProxmoxIsoNaming.TrySplitDatastorePath(datastorePath, out var storage, out var scopeId, out var fileName)
+                || !string.Equals(storage, ProxmoxIsoNaming.StorageName(Options.IsoStore), StringComparison.Ordinal))
+            {
+                throw new HypervisorException($"Unsupported Proxmox ISO path: {datastorePath}");
+            }
+
+            return (storage, scopeId, fileName);
         }
 
         [GeneratedRegex("#.*")]

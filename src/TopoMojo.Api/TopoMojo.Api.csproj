@@ -12,6 +12,7 @@
     <NoWarn>$(NoWarn);1591;8981</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="TopoMojo.Api.Tests" />
     <Content Update="wwwroot/docs/**/*;**/*.json;**/*.DS_Store" CopyToPublishDirectory="Never" />
     <Content Update="appsettings.conf;appsettings.json;seed-data.json.example" CopyToPublishDirectory="Always" />
   </ItemGroup>

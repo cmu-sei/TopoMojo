@@ -7,6 +7,7 @@ namespace TopoMojo.Hypervisor
 {
     public class HypervisorServiceConfiguration
     {
+        public const int DefaultUploadTimeoutMinutes = 60;
         public bool IsVCenter { get; set; }
         public HypervisorType HypervisorType { get; set; }
         public string Type { get; set; }
@@ -61,6 +62,11 @@ namespace TopoMojo.Hypervisor
         /// Null uses the Proxmox default. Has no effect unless EnableHA is set.
         /// </summary>
         public int? HaMaxRelocate { get; set; }
+        /// <summary>
+        /// Proxmox only. Separator folded into flat ISO filenames to carry workspace scope.
+        /// Must consist of [-a-zA-Z0-9_.]; defaults to "__".
+        /// </summary>
+        public string IsoScopeSeparator { get; set; } = "__";
 
         public SddcConfiguration Sddc { get; set; } = new SddcConfiguration();
     }
