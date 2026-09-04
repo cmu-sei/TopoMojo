@@ -121,15 +121,25 @@ namespace TopoMojo.Api.Services
             set { _template.GuestSettings = value; }
         }
 
-        public void AddGuestSettings(string guestinfo)
+        /// <param name="guestinfo">The raw Guest Settings text, one <c>key=value</c> per line.</param>
+        /// <param name="allowSemicolonSeparator">
+        /// When true (the legacy behavior, used by vSphere), ';' separates settings in addition to
+        /// newlines. Proxmox passes ';' through to the guest as ordinary data, so it must opt out
+        /// to avoid truncating a value at the first ';' and leaking the remainder as its own key.
+        /// </param>
+        public void AddGuestSettings(string guestinfo, bool allowSemicolonSeparator = true)
         {
             var result = new List<VmKeyValue>();
 
             if (_template.GuestSettings != null)
                 result.AddRange(_template.GuestSettings);
 
+            var separators = allowSemicolonSeparator
+                ? AppConstants.StringLineSeparators
+                : AppConstants.GuestSettingLineSeparators;
+
             var lines = guestinfo?.Split(
-                AppConstants.StringLineSeparators,
+                separators,
                 StringSplitOptions.RemoveEmptyEntries
             ) ?? [];
 

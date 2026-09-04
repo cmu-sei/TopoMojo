@@ -197,6 +197,23 @@ In Proxmox, a similar functionality is achieved using the QEMU Firmware Configur
 
 Note: This currently only works on Linux Guests. There is an open source [Windows driver](https://github.com/virtio-win/kvm-guest-drivers-windows/tree/master/fwcfg64) that has some basic fw_cfg support, but does not support reading user-defined /opt values at this time.
 
+### Value syntax
+
+Write one `key=value` per line. Only the first `=` on a line is the separator, so the value may contain further `=` characters. A line whose key begins with `#` is treated as a comment and skipped.
+
+Values are escaped for both parsers they pass through on the way to the guest, so commas, spaces, single and double quotes, and backslashes all arrive verbatim — no manual escaping is needed. A `;` is ordinary data in a Proxmox value; note that this differs from vSphere, where `;` separates settings in addition to newlines.
+
+### Implementation note
+
+The `args` property that carries the `-fw_cfg` arguments is parsed twice, and each layer needs a different escape:
+
+1. Proxmox splits `args` into argv with `PVE::Tools::split_args`, which is `Text::ParseWords::shellwords`. It honours quotes and then strips them.
+2. QEMU parses one argv element with `QemuOpts`, which splits on commas. It has no quote handling at all, so quoting cannot protect a comma; its only escape is a doubled comma, which QEMU collapses again before the guest reads the value.
+
+Because the layers do not meet, `ProxmoxFwCfg` always applies both: it doubles every literal comma, then single-quotes the whole argument. Single quotes are used rather than double quotes because they preserve backslashes and are unaffected by a double quote in the value.
+
+### Root user requirement
+
 As described in the Settings section, this currently requires the use of the root user and password. There is a [patch](https://bugzilla.proxmox.com/show_bug.cgi?id=4068) available for Proxmox that would make this no longer necessary, but it has not been merged into a release. Currently, if a root password is not provided, Guest Settings will be skipped when virtual machines are deployed.
 
 ## Using Proxmox Templates

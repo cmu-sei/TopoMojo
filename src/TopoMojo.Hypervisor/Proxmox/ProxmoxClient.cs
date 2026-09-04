@@ -1064,18 +1064,19 @@ namespace TopoMojo.Hypervisor.Proxmox
             return nodes.ElementAt(randomNum).Node;
         }
 
-        private static string GetArgs(VmTemplate template)
+        internal static string GetArgs(VmTemplate template)
         {
-            if (template.GuestSettings.Length == 0)
+            if (template.GuestSettings is null || template.GuestSettings.Length == 0)
                 return null;
-
-            var args = new StringBuilder();
 
             // Default settings
             // TODO: Fix duplication with vsphere?
-            args.Append($"-fw_cfg name=opt/guestinfo.isolationTag,string=\"{template.IsolationTag}\" ");
-            args.Append($"-fw_cfg name=opt/guestinfo.templateSource,string=\"{template.Id}\" ");
-            args.Append($"-fw_cfg name=opt/guestinfo.hostname,string=\"{template.Name.Untagged()}\" ");
+            var args = new List<string>
+            {
+                ProxmoxFwCfg.Arg("guestinfo.isolationTag", template.IsolationTag),
+                ProxmoxFwCfg.Arg("guestinfo.templateSource", template.Id),
+                ProxmoxFwCfg.Arg("guestinfo.hostname", template.Name.Untagged()),
+            };
 
             foreach (var setting in template.GuestSettings)
             {
@@ -1085,10 +1086,10 @@ namespace TopoMojo.Hypervisor.Proxmox
                     continue;
                 }
 
-                args.Append($"-fw_cfg name=opt/{setting.Key},string=\"{setting.Value}\" ");
+                args.Add(ProxmoxFwCfg.Arg(setting.Key, setting.Value));
             }
 
-            return args.ToString().TrimEnd();
+            return string.Join(" ", args);
         }
 
         private async Task<string> GetIso(VmTemplate template)

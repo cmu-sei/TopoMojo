@@ -284,7 +284,7 @@ namespace TopoMojo.Api.Services
             ;
 
             return Mapper.Map<ConvergedTemplate>(entity)
-                .ToVirtualTemplate(isolationTag)
+                .ToVirtualTemplate(isolationTag, _pod.AllowsSemicolonGuestSettingSeparator())
                 .SetHostAffinity(entity.Workspace?.HostAffinity ?? false)
             ;
         }

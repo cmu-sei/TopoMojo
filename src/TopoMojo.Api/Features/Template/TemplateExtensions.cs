@@ -13,7 +13,19 @@ namespace TopoMojo
 {
     public static class TemplateExtensions
     {
-        public static VmTemplate ToVirtualTemplate(this ConvergedTemplate template, string isolationTag = "")
+        /// <summary>
+        /// True when ';' should be treated as a Guest Settings separator, which is the legacy
+        /// vSphere behavior. Proxmox delivers ';' to the guest as ordinary data, so splitting on it
+        /// would silently truncate values.
+        /// </summary>
+        public static bool AllowsSemicolonGuestSettingSeparator(this IHypervisorService pod)
+            => AllowsSemicolonGuestSettingSeparator(pod?.Options?.HypervisorType);
+
+        /// <inheritdoc cref="AllowsSemicolonGuestSettingSeparator(IHypervisorService)"/>
+        public static bool AllowsSemicolonGuestSettingSeparator(HypervisorType? hypervisorType)
+            => hypervisorType != HypervisorType.Proxmox;
+
+        public static VmTemplate ToVirtualTemplate(this ConvergedTemplate template, string isolationTag = "", bool allowSemicolonSeparator = true)
         {
             TemplateUtility tu = new(template.Detail)
             {
@@ -33,7 +45,7 @@ namespace TopoMojo
                 UseUplinkSwitch = template.WorkspaceUseUplinkSwitch
             };
 
-            tu.AddGuestSettings(template.Guestinfo ?? "");
+            tu.AddGuestSettings(template.Guestinfo ?? "", allowSemicolonSeparator);
 
             return tu.AsTemplate();
         }
