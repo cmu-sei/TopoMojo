@@ -41,6 +41,10 @@ namespace TopoMojo.Hypervisor.vMock
 
         public HypervisorServiceConfiguration Options { get { return _optPod; } }
 
+        // The mock stands in for a vSphere-like host, so it accepts the same separators.
+        public static readonly char[] GuestSettingSeparatorSet = [';', '\n', '\r'];
+        public IReadOnlyList<char> GuestSettingSeparators => GuestSettingSeparatorSet;
+
         public Task StartAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;

@@ -532,7 +532,7 @@ namespace TopoMojo.Api.Services
                 gamespace.Workspace.HostAffinity,
                 sudo,
                 templates.Select(t => t
-                        .ToVirtualTemplate(gamespace.Id, _pod.AllowsSemicolonGuestSettingSeparator())
+                        .ToVirtualTemplate(gamespace.Id, _pod.GuestSettingSeparators)
                         .SetHostAffinity(gamespace.Workspace.HostAffinity)
                 ).ToArray()
             ), true);

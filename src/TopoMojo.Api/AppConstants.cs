@@ -29,10 +29,6 @@ namespace TopoMojo.Api
         public const string MarkdownCutLine = "<!-- cut -->";
         public const string TagDelimiter = "#";
         public static char[] StringTokenSeparators = [' ', ',', ';', ':', '|', '\t'];
-        public static char[] StringLineSeparators = [';', '\n', '\r'];
-        // Guest Settings on Proxmox reach the guest through parsers that treat ';' as ordinary
-        // data, so treating it as a separator there truncates values and leaks bogus siblings.
-        public static char[] GuestSettingLineSeparators = ['\n', '\r'];
 
         public const string ErrorListCacheKey = "errbf";
     }

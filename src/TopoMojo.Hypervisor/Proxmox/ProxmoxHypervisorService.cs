@@ -55,6 +55,13 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly IProxmoxVlanManager _vlanManager;
 
         public HypervisorServiceConfiguration Options { get { return _options; } }
+
+        // Newlines only. Proxmox delivers Guest Settings to the guest as ordinary data, so a ';'
+        // is a legitimate value character; treating it as a separator would truncate the value at
+        // the first ';' and leak the remainder as its own setting.
+        public static readonly char[] GuestSettingSeparatorSet = ['\n', '\r'];
+        public IReadOnlyList<char> GuestSettingSeparators => GuestSettingSeparatorSet;
+
         private readonly BlockingCollection<DeploymentContext> DeploymentCollection = [];
 
 

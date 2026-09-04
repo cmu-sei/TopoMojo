@@ -288,7 +288,7 @@ namespace TopoMojo.Api.Services
             {
 
                 var disktasks = Mapper.Map<ConvergedTemplate[]>(templates)
-                    .Select(ct => _pod.DeleteDisks(ct.ToVirtualTemplate()))
+                    .Select(ct => _pod.DeleteDisks(ct.ToVirtualTemplate("", _pod.GuestSettingSeparators)))
                     .ToArray()
                 ;
 

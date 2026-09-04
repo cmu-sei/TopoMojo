@@ -38,6 +38,13 @@ namespace TopoMojo.Hypervisor
         Task ReloadHost(string host);
         HypervisorServiceConfiguration Options { get; }
         /// <summary>
+        /// Characters that separate one Guest Setting from the next in a template's Guest Settings
+        /// text. Every hypervisor separates on newlines; some also accept another character. A
+        /// separator cannot appear literally in a value, so each hypervisor declares only what its
+        /// own authoring syntax supports.
+        /// </summary>
+        IReadOnlyList<char> GuestSettingSeparators { get; }
+        /// <summary>
         /// Path, relative to the ISO store root, where an ISO for the given scope must be written.
         /// Stores with per-scope folders return "{scopeId}/{fileName}"; flat stores return a single
         /// filename with the scope encoded into it. The hypervisor owns storage layout and filename
