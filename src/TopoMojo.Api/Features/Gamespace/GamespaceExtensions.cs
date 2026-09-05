@@ -46,6 +46,10 @@ namespace TopoMojo.Api.Models
                 _ => a.First().Equals(c),
             };
             question.IsGraded = true;
+
+            // Track if this question was ever answered incorrectly for penalty calculation
+            if (!question.IsCorrect)
+                question.HasIncorrectSubmission = true;
         }
 
         public static void SetQuestionWeights(this VariantSpec spec)
@@ -63,7 +67,10 @@ namespace TopoMojo.Api.Models
                 float total = Math.Max(max, 100);
 
                 foreach (var q in questions)
+                {
                     q.Weight /= total;
+                    q.Penalty /= total;  // normalize penalty to match weight scale
+                }
 
                 max = questions.Sum(q => q.Weight);
             }

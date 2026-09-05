@@ -182,7 +182,7 @@ namespace TopoMojo.Api.Services
                 MaxPoints = spec.MaxPoints,
                 NextSectionPreReqThisSection = nextSectionPreReqThisSection,
                 NextSectionPreReqTotal = nextSectionPreReqTotal,
-                Score = WeightToPoints(spec.Score, spec.MaxPoints),
+                Score = spec.Score * spec.MaxPoints,
                 Text = string.Join("\n\n", spec.Text, spec.Challenge.Text),
                 Variant = mappedVariant
             };
@@ -919,21 +919,73 @@ namespace TopoMojo.Api.Services
             foreach (var question in section.Questions)
                 question.Grade(submission.Questions.ElementAtOrDefault(i++)?.Answer ?? "");
 
+            // Calculate cumulative penalty: penalty × number_of_incorrect_attempts
+            var questionsList = section.Questions.ToList();
             section.Score = section.Questions
                 .Where(q => q.IsCorrect)
-                .Select(q => q.Weight - q.Penalty)
+                .Select(q =>
+                {
+                    int questionIdx = questionsList.IndexOf(q);
+                    int wrongCount = CountIncorrectAttempts(spec, submission.SectionIndex, questionIdx, q);
+                    return q.Weight - (q.Penalty * wrongCount);
+                })
                 .Sum()
             ;
 
             spec.Score = spec.Challenge.Sections
                 .SelectMany(s => s.Questions)
                 .Where(q => q.IsCorrect)
-                .Select(q => q.Weight - q.Penalty)
+                .Select(q =>
+                {
+                    var sectionList = spec.Challenge.Sections.ToList();
+                    int sectionIdx = sectionList.FindIndex(sec => sec.Questions.Contains(q));
+                    int questionIdx = sectionList[sectionIdx].Questions.ToList().IndexOf(q);
+                    int wrongCount = CountIncorrectAttempts(spec, sectionIdx, questionIdx, q);
+                    return q.Weight - (q.Penalty * wrongCount);
+                })
                 .Sum()
             ;
 
             if (spec.Score > lastScore)
                 spec.LastScoreTime = submission.Timestamp;
+        }
+
+        private static int CountIncorrectAttempts(ChallengeSpec spec, int sectionIndex, int questionIndex, QuestionSpec question)
+        {
+            int count = 0;
+
+            // Look through all previous submissions for this section
+            foreach (var sub in spec.Submissions.Where(s => s.SectionIndex == sectionIndex))
+            {
+                var answer = sub.Questions.ElementAtOrDefault(questionIndex)?.Answer;
+                if (string.IsNullOrWhiteSpace(answer))
+                    continue;
+
+                // Re-grade this historical answer
+                if (!IsAnswerCorrect(answer, question))
+                    count++;
+            }
+
+            return count;
+        }
+
+        private static bool IsAnswerCorrect(string submission, QuestionSpec question)
+        {
+            if (string.IsNullOrWhiteSpace(submission))
+                return false;
+
+            string[] a = question.Answer.ToLower().Replace(" ", "").Split('|');
+            string b = submission.ToLower();
+            string c = b.Replace(" ", "");
+
+            return question.Grader switch
+            {
+                AnswerGrader.MatchAll => a.Intersect(b.Split(AppConstants.StringTokenSeparators, StringSplitOptions.RemoveEmptyEntries))
+                    .ToArray().Length == a.Length,
+                AnswerGrader.MatchAny => a.Contains(c),
+                AnswerGrader.MatchAlpha => a.First().WithoutSymbols().Equals(c.WithoutSymbols()),
+                _ => a.First().Equals(c),
+            };
         }
 
         private static QuestionSetEligibility[] GetQuestionSetEligibility(VariantSpec variant)
