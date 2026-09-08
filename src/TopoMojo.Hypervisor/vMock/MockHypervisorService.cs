@@ -528,6 +528,14 @@ namespace TopoMojo.Hypervisor.vMock
                 DeploymentCollection.Add(ctx);
         }
 
+        public string GetIsoStorePath(string scopeId, string fileName) => $"{scopeId}/{fileName}";
+
+        public IReadOnlyList<string> GetIsoStorePathCandidates(string scopeId, string fileName)
+            => [GetIsoStorePath(scopeId, fileName)];
+
+        public string GetIsoDatastorePath(string scopeId, string fileName)
+            => $"{_optPod.IsoStore.TrimEnd('/')}/{GetIsoStorePath(scopeId, fileName)}";
+
         public Task<string> UploadFileToDatastore(string datastorePath, string localFilePath)
         {
             throw new NotSupportedException("Mock hypervisor does not support datastore uploads");

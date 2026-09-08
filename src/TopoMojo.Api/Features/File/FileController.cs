@@ -95,7 +95,7 @@ public class FileController(
                 if (uploadOptions.UseDatastoreApi)
                 {
                     dest = BuildTempPath(filename, key);
-                    string datastorePath = ConvertToDatastorePath(filename, key);
+                    string datastorePath = hypervisorService.GetIsoDatastorePath(key, filename);
                     metadata.Add(Meta.DatastorePath, datastorePath);
                 }
                 else
@@ -135,7 +135,7 @@ public class FileController(
 
                     try
                     {
-                        await UploadToDatastore(dp, datastorePath);
+                        await UploadToDatastore(dp, datastorePath, metadata[Meta.Name] ?? metadata[Meta.OriginalName]);
                     }
                     catch (Exception ex)
                     {
@@ -148,13 +148,7 @@ public class FileController(
                 {
                     if (!dp.ToLower().EndsWith(Meta.IsoFileExtension) && System.IO.File.Exists(dp))
                     {
-                        CDBuilder builder = new()
-                        {
-                            UseJoliet = true,
-                            VolumeIdentifier = Meta.IsoVolumeId
-                        };
-                        builder.AddFile(Path.GetFileName(dp), dp);
-                        builder.Build(dp + Meta.IsoFileExtension);
+                        BuildIso(dp, dp + Meta.IsoFileExtension, metadata[Meta.Name] ?? metadata[Meta.OriginalName]);
                         System.IO.File.Delete(dp);
                     }
                 }
@@ -166,74 +160,30 @@ public class FileController(
 
     private string BuildDestinationPath(string filename, string key)
     {
-        if (uploadOptions.SupportsSubfolders)
-        {
-            string path = Path.Combine(
-                uploadOptions.IsoRoot,
-                key.SanitizePath()
-            );
+        string dest = Path.Combine(
+            uploadOptions.IsoRoot,
+            hypervisorService.GetIsoStorePath(key, filename));
 
-            if (!Directory.Exists(path))
-                Directory.CreateDirectory(path);
+        Directory.CreateDirectory(Path.GetDirectoryName(dest));
 
-            return Path.Combine(
-                path,
-                SanitizeIsoFilename(filename)
-            );
-        }
-        else
-        {
-            var fileName = $"{key.SanitizePath()}#{SanitizeIsoFilename(filename)}";
-            return Path.Combine(uploadOptions.IsoRoot, fileName);
-        }
+        return dest;
     }
 
     private string BuildTempPath(string filename, string key)
     {
-        if (!Directory.Exists(uploadOptions.TempRoot))
-            Directory.CreateDirectory(uploadOptions.TempRoot);
+        string path = Path.Combine(
+            uploadOptions.TempRoot,
+            key.SanitizePath(),
+            Actor.Id
+        );
 
-        if (uploadOptions.SupportsSubfolders)
-        {
-            string path = Path.Combine(
-                uploadOptions.TempRoot,
-                key.SanitizePath(),
-                Actor.Id
-            );
+        Directory.CreateDirectory(path);
 
-            if (!Directory.Exists(path))
-                Directory.CreateDirectory(path);
-
-            return Path.Combine(
-                path,
-                SanitizeIsoFilename(filename)
-            );
-        }
-        else
-        {
-            var fileName = $"{key.SanitizePath()}#{Actor.Id}#{SanitizeIsoFilename(filename)}";
-            return Path.Combine(uploadOptions.TempRoot, fileName);
-        }
+        return Path.Combine(path, SanitizeIsoFilename(filename));
     }
 
-    private string ConvertToDatastorePath(string filename, string key)
-    {
-        string isoStore = hypervisorService.Options.IsoStore.TrimEnd('/');
-        string sanitizedFilename = SanitizeIsoFilename(filename);
 
-        if (uploadOptions.SupportsSubfolders)
-        {
-            string sanitizedKey = key.SanitizePath();
-            return $"{isoStore}/{sanitizedKey}/{sanitizedFilename}";
-        }
-        else
-        {
-            string flatName = $"{key.SanitizePath()}#{sanitizedFilename}";
-            return $"{isoStore}/{flatName}";
-        }
-    }
-
-    private async Task UploadToDatastore(string tempFilePath, string datastorePath)
+    private async Task UploadToDatastore(string tempFilePath, string datastorePath, string entryFileName)
     {
         string fileToUpload = tempFilePath;
 
@@ -241,13 +191,7 @@ public class FileController(
         {
             string isoPath = tempFilePath + Meta.IsoFileExtension;
 
-            CDBuilder builder = new()
-            {
-                UseJoliet = true,
-                VolumeIdentifier = Meta.IsoVolumeId
-            };
-            builder.AddFile(Path.GetFileName(tempFilePath), tempFilePath);
-            builder.Build(isoPath);
+            BuildIso(tempFilePath, isoPath, entryFileName);
 
             System.IO.File.Delete(tempFilePath);
             fileToUpload = isoPath;
@@ -316,22 +260,21 @@ public class FileController(
 
             if (uploadOptions.UseDatastoreApi)
             {
-                string datastorePath = ConvertToDatastorePath(filename, actualWorkspaceId);
+                string datastorePath = hypervisorService.GetIsoDatastorePath(actualWorkspaceId, filename);
                 await hypervisorService.DeleteFileFromDatastore(datastorePath);
                 Logger.LogInformation("Deleted datastore ISO: {datastorePath}", datastorePath);
             }
             else
             {
-                string filePath = BuildIsoFilePath(actualWorkspaceId, filename);
-                if (System.IO.File.Exists(filePath))
-                {
-                    System.IO.File.Delete(filePath);
-                    Logger.LogInformation("Deleted local ISO: {filePath}", filePath);
-                }
-                else
-                {
+                string filePath = ResolveExistingIsoPath(
+                    uploadOptions.IsoRoot,
+                    hypervisorService.GetIsoStorePathCandidates(actualWorkspaceId, filename));
+
+                if (filePath is null)
                     return NotFound($"ISO file not found: {path}");
-                }
+
+                System.IO.File.Delete(filePath);
+                Logger.LogInformation("Deleted local ISO: {filePath}", filePath);
             }
 
             return Json(true);
@@ -392,23 +335,30 @@ public class FileController(
     private static string SanitizeIsoFilename(string filename)
         => filename.Replace(" ", "").SanitizeFilename();
 
-    private string BuildIsoFilePath(string workspaceKey, string filename)
+    // Clients can submit a full path as the filename (e.g. "C:\fakepath\file.txt"). Path.GetFileName
+    // only honors the host separator, and Path.GetInvalidFileNameChars() is just { '\0', '/' } on
+    // Linux, so a surviving backslash would become a directory separator inside the generated ISO.
+    internal static string GetIsoEntryName(string fileName)
     {
-        string sanitizedFilename = SanitizeIsoFilename(filename);
+        int cut = fileName.LastIndexOfAny(['/', '\\']);
 
-        if (uploadOptions.SupportsSubfolders)
-        {
-            return Path.Combine(
-                uploadOptions.IsoRoot,
-                workspaceKey.SanitizePath(),
-                sanitizedFilename
-            );
-        }
-        else
-        {
-            string flatName = $"{workspaceKey.SanitizePath()}#{sanitizedFilename}";
-            return Path.Combine(uploadOptions.IsoRoot, flatName);
-        }
+        return SanitizeIsoFilename(cut < 0 ? fileName : fileName[(cut + 1)..]);
     }
+
+    internal static void BuildIso(string sourcePath, string isoPath, string entryNameSource)
+    {
+        CDBuilder builder = new()
+        {
+            UseJoliet = true,
+            VolumeIdentifier = Meta.IsoVolumeId
+        };
+        builder.AddFile(GetIsoEntryName(entryNameSource), sourcePath);
+        builder.Build(isoPath);
+    }
+
+    internal static string ResolveExistingIsoPath(string isoRoot, IEnumerable<string> storePaths)
+        => storePaths
+            .Select(p => Path.Combine(isoRoot, p))
+            .FirstOrDefault(System.IO.File.Exists);
 
 }

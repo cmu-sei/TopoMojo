@@ -4,9 +4,12 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Corsinvest.ProxmoxVE.Api;
@@ -29,7 +32,8 @@ namespace TopoMojo.Hypervisor.Proxmox
             ILogger<ProxmoxClient> logger,
             IProxmoxNameService nameService,
             IProxmoxVlanManager vnetService,
-            Random random
+            Random random,
+            IHttpClientFactory httpClientFactory
         )
         {
             _logger = logger;
@@ -38,6 +42,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             _tasks = [];
             _vmCache = vmCache;
             _random = random;
+            _httpClientFactory = httpClientFactory;
             _config.Tenant ??= "";
 
             int port = 443;
@@ -48,14 +53,15 @@ namespace TopoMojo.Hypervisor.Proxmox
                 port = result.Port;
             }
             _config.Host = host;
+            _port = port;
             _hostPrefix = host.Split('.').FirstOrDefault();
 
-            _pveClient = new PveClient(host, port)
+            _pveClient = new PveClient(host, port, httpClientFactory.CreateClient("proxmox"))
             {
                 ApiToken = options.AccessToken
             };
 
-            _rootPveClient = new PveClient(host, port);
+            _rootPveClient = new PveClient(host, port, httpClientFactory.CreateClient("proxmox"));
 
             _nameService = nameService;
             _vlanManager = vnetService;
@@ -69,6 +75,8 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly IProxmoxNameService _nameService;
         private readonly IProxmoxVlanManager _vlanManager;
         private readonly HypervisorServiceConfiguration _config = null;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly int _port;
         // int _pollInterval = 1000;
         readonly int _syncInterval = 30000;
         readonly int _taskMonitorInterval = 3000;
@@ -77,7 +85,6 @@ namespace TopoMojo.Hypervisor.Proxmox
         private readonly PveClient _pveClient;
         private readonly PveClient _rootPveClient;
         private readonly Random _random;
-        private readonly bool _enableHA = false;
         private readonly object _lock = new();
         private const string deleteTag = "delete"; // tags are always lower-case
 
@@ -332,12 +339,20 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
 
-            if (_enableHA)
+            if (_config.EnableHA && !await RegisterHA(nextId, template.Name) && _config.RequireHA)
             {
-                task = await _pveClient.Cluster.Ha.Resources.Create(nextId);
+                // the create call may have failed after the resource was created, and a vm cannot
+                // be destroyed while it is an HA resource
+                await UnregisterHA(nextId);
+                _vmCache.TryRemove(vm.Id, out _);
+
+                var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
+                await _pveClient.WaitForTaskToFinish(destroyTask);
+
+                throw new HypervisorException($"Could not register vm {template.Name} ({nextId}) as a Proxmox HA resource, and Pod__RequireHA is set.");
             }
 
-            if (template.AutoStart && task.IsSuccessStatusCode)
+            if (template.AutoStart)
             {
                 _logger.LogDebug("deploy: start vm...");
                 vm = await Start(vm.Id);
@@ -350,8 +365,14 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             Vm vm = _vmCache[id];
 
-            var task = await _pveClient.Nodes[vm.Host].Qemu[vm.GetId()].Status.Start.VmStart();
-            await _pveClient.WaitForTaskToFinish(task);
+            // when a vm is HA managed, the HA manager owns its power state and will revert a
+            // direct qemu start, so request the state change from it instead
+            if (!_config.EnableHA || !await SetHAState(vm.Id, "started"))
+            {
+                var task = await _pveClient.Nodes[await GetCurrentNode(vm)].Qemu[vm.GetId()].Status.Start.VmStart();
+                await _pveClient.WaitForTaskToFinish(task);
+            }
+
             vm.State = VmPowerState.Running;
 
             _vmCache.TryUpdate(vm.Id, vm, vm);
@@ -363,9 +384,36 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             Vm vm = _vmCache[id];
 
-            var task = await _pveClient.Nodes[vm.Host].Qemu[vm.GetId()].Status.Stop.VmStop();
-            await _pveClient.WaitForTaskToFinish(task);
+            if (!_config.EnableHA || !await SetHAState(vm.Id, "stopped"))
+            {
+                var task = await _pveClient.Nodes[await GetCurrentNode(vm)].Qemu[vm.GetId()].Status.Stop.VmStop();
+                await _pveClient.WaitForTaskToFinish(task);
+            }
+
             vm.State = VmPowerState.Off;
+
+            _vmCache.TryUpdate(vm.Id, vm, vm);
+
+            return vm;
+        }
+
+        /// <summary>
+        /// Resets a vm in place. Used instead of a stop/start pair for HA managed vms, where two
+        /// state requests in quick succession would be collapsed into a no-op by the HA manager.
+        /// </summary>
+        public async Task<Vm> Reset(string id)
+        {
+            Vm vm = _vmCache[id];
+            var node = await GetCurrentNode(vm);
+            var status = await _pveClient.Nodes[node].Qemu[vm.GetId()].Status.Current.GetAsync();
+
+            // a stopped vm can't be reset, so treat a reset of one as a start
+            if (!status.IsRunning)
+                return await Start(id);
+
+            var task = await _pveClient.Nodes[node].Qemu[vm.GetId()].Status.Reset.VmReset();
+            await _pveClient.WaitForTaskToFinish(task);
+            vm.State = VmPowerState.Running;
 
             _vmCache.TryUpdate(vm.Id, vm, vm);
 
@@ -387,12 +435,13 @@ namespace TopoMojo.Hypervisor.Proxmox
             Result task;
             var pveId = long.Parse(id);
             Vm vm = _vmCache[id];
-            var status = await _pveClient.Nodes[vm.Host].Qemu[pveId].Status.Current.GetAsync();
+            var node = await GetCurrentNode(vm);
+            var status = await _pveClient.Nodes[node].Qemu[pveId].Status.Current.GetAsync();
 
-            if (_enableHA)
+            // a vm cannot be destroyed while it is an HA resource, so this has to come first
+            if (_config.EnableHA)
             {
-                task = await _pveClient.Cluster.Ha.Resources[pveId].Delete();
-                await _pveClient.WaitForTaskToFinish(task);
+                await UnregisterHA(vm.Id);
             }
 
             if (status.IsRunning)
@@ -401,7 +450,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 await _pveClient.WaitForTaskToFinish(task);
             }
 
-            task = await _pveClient.Nodes[vm.Host].Qemu[id].DestroyVm();
+            task = await _pveClient.Nodes[node].Qemu[id].DestroyVm();
             await _pveClient.WaitForTaskToFinish(task);
             vm.Status = "initialized";
 
@@ -418,12 +467,13 @@ namespace TopoMojo.Hypervisor.Proxmox
             string url;
             string ticket;
             var vm = _vmCache[id];
+            var node = await GetCurrentNode(vm);
 
-            var result = await _pveClient.Nodes[vm.Host].Qemu[id].Vncproxy.Vncproxy(websocket: true);
+            var result = await _pveClient.Nodes[node].Qemu[id].Vncproxy.Vncproxy(websocket: true);
 
             if (result.IsSuccessStatusCode)
             {
-                string urlFragment = $"/api2/json/nodes/{vm.Host}/qemu/{id}/vncwebsocket?port={result.Response.data.port}&vncticket={WebUtility.UrlEncode(result.Response.data.ticket)}";
+                string urlFragment = $"/api2/json/nodes/{node}/qemu/{id}/vncwebsocket?port={result.Response.data.port}&vncticket={WebUtility.UrlEncode(result.Response.data.ticket)}";
                 url = $"wss://{_config.Host}{urlFragment}";
                 ticket = result.Response.data.ticket;
             }
@@ -441,10 +491,11 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (vm != null)
             {
-                var config = await _pveClient.Nodes[vm.Host].Qemu[vm.Id].Config.GetAsync();
+                var node = await GetCurrentNode(vm);
+                var config = await _pveClient.Nodes[node].Qemu[vm.Id].Config.GetAsync();
 
                 var disk = config.Disks.ElementAt(0);
-                var storageItems = await _pveClient.Nodes[vm.Host].Storage[disk.Storage].Content.GetAsync();
+                var storageItems = await _pveClient.Nodes[node].Storage[disk.Storage].Content.GetAsync();
 
                 var pveDisk = storageItems.Where(x => disk.FileName == x.FileName).FirstOrDefault();
 
@@ -468,7 +519,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                         {
                             // Full Clone vm
                             var nextId = int.Parse(await GetNextId());
-                            var task = await _pveClient.Nodes[vm.Host].Qemu[vm.Id].Clone.CloneVm(newid: nextId, full: true, target: template.Host, name: template.Name);
+                            var task = await _pveClient.Nodes[node].Qemu[vm.Id].Clone.CloneVm(newid: nextId, full: true, target: template.Host, name: template.Name);
 
                             var t = new PveNodeTask { Id = task.Response.data, Action = "saving", WhenCreated = DateTimeOffset.UtcNow };
                             vm.Task = new VmTask { Name = "saving", WhenCreated = DateTime.UtcNow, Progress = t.Progress };
@@ -528,24 +579,172 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
         }
 
-        public async Task<PveIso[]> GetFiles()
+        public async Task<ProxmoxIsoFile[]> GetFiles()
         {
-            var node = await GetRandomNode();
+            var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
+            var node = await GetIsoStorageNode();
 
             var task = await _pveClient
                 .Nodes[node]
-                .Storage[_config.IsoStore]
+                .Storage[storage]
                 .Content
                 .Index(content: "iso");
             await _pveClient.WaitForTaskToFinish(task);
 
             var isos = task.ToModel<PveIso[]>();
 
-            return isos;
+            return isos
+                .Select(x => ProxmoxIsoFile.From(x, _config.IsoScopeSeparator))
+                .ToArray();
         }
 
-        public Task<PveVmConfig> GetVmConfig(Vm vm)
-            => GetVmConfig(vm.Host, vm.GetId());
+
+        private async Task<string> GetIsoStorageNode()
+        {
+            var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
+            var resources = await _pveClient.GetResourcesAsync(ClusterResourceType.Storage);
+            return SelectIsoStorageNode(resources, storage, _random);
+        }
+
+        internal static string SelectIsoStorageNode(
+            IEnumerable<ClusterResource> resources,
+            string storage,
+            Random random)
+        {
+            var candidates = resources
+                .Where(x => x.ResourceType == ClusterResourceType.Storage
+                    && string.Equals(x.Storage, storage, StringComparison.Ordinal)
+                    && x.IsAvailable
+                    && !string.IsNullOrWhiteSpace(x.Node))
+                .ToList();
+            var nodes = candidates
+                .Select(x => x.Node)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            if (nodes.Count == 0)
+                throw new HypervisorException($"No online Proxmox node currently offers ISO storage '{storage}'.");
+
+            if (nodes.Count == 1)
+                return nodes[0];
+
+            if (!candidates.All(x => x.Shared))
+            {
+                throw new HypervisorException(
+                    $"Pod__IsoStore '{storage}' is available on multiple nodes but is not shared; "
+                    + "an ISO written through one node would not be mountable from the others.");
+            }
+
+            return nodes[random.Next(nodes.Count)];
+        }
+
+        public async Task UploadIso(string scopeId, string fileName, string localFilePath, CancellationToken cancellationToken = default)
+        {
+            var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
+            var storedName = ProxmoxIsoNaming.Encode(scopeId, fileName, _config.IsoScopeSeparator);
+
+            if (!storedName.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
+                && !storedName.EndsWith(".img", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new HypervisorException($"Proxmox ISO filename must end with .iso or .img: {storedName}");
+            }
+
+            var node = await GetIsoStorageNode();
+            _logger.LogInformation(
+                "Uploading Proxmox ISO {storedName} to storage {storage} on node {node}",
+                storedName,
+                storage,
+                node);
+
+            using var fileStream = File.OpenRead(localFilePath);
+            var uploadClient = CreateIsoUploadClient();
+            var uploadTimeout = ResolveIsoUploadTimeout(uploadClient.GetHttpClient().Timeout);
+            var result = await uploadClient.UploadFileToStorageAsync(
+                node,
+                storage,
+                "iso",
+                fileStream,
+                storedName,
+                cancellationToken,
+                // Passed explicitly because the SDK assigns HttpClient.Timeout from this argument and would
+                // otherwise apply its own 600 second default.
+                secondsTimeout: (int)uploadTimeout.TotalSeconds);
+
+            if (!await _pveClient.WaitForTaskToFinish(result, timeout: (long)uploadTimeout.TotalMilliseconds))
+                throw new HypervisorException(
+                    $"Proxmox ISO upload task did not finish within {uploadTimeout.TotalMinutes:0.##} minutes: {storedName}");
+
+            _logger.LogInformation(
+                "Uploaded Proxmox ISO {storedName} to storage {storage} on node {node}",
+                storedName,
+                storage,
+                node);
+        }
+
+        public async Task DeleteIso(string scopeId, string fileName)
+        {
+            var storage = ProxmoxIsoNaming.StorageName(_config.IsoStore);
+            var isos = await GetFiles();
+            string[] candidates;
+
+            try
+            {
+                candidates =
+                [
+                    ProxmoxIsoNaming.Encode(scopeId, fileName, _config.IsoScopeSeparator),
+                    ProxmoxIsoNaming.EncodeLegacy(scopeId, fileName)
+                ];
+            }
+            catch (ArgumentException ex)
+            {
+                throw new FileNotFoundException($"ISO not found in Proxmox storage: {scopeId}/{fileName}", ex);
+            }
+
+            var match = candidates
+                .Select(name => isos.FirstOrDefault(x =>
+                    string.Equals(x.Name, name, StringComparison.Ordinal)))
+                .FirstOrDefault(x => x is not null);
+
+            if (match is null)
+                throw new FileNotFoundException($"ISO not found in Proxmox storage: {scopeId}/{fileName}");
+
+            var node = await GetIsoStorageNode();
+            _logger.LogInformation(
+                "Deleting Proxmox ISO {volid} from storage {storage} on node {node}",
+                match.Volid,
+                storage,
+                node);
+
+            var result = await _pveClient
+                .Nodes[node]
+                .Storage[storage]
+                .Content[match.Volid]
+                .Delete();
+            if (!await _pveClient.WaitForTaskToFinish(result))
+                throw new HypervisorException($"Proxmox ISO delete task did not finish: {match.Volid}");
+
+            _logger.LogInformation(
+                "Deleted Proxmox ISO {volid} from storage {storage} on node {node}",
+                match.Volid,
+                storage,
+                node);
+        }
+
+        private PveClient CreateIsoUploadClient()
+            => new(_config.Host, _port, _httpClientFactory.CreateClient("proxmoxIsoUpload"))
+            {
+                ApiToken = _config.AccessToken
+            };
+
+        // Guards the two values HttpClient allows but the PVE upload cannot use: Timeout.InfiniteTimeSpan
+        // (-1ms) and any non-positive span. Falls back to the FileUpload__UploadTimeoutMinutes default.
+        internal static TimeSpan ResolveIsoUploadTimeout(TimeSpan configured)
+            => configured > TimeSpan.Zero
+                ? configured
+                : TimeSpan.FromMinutes(HypervisorServiceConfiguration.DefaultUploadTimeoutMinutes);
+
+        public async Task<PveVmConfig> GetVmConfig(Vm vm)
+            => await GetVmConfig(await GetCurrentNode(vm), vm.GetId());
 
         public async Task<PveVmConfig> GetVmConfig(string node, long vmId)
         {
@@ -602,7 +801,8 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<Vm> PushVmConfigUpdate(long vmId, PveVmUpdateConfig update)
         {
             var vm = _vmCache[vmId.ToString()];
-            var currentConfig = await GetVmConfig(vm);
+            var node = await GetCurrentNode(vm);
+            var currentConfig = await GetVmConfig(node, vm.GetId());
 
             // if there are any net assignment updates, we need to resolve their IDs from the names
             // passed in. We make a new dictionary to hold them rather than mutate the argument.
@@ -627,7 +827,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             var updateTask = await _pveClient
-                .Nodes[vm.Host]
+                .Nodes[node]
                 .Qemu[vm.Id]
                 .Config
                 .UpdateVmAsync
@@ -637,6 +837,189 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             await _pveClient.WaitForTaskToFinish(updateTask);
             return vm;
+        }
+
+        /// <summary>
+        /// The HA resource id ("sid") of a vm, e.g. vm:100.
+        /// </summary>
+        private static string GetSid(string id) => $"vm:{id}";
+
+        /// <summary>
+        /// Registers a vm as a cluster HA resource so that Proxmox's Cluster Resource Scheduler can
+        /// place and rebalance it. Resources are created stopped; power state is then driven through
+        /// the HA manager (see <see cref="SetHAState"/>), because the HA manager reverts direct
+        /// qemu power operations on resources it manages.
+        /// </summary>
+        /// <remarks>
+        /// A failure is logged rather than thrown, and the caller decides what to do with it. An
+        /// unmanaged vm still works; it just won't be rebalanced. See RequireHA.
+        /// </remarks>
+        /// <returns>False if the vm could not be registered.</returns>
+        private async Task<bool> RegisterHA(string id, string comment)
+        {
+            try
+            {
+                var task = await _pveClient.Cluster.Ha.Resources.Create(
+                    GetSid(id),
+                    auto_rebalance: _config.HaAutoRebalance,
+                    comment: comment,
+                    max_relocate: _config.HaMaxRelocate,
+                    max_restart: _config.HaMaxRestart,
+                    state: "stopped",
+                    type: "vm");
+                await _pveClient.WaitForTaskToFinish(task);
+
+                _logger.LogDebug("registered ha resource {sid} (auto_rebalance: {rebalance})", GetSid(id), _config.HaAutoRebalance);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register ha resource {sid}. The vm will not be managed by the Proxmox HA manager or rebalanced by CRS.", GetSid(id));
+
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Removes a vm from cluster HA management. Purging also removes it from any HA rule that
+        /// references it, deleting the rule if it was the rule's only resource.
+        /// </summary>
+        /// <returns>False if the vm was not an HA resource.</returns>
+        private async Task<bool> UnregisterHA(string id)
+        {
+            try
+            {
+                var task = await _pveClient.Cluster.Ha.Resources[GetSid(id)].Delete(purge: true);
+                await _pveClient.WaitForTaskToFinish(task);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // most likely the vm was deployed before HA was enabled, so there is nothing to remove
+                _logger.LogDebug(ex, "Could not delete ha resource {sid}", GetSid(id));
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Requests a power state of the HA manager for a vm it manages.
+        /// </summary>
+        /// <param name="state">started or stopped</param>
+        /// <returns>False if the vm was not an HA resource, so the caller can fall back to a direct qemu operation.</returns>
+        private async Task<bool> SetHAState(string id, string state)
+        {
+            try
+            {
+                var task = await _pveClient.Cluster.Ha.Resources[GetSid(id)].Update(state: state);
+                await _pveClient.WaitForTaskToFinish(task);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // most likely the vm was deployed before HA was enabled
+                _logger.LogWarning(ex, "Could not request ha state {state} for {sid}, falling back to a direct power operation", state, GetSid(id));
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Keeps the vms of an isolation on the same node using a positive HA resource-affinity rule.
+        /// Requires the vms to be HA resources, so it is only meaningful when EnableHA is set.
+        /// </summary>
+        /// <remarks>The rule is cleaned up by <see cref="UnregisterHA"/> when the last member vm is deleted.</remarks>
+        public async Task SetPositiveAffinity(string isolationTag, Vm[] vms)
+        {
+            if (vms.Length == 0)
+                return;
+
+            var rule = GetAffinityRuleId(isolationTag);
+            var existing = await GetAffinityRuleResources(rule);
+
+            // vms of an isolation can be deployed one at a time, so add to the rule rather than replace it
+            var sids = existing
+                .Union(vms.Select(vm => GetSid(vm.Id)))
+                .ToArray();
+
+            if (sids.Length < 2)
+            {
+                _logger.LogDebug("skipping ha affinity {rule}, an isolation of one vm has nothing to keep together", rule);
+                return;
+            }
+
+            var resources = string.Join(',', sids);
+
+            var task = existing.Length != 0
+                ? await _pveClient.Cluster.Ha.Rules[rule].UpdateRule("resource-affinity", resources: resources)
+                : await _pveClient.Cluster.Ha.Rules.CreateRule(
+                    resources,
+                    rule,
+                    "resource-affinity",
+                    affinity: "positive",
+                    comment: $"topomojo isolation {isolationTag}");
+
+            await _pveClient.WaitForTaskToFinish(task);
+
+            _logger.LogDebug("set positive ha affinity {rule} for {resources}", rule, resources);
+        }
+
+        /// <summary>
+        /// The resource ids already in an HA rule, or an empty array if the rule doesn't exist.
+        /// </summary>
+        private async Task<string[]> GetAffinityRuleResources(string rule)
+        {
+            try
+            {
+                var result = await _pveClient.Cluster.Ha.Rules[rule].ReadRule();
+
+                if (!result.IsSuccessStatusCode)
+                    return [];
+
+                return (((string)result.Response.data.resources) ?? "")
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not read ha rule {rule}", rule);
+                return [];
+            }
+        }
+
+        /// <summary>
+        /// Proxmox config ids allow only letters, numbers, dashes, underscores and periods.
+        /// </summary>
+        private static string GetAffinityRuleId(string isolationTag)
+            => $"topomojo-{InvalidPveIdCharsRegex().Replace(isolationTag ?? "", "-")}";
+
+        /// <summary>
+        /// Resolves the node a vm is currently running on. CRS can migrate HA managed vms at any time,
+        /// and the vm cache only catches up on its next refresh, so the cached node can be stale.
+        /// </summary>
+        private async Task<string> GetCurrentNode(Vm vm)
+        {
+            if (!_config.EnableHA)
+                return vm.Host;
+
+            try
+            {
+                var pveVm = await _pveClient.GetVmAsync(vm.Id);
+
+                if (pveVm != null && !string.IsNullOrEmpty(pveVm.Node) && pveVm.Node != vm.Host)
+                {
+                    _logger.LogDebug("vm {name} ({id}) moved from {old} to {new}", vm.Name, vm.Id, vm.Host, pveVm.Node);
+                    vm.Host = pveVm.Node;
+                    _vmCache.TryUpdate(vm.Id, vm, vm);
+                }
+
+                return vm.Host;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not resolve the current node of vm {id}, using {host}", vm.Id, vm.Host);
+                return vm.Host;
+            }
         }
 
         /// <summary>
@@ -658,7 +1041,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
                 if (targetNodes.Any())
                 {
-                    targetNode = targetNodes.ElementAt(_random.Next(0, targetNodes.Count() - 1));
+                    targetNode = targetNodes.ElementAt(_random.Next(0, targetNodes.Count()));
                 }
                 else
                 {
@@ -677,7 +1060,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         private async Task<string> GetRandomNode()
         {
             var nodes = await _pveClient.GetNodesAsync();
-            var randomNum = _random.Next(0, nodes.Count() - 1);
+            var randomNum = _random.Next(0, nodes.Count());
             return nodes.ElementAt(randomNum).Node;
         }
 
@@ -712,12 +1095,19 @@ namespace TopoMojo.Hypervisor.Proxmox
         {
             if (string.IsNullOrEmpty(template.Iso)) return null;
 
-            var isos = await GetFiles();
-            return isos
-                .Where(x => x.Volid == template.Iso)
-                .FirstOrDefault()
-                ?.Volid;
+            var match = MatchIso(await GetFiles(), template.Iso);
+
+            if (match is null)
+                _logger.LogWarning("No ISO matching {iso} on storage {storage}", template.Iso, _config.IsoStore);
+
+            return match?.Volid;
         }
+
+        // Matching goes through ProxmoxIsoFile.DisplayName only: ProxmoxIsoNaming.TryDecode already
+        // resolves both the configured and the legacy '#' scope separator.
+        internal static ProxmoxIsoFile MatchIso(IEnumerable<ProxmoxIsoFile> isos, string iso)
+            => isos.FirstOrDefault(x =>
+                string.Equals(x.DisplayName, iso, StringComparison.OrdinalIgnoreCase));
 
         private static string GetMemory(VmTemplate template)
         {
@@ -996,6 +1386,9 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
             // _logger.LogDebug("taskMonitor ended.");
         }
+
+        [GeneratedRegex(@"[^A-Za-z0-9_.\-]")]
+        private static partial Regex InvalidPveIdCharsRegex();
 
         [GeneratedRegex(@"net(\d)+")]
         private static partial Regex NicDataRegex();

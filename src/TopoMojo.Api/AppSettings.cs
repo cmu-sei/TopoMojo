@@ -107,7 +107,6 @@ namespace TopoMojo.Api
         public string TopoRoot { get; set; } = "wwwroot";
         public string IsoRoot { get; set; } = "wwwroot/isos";
         public string DocRoot { get; set; } = "wwwroot/docs";
-        public bool SupportsSubfolders { get; set; } = true;
 
         /// <summary>
         /// Enable API-based datastore uploads for VMware Cloud environments where NFS is not available
@@ -120,9 +119,9 @@ namespace TopoMojo.Api
         public string TempRoot { get; set; } = Path.Combine(Path.GetTempPath(), "topoiso");
 
         /// <summary>
-        /// Timeout in minutes for datastore API uploads (default: 120 minutes / 2 hours)
+        /// Timeout in minutes for uploads when UseDatastoreApi is enabled
         /// </summary>
-        public int UploadTimeoutMinutes { get; set; } = 120;
+        public int UploadTimeoutMinutes { get; set; } = HypervisorServiceConfiguration.DefaultUploadTimeoutMinutes;
 
         /// <summary>
         /// Hours after which temp files are considered stale and can be deleted (default: 24 hours)

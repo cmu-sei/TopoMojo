@@ -22,12 +22,5 @@ namespace TopoMojo.Hypervisor.Proxmox.Models
             }
         }
 
-        public string DisplayName
-        {
-            get
-            {
-                return this.Name.Replace('#', '/');
-            }
-        }
     }
 }

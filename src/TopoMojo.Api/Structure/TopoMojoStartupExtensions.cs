@@ -2,6 +2,8 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root.
 
 using System.Reflection;
+using System.Net;
+using System.Net.Http;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using TopoMojo.Api;
@@ -130,7 +132,9 @@ namespace Microsoft.Extensions.DependencyInjection
             var config = podConfig();
 
             // Configure HttpClient for vSphere datastore uploads
-            var timeoutMinutes = uploadOptions?.UploadTimeoutMinutes ?? 120;
+            var uploadTimeoutMinutes = uploadOptions?.UploadTimeoutMinutes > 0
+                ? uploadOptions.UploadTimeoutMinutes
+                : HypervisorServiceConfiguration.DefaultUploadTimeoutMinutes;
             services.AddHttpClient("vSphereDatastore")
                 .ConfigurePrimaryHttpMessageHandler(() =>
                 {
@@ -144,8 +148,36 @@ namespace Microsoft.Extensions.DependencyInjection
                 })
                 .ConfigureHttpClient(client =>
                 {
-                    client.Timeout = TimeSpan.FromMinutes(timeoutMinutes);
+                    client.Timeout = TimeSpan.FromMinutes(uploadTimeoutMinutes);
                 });
+
+            // Named HttpClient for Corsinvest's PveClient. Supplying no client causes the SDK to
+            // create its own HttpClient and handler, which prevents handler pooling and can
+            // exhaust sockets when Proxmox clients are recreated.
+            HttpMessageHandler ProxmoxPrimaryHandler()
+            {
+                var handler = new HttpClientHandler
+                {
+                    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+                };
+
+                if (config.IgnoreCertificateErrors)
+                {
+                    handler.ServerCertificateCustomValidationCallback =
+                            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+                }
+
+                return handler;
+            }
+
+            services.AddHttpClient("proxmox")
+                .ConfigurePrimaryHttpMessageHandler(ProxmoxPrimaryHandler);
+
+            services.AddHttpClient("proxmoxIsoUpload", client =>
+                {
+                    client.Timeout = TimeSpan.FromMinutes(uploadTimeoutMinutes);
+                })
+                .ConfigurePrimaryHttpMessageHandler(ProxmoxPrimaryHandler);
 
             if (string.IsNullOrWhiteSpace(config.Url))
             {

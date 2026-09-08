@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Corsinvest.ProxmoxVE.Api;
@@ -32,7 +33,8 @@ namespace TopoMojo.Hypervisor.Proxmox
         (
             HypervisorServiceConfiguration hypervisorOptions,
             ILogger<ProxmoxVnetsClient> logger,
-            Random random
+            Random random,
+            IHttpClientFactory httpClientFactory
         )
         {
             _logger = logger;
@@ -46,7 +48,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
             hypervisorOptions.Host = host;
 
-            _pveClient = new PveClient(host, port)
+            _pveClient = new PveClient(host, port, httpClientFactory.CreateClient("proxmox"))
             {
                 ApiToken = hypervisorOptions.AccessToken
             };
