@@ -29,7 +29,6 @@ namespace TopoMojo.Api
         public const string MarkdownCutLine = "<!-- cut -->";
         public const string TagDelimiter = "#";
         public static char[] StringTokenSeparators = [' ', ',', ';', ':', '|', '\t'];
-        public static char[] StringLineSeparators = [';', '\n', '\r'];
 
         public const string ErrorListCacheKey = "errbf";
     }

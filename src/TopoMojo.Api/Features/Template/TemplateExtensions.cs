@@ -13,7 +13,12 @@ namespace TopoMojo
 {
     public static class TemplateExtensions
     {
-        public static VmTemplate ToVirtualTemplate(this ConvergedTemplate template, string isolationTag = "")
+        /// <summary>
+        /// Projects a template into the form the hypervisor deploys. <paramref name="guestSettingSeparators"/>
+        /// comes from <see cref="IHypervisorService.GuestSettingSeparators"/> and is required, so that
+        /// no hypervisor's Guest Settings syntax is silently assumed.
+        /// </summary>
+        public static VmTemplate ToVirtualTemplate(this ConvergedTemplate template, string isolationTag, IReadOnlyList<char> guestSettingSeparators)
         {
             TemplateUtility tu = new(template.Detail)
             {
@@ -33,7 +38,7 @@ namespace TopoMojo
                 UseUplinkSwitch = template.WorkspaceUseUplinkSwitch
             };
 
-            tu.AddGuestSettings(template.Guestinfo ?? "");
+            tu.AddGuestSettings(template.Guestinfo ?? "", guestSettingSeparators);
 
             return tu.AsTemplate();
         }

@@ -49,6 +49,12 @@ namespace TopoMojo.Hypervisor.vSphere
         private readonly BlockingCollection<DeploymentContext> DeploymentCollection = [];
         public HypervisorServiceConfiguration Options { get { return _options; } }
 
+        // vSphere carries Guest Settings in the virtual machine's ExtraConfig, where a ';' has no
+        // meaning to any parser in the path, so its authoring syntax accepts ';' as a separator in
+        // addition to newlines.
+        public static readonly char[] GuestSettingSeparatorSet = [';', '\n', '\r'];
+        public IReadOnlyList<char> GuestSettingSeparators => GuestSettingSeparatorSet;
+
         public async Task ReloadHost(string hostname)
         {
             string host = "https://" + hostname + "/sdk";

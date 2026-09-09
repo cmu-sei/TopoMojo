@@ -121,7 +121,13 @@ namespace TopoMojo.Api.Services
             set { _template.GuestSettings = value; }
         }
 
-        public void AddGuestSettings(string guestinfo)
+        /// <param name="guestinfo">The raw Guest Settings text, one <c>key=value</c> per line.</param>
+        /// <param name="separators">
+        /// The characters that end one setting and begin the next, as declared by the target
+        /// hypervisor in <see cref="IHypervisorService.GuestSettingSeparators"/>. A separator cannot
+        /// appear literally in a value, so this set is never widened here.
+        /// </param>
+        public void AddGuestSettings(string guestinfo, IReadOnlyList<char> separators)
         {
             var result = new List<VmKeyValue>();
 
@@ -129,7 +135,7 @@ namespace TopoMojo.Api.Services
                 result.AddRange(_template.GuestSettings);
 
             var lines = guestinfo?.Split(
-                AppConstants.StringLineSeparators,
+                [.. separators],
                 StringSplitOptions.RemoveEmptyEntries
             ) ?? [];
 
