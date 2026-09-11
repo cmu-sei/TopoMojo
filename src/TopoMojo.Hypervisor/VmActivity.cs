@@ -17,9 +17,9 @@ public class VmActivity
 
         return new VmActivity
         {
-            Kind = task.Name?.Contains("migrat", System.StringComparison.OrdinalIgnoreCase) == true
-                || task.Name?.Contains("relocat", System.StringComparison.OrdinalIgnoreCase) == true
-                ? VmActivityKind.Migrating : VmActivityKind.Busy,
+            // Task names are display text, not operation identifiers.
+            // Hypervisor adapters identify migration from their operation status.
+            Kind = VmActivityKind.Busy,
             Status = task.Progress < 0 ? VmActivityStatus.Failed : VmActivityStatus.Active,
             Message = task.Progress < 0 ? "The VM operation failed." : null
         };

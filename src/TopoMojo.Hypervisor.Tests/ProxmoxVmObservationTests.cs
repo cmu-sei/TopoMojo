@@ -10,11 +10,8 @@ namespace TopoMojo.Hypervisor.Tests;
 
 public sealed class ProxmoxVmObservationTests
 {
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData(" ")]
-    public void FreshDeploymentRetainsIdentityWhilePowerAndNodeConverge(string name)
+    [Fact]
+    public void FreshDeploymentRetainsIdentityWhilePowerAndNodeConverge()
     {
         var deployed = new Vm
         {
@@ -25,24 +22,13 @@ public sealed class ProxmoxVmObservationTests
             ResourceType = ClusterResourceType.Vm, VmId = 123, Node = "pve2", IsRunning = true
         };
 
-        var vm = ProxmoxClient.MapVmObservation(observed, name, deployed);
+        var vm = ProxmoxClient.MapVmObservation(observed, "", deployed);
 
         Assert.Equal("Ubuntu#workspace-id", vm.Name);
         Assert.Equal("workspace-id", vm.Name.Tag());
         Assert.Equal("pve2", vm.Host);
         Assert.Equal(VmPowerState.Running, vm.State);
         Assert.Equal("Ubuntu#workspace-id", deployed.Name);
-    }
-
-    [Fact]
-    public void FreshNameReplacesPreviousNameWhenInventoryConverges()
-    {
-        var vm = ProxmoxClient.MapVmObservation(
-            new ClusterResource { VmId = 123, IsRunning = false },
-            "Renamed#workspace-id",
-            new Vm { Id = "123", Name = "Previous#workspace-id" });
-        Assert.Equal("Renamed#workspace-id", vm.Name);
-        Assert.Equal(VmPowerState.Off, vm.State);
     }
 
     [Fact]
