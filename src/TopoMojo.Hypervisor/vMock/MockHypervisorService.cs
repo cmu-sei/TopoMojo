@@ -349,6 +349,8 @@ namespace TopoMojo.Hypervisor.vMock
                     Name = vm.Name.Untagged(),
                     IsolationId = vm.Name.Tag(),
                     Url = "https://mock.topomojo.local/ticket/12345678",
+                    State = vm.State,
+                    Activity = VmActivity.FromTask(vm.Task),
                     IsRunning = vm.State == VmPowerState.Running
                 }
             ;

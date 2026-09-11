@@ -174,23 +174,31 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             try
             {
-                var vm = await LoadVm(id);
+                var cached = await LoadVm(id);
+                if (cached == null)
+                    throw new HypervisorException("The VM is not currently available.");
+                info.Id = cached.Id;
+                info.Name = cached.Name.Untagged();
+                info.IsolationId = cached.Name.Tag();
+                var (vm, activity) = await _pveClient.ReadConsoleState(cached.Id);
+                info.State = vm.State;
+                info.IsRunning = vm.State == VmPowerState.Running;
+                info.Activity = activity;
+                if (!info.IsRunning || activity?.Status == VmActivityStatus.Active)
+                    return info;
 
-                info = new VmConsole
-                {
-                    Id = vm.Id,
-                    Name = vm.Name.Untagged(),
-                    IsolationId = vm.Name.Tag(),
-                    IsRunning = vm.State == VmPowerState.Running
-                };
-
-                // throws if powered off
                 var ticket = await _pveClient.GetTicket(GetId(vm.Id));
                 info.Url = ticket.Item1;
                 info.Ticket = ticket.Item2;
 
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not prepare console for vm {id}", id);
+                info.Error = "The console is temporarily unavailable. Retrying.";
+                if (info.State == null)
+                    info.Activity = new VmActivity { Kind = VmActivityKind.Unknown };
+            }
 
             return info;
         }
