@@ -182,7 +182,6 @@ namespace TopoMojo.Hypervisor.Proxmox
                 info.IsolationId = cached.Name.Tag();
                 var (vm, activity) = await _pveClient.ReadConsoleState(cached.Id);
                 info.State = vm.State;
-                info.IsRunning = vm.State == VmPowerState.Running;
                 info.Activity = activity;
                 if (!info.IsRunning || activity?.Status == VmActivityStatus.Active)
                     return info;

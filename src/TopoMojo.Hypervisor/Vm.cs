@@ -84,7 +84,7 @@ namespace TopoMojo.Hypervisor
         public string Name { get; set; }
         public string Url { get; set; }
         public string Ticket { get; set; }
-        public bool IsRunning { get; set; }
+        public bool IsRunning => State == VmPowerState.Running;
         // Null means the hypervisor could not establish the current power state.
         public VmPowerState? State { get; set; }
         public VmActivity Activity { get; set; }

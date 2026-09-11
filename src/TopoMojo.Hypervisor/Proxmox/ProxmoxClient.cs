@@ -348,7 +348,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 // the create call may have failed after the resource was created, and a vm cannot
                 // be destroyed while it is an HA resource
                 await UnregisterHA(nextId);
-                _vmCache.TryRemove(vm.Id, out _);
+                RemoveCachedVm(vm.Id, out _);
 
                 var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
                 await _pveClient.WaitForTaskToFinish(destroyTask);
@@ -387,11 +387,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             // A failed observation after acceptance must not misreport a rejected start.
             try
             {
-                var observed = await _pveClient.GetVmAsync(vm.Id);
-                if (observed != null)
-                    vm = LoadVm(observed) ?? vm;
-                if (vm.State == VmPowerState.Running)
-                    _consoleStarts.TryRemove(id, out _);
+                vm = await RefreshObservedVm(id);
             }
             catch (Exception ex)
             {
@@ -403,7 +399,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<Vm> Stop(string id)
         {
             Vm vm = _vmCache[id];
-            _consoleStarts.TryRemove(id, out _);
+            ClearConsoleStart(id);
 
             if (!_config.EnableHA || !await SetHAState(vm.Id, "stopped"))
             {
@@ -478,7 +474,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             // Don't set vm to the result here, because if we get unlucky and the sync task removed
             // this vm from the cache first, we'll get a null value, which will cause errors in the
             // calling method
-            _vmCache.TryRemove(vm.Id, out _);
+            RemoveCachedVm(vm.Id, out _);
 
             return vm;
         }
@@ -1233,7 +1229,18 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
 
+            if (vm.State == VmPowerState.Running)
+                ClearConsoleStart(vm.Id);
+
             return vm;
+        }
+
+        private void ClearConsoleStart(string id) => _consoleStarts.TryRemove(id, out _);
+
+        private bool RemoveCachedVm(string id, out Vm vm)
+        {
+            ClearConsoleStart(id);
+            return _vmCache.TryRemove(id, out vm);
         }
 
         internal static Vm MapVmObservation(IClusterResourceVm observed, string name, Vm previous)
@@ -1255,14 +1262,19 @@ namespace TopoMojo.Hypervisor.Proxmox
             };
         }
 
-        // Console reads need fresh power/node data; the general inventory cache refreshes every 30s.
-        public async Task<(Vm Vm, VmActivity Activity)> ReadConsoleState(string id)
+        private async Task<Vm> RefreshObservedVm(string id)
         {
             var observed = await _pveClient.GetVmAsync(id);
             if (observed == null)
                 throw new HypervisorException("The VM is not currently available.");
-            var vm = LoadVm(observed)
+            return LoadVm(observed)
                 ?? throw new HypervisorException("The VM is not currently available.");
+        }
+
+        // Console reads need fresh power/node data; the general inventory cache refreshes every 30s.
+        public async Task<(Vm Vm, VmActivity Activity)> ReadConsoleState(string id)
+        {
+            var vm = await RefreshObservedVm(id);
 
             ClusterHaStatusCurrent ha = null;
             if (_config.EnableHA)
@@ -1285,11 +1297,6 @@ namespace TopoMojo.Hypervisor.Proxmox
             }
 
             _consoleStarts.TryGetValue(id, out var requested);
-            if (vm.State == VmPowerState.Running)
-            {
-                _consoleStarts.TryRemove(id, out _);
-                requested = null;
-            }
             return (vm, ProxmoxVmActivity.Resolve(vm, ha, requested));
         }
 
@@ -1319,7 +1326,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             foreach (string key in existing.Except(active))
             {
-                if (_vmCache.TryRemove(key, out Vm stale))
+                if (RemoveCachedVm(key, out Vm stale))
                 {
                     _logger.LogDebug("removing stale cache entry [{host}] {stale}", _config.Host, stale.Name);
                 }

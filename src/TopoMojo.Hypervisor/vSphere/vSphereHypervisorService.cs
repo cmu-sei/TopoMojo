@@ -419,7 +419,6 @@ namespace TopoMojo.Hypervisor.vSphere
                     Name = ctx.Vm.Name.Untagged(),
                     IsolationId = ctx.Vm.Name.Tag(),
                     State = ctx.Vm.State,
-                    IsRunning = ctx.Vm.State == VmPowerState.Running,
                     Activity = VmActivity.FromTask(ctx.Vm.Task)
                 };
                 if (info.IsRunning && info.Activity?.Status != VmActivityStatus.Active)
