@@ -422,6 +422,11 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> DeleteTemplate(string templateName)
         {
+            // no name is not a name to match; without this a cached vm carrying no name of its own
+            // would answer to it
+            if (!templateName.HasValue())
+                return null;
+
             Vm vm = _vmCache.Where(x => x.Value.Name == templateName).FirstOrDefault().Value;
 
             if (vm == null)
