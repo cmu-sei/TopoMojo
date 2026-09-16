@@ -71,6 +71,10 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private readonly ILogger<ProxmoxClient> _logger;
         private readonly Dictionary<string, PveNodeTask> _tasks;
+        private readonly ConcurrentDictionary<string, VmActivity> _consoleStarts = new();
+        private readonly SemaphoreSlim _haStatusLock = new(1, 1);
+        private ClusterHaStatusCurrent[] _haStatus = [];
+        private DateTimeOffset _haStatusRead;
         private readonly ConcurrentDictionary<string, Vm> _vmCache;
         private readonly IProxmoxNameService _nameService;
         private readonly IProxmoxVlanManager _vlanManager;
@@ -344,7 +348,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                 // the create call may have failed after the resource was created, and a vm cannot
                 // be destroyed while it is an HA resource
                 await UnregisterHA(nextId);
-                _vmCache.TryRemove(vm.Id, out _);
+                RemoveCachedVm(vm.Id, out _);
 
                 var destroyTask = await _pveClient.Nodes[targetNode].Qemu[nextId].DestroyVm();
                 await _pveClient.WaitForTaskToFinish(destroyTask);
@@ -364,25 +368,38 @@ namespace TopoMojo.Hypervisor.Proxmox
         public async Task<Vm> Start(string id)
         {
             Vm vm = _vmCache[id];
-
-            // when a vm is HA managed, the HA manager owns its power state and will revert a
-            // direct qemu start, so request the state change from it instead
-            if (!_config.EnableHA || !await SetHAState(vm.Id, "started"))
+            _consoleStarts[id] = new() { Kind = VmActivityKind.Starting };
+            try
             {
-                var task = await _pveClient.Nodes[await GetCurrentNode(vm)].Qemu[vm.GetId()].Status.Start.VmStart();
-                await _pveClient.WaitForTaskToFinish(task);
+                // Acceptance by HA is not an observation that the guest is running.
+                if (!_config.EnableHA || !await SetHAState(vm.Id, "started"))
+                {
+                    var task = await _pveClient.Nodes[await GetCurrentNode(vm)].Qemu[vm.GetId()].Status.Start.VmStart();
+                    await _pveClient.WaitForTaskToFinish(task);
+                }
             }
-
-            vm.State = VmPowerState.Running;
-
-            _vmCache.TryUpdate(vm.Id, vm, vm);
-
+            catch
+            {
+                _consoleStarts[id] = new() { Kind = VmActivityKind.Starting,
+                    Status = VmActivityStatus.Failed, Message = "The VM could not be started." };
+                throw;
+            }
+            // A failed observation after acceptance must not misreport a rejected start.
+            try
+            {
+                vm = await RefreshObservedVm(id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Start accepted, but current power state is unavailable for vm {id}", id);
+            }
             return vm;
         }
 
         public async Task<Vm> Stop(string id)
         {
             Vm vm = _vmCache[id];
+            ClearConsoleStart(id);
 
             if (!_config.EnableHA || !await SetHAState(vm.Id, "stopped"))
             {
@@ -457,7 +474,7 @@ namespace TopoMojo.Hypervisor.Proxmox
             // Don't set vm to the result here, because if we get unlucky and the sync task removed
             // this vm from the cache first, we'll get a null value, which will cause errors in the
             // calling method
-            _vmCache.TryRemove(vm.Id, out _);
+            RemoveCachedVm(vm.Id, out _);
 
             return vm;
         }
@@ -1194,17 +1211,9 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private Vm LoadVm(IClusterResourceVm pveVm)
         {
-            Vm vm = new()
-            {
-                Name = pveVm.Name == null ? "" : _nameService.FromPveName(pveVm.Name),
-                Id = pveVm.VmId.ToString(),
-                State = pveVm.IsRunning ? VmPowerState.Running : VmPowerState.Off,
-                Status = "deployed",
-                Host = pveVm.Node,
-                Tags = pveVm.Tags == null ? [] : pveVm.Tags.Split(' '),
-                HypervisorType = HypervisorType.Proxmox,
-                IsTemplate = pveVm.IsTemplate
-            };
+            _vmCache.TryGetValue(pveVm.VmId.ToString(), out var previous);
+            var name = string.IsNullOrWhiteSpace(pveVm.Name) ? null : _nameService.FromPveName(pveVm.Name);
+            var vm = MapVmObservation(pveVm, name, previous);
 
             if (_tasks.TryGetValue(vm.Id, out PveNodeTask value))
             {
@@ -1220,7 +1229,75 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
 
+            if (vm.State == VmPowerState.Running)
+                ClearConsoleStart(vm.Id);
+
             return vm;
+        }
+
+        private void ClearConsoleStart(string id) => _consoleStarts.TryRemove(id, out _);
+
+        private bool RemoveCachedVm(string id, out Vm vm)
+        {
+            ClearConsoleStart(id);
+            return _vmCache.TryRemove(id, out vm);
+        }
+
+        internal static Vm MapVmObservation(IClusterResourceVm observed, string name, Vm previous)
+        {
+            var id = observed.VmId.ToString();
+            return new Vm
+            {
+                // Immediately after cloning, Proxmox can report power/node data without a name.
+                // Keep the identity recorded by Deploy instead of erasing its isolation tag.
+                Name = !string.IsNullOrWhiteSpace(name) ? name
+                    : previous?.Id == id ? previous.Name : "",
+                Id = id,
+                State = observed.IsRunning ? VmPowerState.Running : VmPowerState.Off,
+                Status = "deployed",
+                Host = observed.Node,
+                Tags = observed.Tags == null ? [] : observed.Tags.Split(' '),
+                HypervisorType = HypervisorType.Proxmox,
+                IsTemplate = observed.IsTemplate
+            };
+        }
+
+        private async Task<Vm> RefreshObservedVm(string id)
+        {
+            var observed = await _pveClient.GetVmAsync(id);
+            if (observed == null)
+                throw new HypervisorException("The VM is not currently available.");
+            return LoadVm(observed)
+                ?? throw new HypervisorException("The VM is not currently available.");
+        }
+
+        // Console reads need fresh power/node data; the general inventory cache refreshes every 30s.
+        public async Task<(Vm Vm, VmActivity Activity)> ReadConsoleState(string id)
+        {
+            var vm = await RefreshObservedVm(id);
+
+            ClusterHaStatusCurrent ha = null;
+            if (_config.EnableHA)
+            {
+                // Share a short-lived HA snapshot across console tabs instead of querying per VM.
+                await _haStatusLock.WaitAsync();
+                try
+                {
+                    if (DateTimeOffset.UtcNow - _haStatusRead >= TimeSpan.FromSeconds(5))
+                    {
+                        var result = await _pveClient.Cluster.Ha.Status.Current.Status();
+                        if (!result.IsSuccessStatusCode)
+                            throw new HypervisorException("VM operation status is unavailable.");
+                        _haStatus = result.ToModel<ClusterHaStatusCurrent[]>();
+                        _haStatusRead = DateTimeOffset.UtcNow;
+                    }
+                    ha = _haStatus.FirstOrDefault(s => s.Sid == GetSid(id));
+                }
+                finally { _haStatusLock.Release(); }
+            }
+
+            _consoleStarts.TryGetValue(id, out var requested);
+            return (vm, ProxmoxVmActivity.Resolve(vm, ha, requested));
         }
 
         private async Task<Vm[]> ReloadVmCache()
@@ -1249,7 +1326,7 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             foreach (string key in existing.Except(active))
             {
-                if (_vmCache.TryRemove(key, out Vm stale))
+                if (RemoveCachedVm(key, out Vm stale))
                 {
                     _logger.LogDebug("removing stale cache entry [{host}] {stale}", _config.Host, stale.Name);
                 }

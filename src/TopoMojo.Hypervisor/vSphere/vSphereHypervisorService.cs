@@ -418,13 +418,19 @@ namespace TopoMojo.Hypervisor.vSphere
                     Id = ctx.Vm.Id,
                     Name = ctx.Vm.Name.Untagged(),
                     IsolationId = ctx.Vm.Name.Tag(),
-                    IsRunning = ctx.Vm.State == VmPowerState.Running,
-                    // throws if powered off
-                    Url = await ctx.Host.GetTicket(ctx.Vm.Id)
+                    State = ctx.Vm.State,
+                    Activity = VmActivity.FromTask(ctx.Vm.Task)
                 };
-
+                if (info.IsRunning && info.Activity?.Status != VmActivityStatus.Active)
+                    info.Url = await ctx.Host.GetTicket(ctx.Vm.Id);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not prepare console for vm {id}", id);
+                info.Error = "The console is temporarily unavailable. Retrying.";
+                if (info.State == null)
+                    info.Activity = new VmActivity { Kind = VmActivityKind.Unknown };
+            }
 
             return info;
         }
