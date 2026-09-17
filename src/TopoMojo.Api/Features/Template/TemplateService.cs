@@ -8,6 +8,7 @@ using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Extensions;
 using TopoMojo.Hypervisor;
 using TopoMojo.Api.Models;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace TopoMojo.Api.Services
@@ -154,10 +155,38 @@ namespace TopoMojo.Api.Services
             entity.Id = Guid.NewGuid().ToString("n");
             entity.Name = model.Name ?? $"{entity.Name}{suffix}";
             entity.IsPublished = false;
+            entity.Detail = LocalizeCloneDiskPaths(entity.Detail, entity.WorkspaceId, entity.Id);
 
             await _store.Create(entity);
 
             return Mapper.Map<TemplateDetail>(entity);
+        }
+
+        /// <summary>
+        /// Point a cloned template's detail at its own disks
+        /// </summary>
+        /// <remarks>
+        /// A clone starts as a copy of its source's detail, so without this its disk paths are the
+        /// source's disk paths. That leaves the clone unlinked but not independent: deleting it
+        /// deletes disks the source still needs. Recording the source's path as each disk's Source
+        /// is what makes disk initialization copy the disk rather than share it. This is the same
+        /// treatment WorkspaceStore.Clone gives the templates of a cloned workspace.
+        /// </remarks>
+        internal static string LocalizeCloneDiskPaths(string detail, string workspaceId, string templateId)
+        {
+            if (detail.IsEmpty())
+                return detail;
+
+            var tu = new TemplateUtility(detail);
+
+            // A template with no workspace is stock, and stock disks live in the public folder,
+            // which is keyed by the empty guid the same way a workspace folder is keyed by its id.
+            tu.LocalizeDiskPaths(
+                workspaceId.NotEmpty() ? workspaceId : Guid.Empty.ToString(),
+                templateId
+            );
+
+            return tu.ToString();
         }
 
         public async Task<Template> Update(ChangedTemplate template)
@@ -268,11 +297,139 @@ namespace TopoMojo.Api.Services
 
             // if root template, delete disk(s)
             if (entity.IsLinked.Equals(false))
+            {
+                string[] shared = ExcludeSharedArtifacts(deployable, await OtherTemplateDetails(id));
+
+                if (shared.Length > 0)
+                {
+                    Logger.LogWarning(
+                        "template {templateId} shares {sharedArtifacts} with another template; leaving them in place",
+                        id,
+                        string.Join(", ", shared)
+                    );
+                }
+
                 await _pod.DeleteDisks(deployable);
+            }
 
             await _store.Delete(id);
 
             return Mapper.Map<Template>(entity);
+        }
+
+        /// <summary>
+        /// The detail of every template except one
+        /// </summary>
+        /// <remarks>
+        /// Read whole rather than narrowed in the database by the disk path, because a path is stored
+        /// inside a json document that escapes it: an apostrophe or a non-ascii character in a path
+        /// is a \uXXXX sequence in the column, so a substring predicate would miss the very row that
+        /// shares the disk. Deleting a template is rare, and a candidate row has to be parsed to be
+        /// believed anyway.
+        /// </remarks>
+        private async Task<string[]> OtherTemplateDetails(string id)
+        {
+            return await _store.List()
+                .Where(t => t.Id != id && t.Detail != null)
+                .Select(t => t.Detail)
+                .ToArrayAsync()
+            ;
+        }
+
+        /// <summary>
+        /// Drop the artifacts another template also uses, and name what was dropped
+        /// </summary>
+        /// <remarks>
+        /// Clones created before <see cref="LocalizeCloneDiskPaths"/> carry their source's disk paths
+        /// and, on Proxmox, its template name, so deleting one of them would take artifacts the
+        /// source still needs. Removing those from the deployable template is what keeps the
+        /// hypervisor away from them, and lets the rest of the delete proceed. A detail that cannot
+        /// be parsed is read as claiming nothing, so one bad row cannot block every delete.
+        /// </remarks>
+        internal static string[] ExcludeSharedArtifacts(VmTemplate deployable, IEnumerable<string> otherDetails)
+        {
+            var others = otherDetails
+                .Select(AsTemplateOrNull)
+                .Where(t => t is not null)
+                .ToArray()
+            ;
+
+            var shared = new List<string>();
+
+            if (deployable.Template.NotEmpty() && others.Any(t => SameName(t.Template, deployable.Template)))
+            {
+                shared.Add(deployable.Template);
+
+                // Proxmox deletes a template's disks by deleting the named template itself, so
+                // dropping the name is how it is told there is nothing here of this template's own.
+                deployable.Template = null;
+            }
+
+            if (deployable.Disks is { Length: > 0 })
+            {
+                string[] claimed = [.. others
+                    .SelectMany(t => t.Disks ?? [])
+                    .Select(d => d.Path)
+                    .Distinct()
+                ];
+
+                var keep = new List<VmDisk>();
+
+                foreach (VmDisk disk in deployable.Disks)
+                {
+                    if (claimed.Any(path => SameDiskFile(path, disk.Path)))
+                        shared.Add(disk.Path);
+                    else
+                        keep.Add(disk);
+                }
+
+                deployable.Disks = [.. keep];
+            }
+
+            return [.. shared];
+        }
+
+        /// <summary>
+        /// Whether two datastore paths name the same disk file
+        /// </summary>
+        /// <remarks>
+        /// Compared by folder and file rather than as whole strings, so that the datastore prefix a
+        /// path may or may not carry does not decide whether a disk is shared. Ambiguity resolves
+        /// toward shared, because leaving a disk in place is recoverable and deleting one that is
+        /// still in use is not.
+        /// </remarks>
+        internal static bool SameDiskFile(string a, string b)
+        {
+            if (a.IsEmpty() || b.IsEmpty())
+                return false;
+
+            var x = new DatastorePath(a);
+            var y = new DatastorePath(b);
+
+            return SameName(x.Folder, y.Folder) && SameName(x.File, y.File);
+        }
+
+        private static bool SameName(string a, string b)
+            => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// A template detail as a template, or null if it is not one
+        /// </summary>
+        private static VmTemplate AsTemplateOrNull(string detail)
+        {
+            // An empty detail would be filled in with a placeholder disk, which is not a claim on
+            // anything, and the template it belongs to resolves its real disks through its parent.
+            if (detail.IsEmpty())
+                return null;
+
+            try
+            {
+                return new TemplateUtility(detail).AsTemplate();
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
         }
 
         public async Task<VmTemplate> GetDeployableTemplate(string id, string tag = "")
