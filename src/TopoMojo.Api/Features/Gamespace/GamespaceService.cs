@@ -182,7 +182,7 @@ namespace TopoMojo.Api.Services
                 MaxPoints = spec.MaxPoints,
                 NextSectionPreReqThisSection = nextSectionPreReqThisSection,
                 NextSectionPreReqTotal = nextSectionPreReqTotal,
-                Score = WeightToPoints(spec.Score, spec.MaxPoints),
+                Score = spec.Score * spec.MaxPoints,
                 Text = string.Join("\n\n", spec.Text, spec.Challenge.Text),
                 Variant = mappedVariant
             };
@@ -919,21 +919,66 @@ namespace TopoMojo.Api.Services
             foreach (var question in section.Questions)
                 question.Grade(submission.Questions.ElementAtOrDefault(i++)?.Answer ?? "");
 
+            // Calculate cumulative penalty: penalty × number_of_incorrect_attempts
+            var questionsList = section.Questions.ToList();
             section.Score = section.Questions
                 .Where(q => q.IsCorrect)
-                .Select(q => q.Weight - q.Penalty)
+                .Select(q =>
+                {
+                    int questionIdx = questionsList.IndexOf(q);
+                    int wrongCount = CountIncorrectAttempts(spec, submission.SectionIndex, questionIdx, q);
+                    // Penalty is a 0-1 fraction of the question mark, deducted per prior
+                    // wrong try and floored at 0, matching qbehaviour_mojomatch:
+                    //   score = weight * max(0, 1 - penalty * wrongCount)
+                    return q.Weight * Math.Max(0f, 1f - (q.Penalty * wrongCount));
+                })
                 .Sum()
             ;
 
             spec.Score = spec.Challenge.Sections
                 .SelectMany(s => s.Questions)
                 .Where(q => q.IsCorrect)
-                .Select(q => q.Weight - q.Penalty)
+                .Select(q =>
+                {
+                    var sectionList = spec.Challenge.Sections.ToList();
+                    int sectionIdx = sectionList.FindIndex(sec => sec.Questions.Contains(q));
+                    int questionIdx = sectionList[sectionIdx].Questions.ToList().IndexOf(q);
+                    int wrongCount = CountIncorrectAttempts(spec, sectionIdx, questionIdx, q);
+                    // See the section-scoring comment above: fraction penalty, floored at 0.
+                    return q.Weight * Math.Max(0f, 1f - (q.Penalty * wrongCount));
+                })
                 .Sum()
             ;
 
             if (spec.Score > lastScore)
                 spec.LastScoreTime = submission.Timestamp;
+        }
+
+        internal static int CountIncorrectAttempts(ChallengeSpec spec, int sectionIndex, int questionIndex, QuestionSpec question)
+        {
+            int count = 0;
+
+            // Count only wrong attempts made BEFORE the question was first answered
+            // correctly. Once correct, the question is locked (Grade early-returns on
+            // IsCorrect), so later submissions - e.g. the client resending answers while
+            // working other questions in the same section - must not add penalty.
+            foreach (var sub in spec.Submissions
+                .Where(s => s.SectionIndex == sectionIndex)
+                .OrderBy(s => s.Timestamp))
+            {
+                var answer = sub.Questions.ElementAtOrDefault(questionIndex)?.Answer;
+                if (string.IsNullOrWhiteSpace(answer))
+                    continue;
+
+                // Re-grade with the same matcher live grading uses; stop at the first
+                // correct answer so post-correct submissions do not over-penalize.
+                if (question.IsMatch(answer))
+                    break;
+
+                count++;
+            }
+
+            return count;
         }
 
         private static QuestionSetEligibility[] GetQuestionSetEligibility(VariantSpec variant)
@@ -984,10 +1029,13 @@ namespace TopoMojo.Api.Services
                 MaxPoints = spec.MaxPoints,
                 MaxAttempts = spec.MaxAttempts,
                 Attempts = spec.Submissions.Count,
-                Score = WeightToPoints(spec.Score, spec.MaxPoints),
+                // Decimal points (not int-rounded) so a penalized score like 99.8
+                // is preserved instead of rounding up to 100 and hiding the penalty.
+                // Score/SectionScore are doubles, so this is not an API contract change.
+                Score = spec.Score * spec.MaxPoints,
                 SectionIndex = sectionIndex,
                 SectionCount = spec.Challenge.Sections?.Count ?? 0,
-                SectionScore = WeightToPoints(section.Score, spec.MaxPoints),
+                SectionScore = section.Score * spec.MaxPoints,
                 SectionText = section.Text,
                 Questions = Mapper.Map<QuestionView[]>(section.Questions.Where(q => !q.Hidden))
             };
