@@ -127,10 +127,10 @@ public class DocumentController(
             () => workspaceService.CanEdit(id, Actor.Id).Result
         )) return Forbid();
 
-        string path = BuildPath(id);
-        path = Path.Combine(path, filename);
+        // filename arrives as a query parameter, so it has to be treated as a path, not a name.
+        string path = PathGuard.ResolveContainedFilename(BuildPath(id), filename);
 
-        if (filename.IsEmpty() || !System.IO.File.Exists(path))
+        if (path is null || !System.IO.File.Exists(path))
             return BadRequest();
 
         System.IO.File.Delete(path);

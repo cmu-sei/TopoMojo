@@ -375,7 +375,20 @@ public class TransferService(
             // save all other files to docs
             if (!entry.FullName.EndsWith('/'))
             {
-                string dest = Path.Combine(docPath, entry.FullName);
+                // Archives are shared between instances, so entry names are untrusted input. An entry
+                // named "../.." would otherwise be written outside docPath.
+                string dest = PathGuard.ResolveContained(docPath, entry.FullName);
+
+                if (dest is null)
+                {
+                    Logger.LogWarning(
+                        "Skipped import of zip entry {entryName}: resolves outside {docPath}",
+                        entry.FullName,
+                        docPath
+                    );
+                    continue;
+                }
+
                 Directory.CreateDirectory(Path.GetDirectoryName(dest));
                 using FileStream writer = File.Create(dest);
                 await entry.Open().CopyToAsync(writer);
