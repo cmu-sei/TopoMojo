@@ -1089,12 +1089,11 @@ namespace TopoMojo.Hypervisor.Proxmox
         /// <returns></returns>
         private async Task<string> GetTargetNode()
         {
-            string target = null;
-            var nodes = await _pveClient.GetNodesAsync();
+            var nodes = (await _pveClient.GetNodesAsync()).ToList();
+            IClusterResourceNode targetNode = null;
 
-            if (nodes.Any())
+            if (nodes.Count > 0)
             {
-                IClusterResourceNode targetNode;
                 var targetNodes = nodes.Where(x =>
                     x.IsOnline &&
                     x.MemoryUsagePercentage <= 50);
@@ -1110,11 +1109,20 @@ namespace TopoMojo.Hypervisor.Proxmox
                         .Where(x => x.IsOnline)
                         .FirstOrDefault();
                 }
-
-                target = targetNode.Node;
             }
 
-            return target;
+            // No online node means nothing can be deployed; say which nodes were seen rather than
+            // failing later on a null node name.
+            if (targetNode is null)
+            {
+                throw new HypervisorException(
+                    "No online Proxmox node is available to deploy to. Nodes reported by the cluster: "
+                    + (nodes.Count == 0
+                        ? "(none)"
+                        : string.Join(", ", nodes.Select(x => $"{x.Node}={x.Status ?? "(no status)"}"))));
+            }
+
+            return targetNode.Node;
         }
 
         private async Task<string> GetRandomNode()
