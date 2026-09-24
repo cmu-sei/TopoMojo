@@ -655,11 +655,12 @@ namespace TopoMojo.Hypervisor.Proxmox
             string storage,
             Random random)
         {
-            var candidates = resources
+            var matching = resources
                 .Where(x => x.ResourceType == ClusterResourceType.Storage
-                    && string.Equals(x.Storage, storage, StringComparison.Ordinal)
-                    && x.IsAvailable
-                    && !string.IsNullOrWhiteSpace(x.Node))
+                    && string.Equals(x.Storage, storage, StringComparison.Ordinal))
+                .ToList();
+            var candidates = matching
+                .Where(x => x.IsAvailable && !string.IsNullOrWhiteSpace(x.Node))
                 .ToList();
             var nodes = candidates
                 .Select(x => x.Node)
@@ -667,7 +668,22 @@ namespace TopoMojo.Hypervisor.Proxmox
                 .ToList();
 
             if (nodes.Count == 0)
-                throw new HypervisorException($"No online Proxmox node currently offers ISO storage '{storage}'.");
+            {
+                // Distinguish "the storage isn't there" from "nothing is reporting": a node with pvestatd
+                // stopped still lists its storage, with status "unknown", which is not a storage problem.
+                if (matching.Count == 0)
+                {
+                    throw new HypervisorException(
+                        $"No Proxmox node reports ISO storage '{storage}'. Check Pod__IsoStore, or whether the "
+                        + "cluster is reporting resource status at all (a node with pvestatd stopped is not).");
+                }
+
+                throw new HypervisorException(
+                    $"No online Proxmox node currently offers ISO storage '{storage}'. {matching.Count} node(s) "
+                    + $"list it but none report as available: "
+                    + $"{string.Join(", ", matching.Select(x => $"{x.Node ?? "(unnamed)"}={x.Status ?? "(no status)"}"))}. "
+                    + "A node with pvestatd stopped reports status 'unknown'.");
+            }
 
             if (nodes.Count == 1)
                 return nodes[0];

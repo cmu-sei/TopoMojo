@@ -36,6 +36,37 @@ public sealed class ProxmoxIsoStorageNodeTests
     }
 
     [Fact]
+    public void SelectIsoStorageNode_ReportsNodeStatusWhenNothingIsReporting()
+    {
+        var resources = new[]
+        {
+            StorageResource("iso", "node-a", false, true, "unknown"),
+            StorageResource("iso", "node-b", false, true, "unknown")
+        };
+
+        var ex = Assert.Throws<HypervisorException>(
+            () => ProxmoxClient.SelectIsoStorageNode(resources, "iso", Random.Shared));
+
+        Assert.Contains("node-a=unknown", ex.Message);
+        Assert.Contains("node-b=unknown", ex.Message);
+        Assert.Contains("pvestatd", ex.Message);
+    }
+
+    [Fact]
+    public void SelectIsoStorageNode_DistinguishesAnUnknownStorageFromAnOfflineOne()
+    {
+        var resources = new[]
+        {
+            StorageResource("other", "node-a", true, true)
+        };
+
+        var ex = Assert.Throws<HypervisorException>(
+            () => ProxmoxClient.SelectIsoStorageNode(resources, "iso", Random.Shared));
+
+        Assert.Contains("No Proxmox node reports ISO storage 'iso'", ex.Message);
+    }
+
+    [Fact]
     public void SelectIsoStorageNode_NeverSelectsAnUnavailableNode()
     {
         var resources = new[]
@@ -91,13 +122,15 @@ public sealed class ProxmoxIsoStorageNodeTests
         string storage,
         string node,
         bool isAvailable,
-        bool shared)
+        bool shared,
+        string status = null)
         => new()
         {
             ResourceType = ClusterResourceType.Storage,
             Storage = storage,
             Node = node,
             IsAvailable = isAvailable,
-            Shared = shared
+            Shared = shared,
+            Status = status
         };
 }
