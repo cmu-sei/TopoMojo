@@ -141,14 +141,14 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             if (vmTemplate != null)
             {
-                throw new InvalidOperationException("Template already exists");
+                throw new InvalidOperationException($"Template '{template.Template}' already exists");
             }
 
             var parentTemplate = _vmCache
                 .Where(x => x.Value.Name == template.ParentTemplate)
                 .FirstOrDefault()
                 .Value
-                ?? throw new InvalidOperationException("Parent Template does not exist");
+                ?? throw new InvalidOperationException($"Parent template '{template.ParentTemplate}' does not exist");
 
             var nextId = await GetNextId();
             var pveId = int.Parse(nextId);
@@ -191,18 +191,45 @@ namespace TopoMojo.Hypervisor.Proxmox
             return vm;
         }
 
+        /// <summary>
+        /// Finds the template a deploy should clone from. Proxmox omits the name of a vm whose node is not
+        /// reporting (pvestatd down leaves /cluster/resources entries with status "unknown" and no name), so
+        /// a template can drop out of the cache while the cluster otherwise looks healthy. Say so instead of
+        /// dereferencing null.
+        /// </summary>
+        internal static Vm SelectTemplateVm(IEnumerable<Vm> cached, string templateName)
+        {
+            var matches = cached
+                .Where(x => x is not null && x.Name == templateName)
+                .ToList();
+
+            var vmTemplate = matches
+                .FirstOrDefault(x => x.Tags == null || !x.Tags.Contains(deleteTag));
+
+            if (vmTemplate is not null)
+                return vmTemplate;
+
+            if (matches.Count > 0)
+            {
+                throw new HypervisorException(
+                    $"Template '{templateName}' was found in the Proxmox vm cache, but every copy "
+                    + $"({string.Join(", ", matches.Select(x => x.Id))}) is tagged '{deleteTag}' for deletion.");
+            }
+
+            throw new HypervisorException(
+                $"Template '{templateName}' was not found in the Proxmox vm cache. Either it does not exist, "
+                + "or the node hosting it is not reporting to the cluster (a node with pvestatd stopped returns "
+                + "resources with status 'unknown' and no name, which keeps them out of the cache).");
+        }
+
         public async Task<Vm> Deploy(VmTemplate template)
         {
             Result task;
             Vm vm = null;
 
             _logger.LogDebug("deploy: create vm...");
+            var vmTemplate = SelectTemplateVm(_vmCache.Values, template.Template);
             var targetNode = await GetTargetNode();
-            var vmTemplate = _vmCache
-                .Where(x => x.Value.Name == template.Template &&
-                            (x.Value.Tags == null || !x.Value.Tags.Contains(deleteTag)))
-                .FirstOrDefault()
-                .Value;
 
             var nextId = await GetNextId();
             var pveId = int.Parse(nextId);
@@ -628,11 +655,12 @@ namespace TopoMojo.Hypervisor.Proxmox
             string storage,
             Random random)
         {
-            var candidates = resources
+            var matching = resources
                 .Where(x => x.ResourceType == ClusterResourceType.Storage
-                    && string.Equals(x.Storage, storage, StringComparison.Ordinal)
-                    && x.IsAvailable
-                    && !string.IsNullOrWhiteSpace(x.Node))
+                    && string.Equals(x.Storage, storage, StringComparison.Ordinal))
+                .ToList();
+            var candidates = matching
+                .Where(x => x.IsAvailable && !string.IsNullOrWhiteSpace(x.Node))
                 .ToList();
             var nodes = candidates
                 .Select(x => x.Node)
@@ -640,7 +668,22 @@ namespace TopoMojo.Hypervisor.Proxmox
                 .ToList();
 
             if (nodes.Count == 0)
-                throw new HypervisorException($"No online Proxmox node currently offers ISO storage '{storage}'.");
+            {
+                // Distinguish "the storage isn't there" from "nothing is reporting": a node with pvestatd
+                // stopped still lists its storage, with status "unknown", which is not a storage problem.
+                if (matching.Count == 0)
+                {
+                    throw new HypervisorException(
+                        $"No Proxmox node reports ISO storage '{storage}'. Check Pod__IsoStore, or whether the "
+                        + "cluster is reporting resource status at all (a node with pvestatd stopped is not).");
+                }
+
+                throw new HypervisorException(
+                    $"No online Proxmox node currently offers ISO storage '{storage}'. {matching.Count} node(s) "
+                    + $"list it but none report as available: "
+                    + $"{string.Join(", ", matching.Select(x => $"{x.Node ?? "(unnamed)"}={x.Status ?? "(no status)"}"))}. "
+                    + "A node with pvestatd stopped reports status 'unknown'.");
+            }
 
             if (nodes.Count == 1)
                 return nodes[0];
@@ -1046,12 +1089,11 @@ namespace TopoMojo.Hypervisor.Proxmox
         /// <returns></returns>
         private async Task<string> GetTargetNode()
         {
-            string target = null;
-            var nodes = await _pveClient.GetNodesAsync();
+            var nodes = (await _pveClient.GetNodesAsync()).ToList();
+            IClusterResourceNode targetNode = null;
 
-            if (nodes.Any())
+            if (nodes.Count > 0)
             {
-                IClusterResourceNode targetNode;
                 var targetNodes = nodes.Where(x =>
                     x.IsOnline &&
                     x.MemoryUsagePercentage <= 50);
@@ -1067,11 +1109,20 @@ namespace TopoMojo.Hypervisor.Proxmox
                         .Where(x => x.IsOnline)
                         .FirstOrDefault();
                 }
-
-                target = targetNode.Node;
             }
 
-            return target;
+            // No online node means nothing can be deployed; say which nodes were seen rather than
+            // failing later on a null node name.
+            if (targetNode is null)
+            {
+                throw new HypervisorException(
+                    "No online Proxmox node is available to deploy to. Nodes reported by the cluster: "
+                    + (nodes.Count == 0
+                        ? "(none)"
+                        : string.Join(", ", nodes.Select(x => $"{x.Node}={x.Status ?? "(no status)"}"))));
+            }
+
+            return targetNode.Node;
         }
 
         private async Task<string> GetRandomNode()
