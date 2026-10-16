@@ -4,6 +4,7 @@
 using System.Text.Json;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Extensions;
@@ -16,6 +17,7 @@ namespace TopoMojo.Api.Services
         IWorkspaceStore workspaceStore,
         IGamespaceStore gamespaceStore,
         IHypervisorService podService,
+        IMemoryCache localCache,
         ILogger<WorkspaceService> logger,
         IMapper mapper,
         CoreOptions options
@@ -24,6 +26,8 @@ namespace TopoMojo.Api.Services
         private readonly IWorkspaceStore _store = workspaceStore;
         private readonly IGamespaceStore _gamespaceStore = gamespaceStore;
         private readonly IHypervisorService _pod = podService;
+        private readonly IMemoryCache _cache = localCache;
+        private const string CapacityCacheKey = "hypervisor:capacity";
 
         /// <summary>
         /// List workspace summaries.
@@ -434,6 +438,49 @@ namespace TopoMojo.Api.Services
                 LaunchCount = workspace.LaunchCount,
                 ActiveGamespaceCount = activeGameCount
             };
+        }
+
+        /// <summary>
+        /// Estimate how many more gamespaces of a workspace the hypervisor has room for.
+        /// Hypervisor figures are cached for Core:CapacityCacheSeconds so a busy
+        /// facilitator page does not query the hypervisor on every load.
+        /// </summary>
+        /// <param name="id">Workspace Id</param>
+        /// <param name="request"></param>
+        /// <param name="includeNodes">Include per-host figures</param>
+        /// <returns></returns>
+        public async Task<WorkspaceCapacity> GetCapacity(string id, WorkspaceCapacityRequest request, bool includeNodes)
+        {
+            var workspace = await _store.LoadWithParents(id);
+
+            var demand = CapacityCalculator.Demand(
+                Mapper.Map<ConvergedTemplate[]>(workspace.Templates),
+                request.Players,
+                CoreOptions.ReplicaLimit
+            );
+
+            var capacity = await _cache.GetOrCreateAsync(CapacityCacheKey, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(
+                    Math.Max(CoreOptions.CapacityCacheSeconds, 1)
+                );
+                return _pod.GetCapacity();
+            });
+
+            var result = CapacityCalculator.Fit(
+                demand,
+                capacity,
+                request.Count,
+                CoreOptions.CapacityHeadroomPercent,
+                workspace.HostAffinity
+            );
+
+            result.WorkspaceId = id;
+
+            if (includeNodes)
+                result.Nodes = capacity.Nodes;
+
+            return result;
         }
 
         /// <summary>
