@@ -471,6 +471,29 @@ namespace TopoMojo.Hypervisor.vMock
             await Task.Delay(0);
         }
 
+        public Task<HypervisorCapacity> GetCapacity()
+        {
+            // A fixed 64 GB host with a quarter in use, so the capacity check has
+            // something to show without a hypervisor.
+            return Task.FromResult(new HypervisorCapacity
+            {
+                Provider = "mock",
+                AsOf = DateTimeOffset.UtcNow,
+                Nodes =
+                [
+                    new HypervisorCapacityNode
+                    {
+                        Name = "mock",
+                        Available = true,
+                        MemoryTotalMb = 65536,
+                        MemoryUsedMb = 16384,
+                        CpuCores = 16,
+                        CpuUsagePercent = 10
+                    }
+                ]
+            });
+        }
+
         public async Task DeleteAll(string target)
         {
             foreach (var vm in _vms.Values.Where(v => v.Name.Contains(target)).ToArray())

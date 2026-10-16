@@ -145,6 +145,53 @@ namespace TopoMojo.Hypervisor.vSphere
             ];
         }
 
+        public static PropertyFilterSpec[] CapacityFilter(ManagedObjectReference res, ManagedObjectReference pool)
+        {
+            return [
+                new()
+                {
+                    propSet = [
+                        new PropertySpec
+                        {
+                            type = "HostSystem",
+                            pathSet = ["name", "summary"]
+                        }
+                    ],
+                    objectSet = [
+                        new ObjectSpec
+                        {
+                            obj = res, //_res
+                            skip = true,
+                            skipSpecified = true,
+                            selectSet = [
+                                new TraversalSpec
+                                {
+                                    type = "ComputeResource",
+                                    path = "host"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                new()
+                {
+                    propSet = [
+                        new PropertySpec
+                        {
+                            type = "ResourcePool",
+                            pathSet = ["runtime", "config"]
+                        }
+                    ],
+                    objectSet = [
+                        new ObjectSpec
+                        {
+                            obj = pool //_pool
+                        }
+                    ]
+                }
+            ];
+        }
+
         public static PropertyFilterSpec[] DistributedPortgroupFilter(ManagedObjectReference mor)
         {
             PropertySpec prop = new()

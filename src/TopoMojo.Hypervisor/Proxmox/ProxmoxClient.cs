@@ -1125,6 +1125,33 @@ namespace TopoMojo.Hypervisor.Proxmox
             return targetNode.Node;
         }
 
+        public async Task<HypervisorCapacity> GetCapacity()
+        {
+            var nodes = await _pveClient.GetResourcesAsync(ClusterResourceType.Node);
+
+            return new HypervisorCapacity
+            {
+                Provider = "proxmox",
+                AsOf = DateTimeOffset.UtcNow,
+                Nodes = nodes.Select(MapCapacityNode).OrderBy(x => x.Name).ToArray()
+            };
+        }
+
+        internal static HypervisorCapacityNode MapCapacityNode(IClusterResourceNode node)
+        {
+            const long mb = 1024 * 1024;
+
+            return new HypervisorCapacityNode
+            {
+                Name = node.Node,
+                Available = node.IsOnline,
+                MemoryTotalMb = (long)(node.MemorySize / mb),
+                MemoryUsedMb = (long)(node.MemoryUsage / mb),
+                CpuCores = (int)node.CpuSize,
+                CpuUsagePercent = Math.Round(node.CpuUsagePercentage * 100, 1)
+            };
+        }
+
         private async Task<string> GetRandomNode()
         {
             var nodes = await _pveClient.GetNodesAsync();
