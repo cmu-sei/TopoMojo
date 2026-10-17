@@ -459,13 +459,7 @@ namespace TopoMojo.Api.Services
                 CoreOptions.ReplicaLimit
             );
 
-            var capacity = await _cache.GetOrCreateAsync(CapacityCacheKey, entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(
-                    Math.Max(CoreOptions.CapacityCacheSeconds, 1)
-                );
-                return _pod.GetCapacity();
-            });
+            var capacity = await GetHypervisorCapacity();
 
             var result = CapacityCalculator.Fit(
                 demand,
@@ -481,6 +475,22 @@ namespace TopoMojo.Api.Services
                 result.Nodes = capacity.Nodes;
 
             return result;
+        }
+
+        /// <summary>
+        /// Current hypervisor figures, cached for Core:CapacityCacheSeconds. A failed read
+        /// is not cached.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<HypervisorCapacity> GetHypervisorCapacity()
+        {
+            return await _cache.GetOrCreateAsync(CapacityCacheKey, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(
+                    Math.Max(CoreOptions.CapacityCacheSeconds, 1)
+                );
+                return _pod.GetCapacity();
+            });
         }
 
         /// <summary>
