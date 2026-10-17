@@ -6,15 +6,22 @@ using System;
 namespace TopoMojo.Hypervisor
 {
     /// <summary>
-    /// Point-in-time memory and cpu figures for the compute a hypervisor deploys to.
-    /// Memory is the figure that decides how many gamespaces fit; cpu is reported for
-    /// information, because vcpus are overcommitted as a matter of course.
+    /// Point-in-time memory, cpu and disk figures for the compute and storage a hypervisor
+    /// deploys to. Memory is the figure that decides how many gamespaces fit; cpu and disk
+    /// are reported for information, because vcpus are overcommitted as a matter of course
+    /// and linked clones make a gamespace's disk use unpredictable.
     /// </summary>
     public class HypervisorCapacity
     {
         public string Provider { get; set; }
         public DateTimeOffset AsOf { get; set; }
         public HypervisorCapacityNode[] Nodes { get; set; } = [];
+
+        /// <summary>
+        /// The storage named by Pod:VmStore and Pod:DiskStore. Shared storage appears once;
+        /// local storage appears once per node that has it.
+        /// </summary>
+        public HypervisorCapacityStorage[] Storage { get; set; } = [];
 
         /// <summary>
         /// Memory still available to the TopoMojo resource pool when the pool has a limit
@@ -36,5 +43,19 @@ namespace TopoMojo.Hypervisor
         public long MemoryUsedMb { get; set; }
         public int CpuCores { get; set; }
         public double CpuUsagePercent { get; set; }
+    }
+
+    public class HypervisorCapacityStorage
+    {
+        public string Name { get; set; }
+
+        /// <summary>
+        /// The node that owns local storage. Null for shared storage.
+        /// </summary>
+        public string Node { get; set; }
+        public bool Shared { get; set; }
+        public bool Available { get; set; }
+        public long TotalMb { get; set; }
+        public long UsedMb { get; set; }
     }
 }

@@ -178,6 +178,31 @@ namespace TopoMojo.Hypervisor.vSphere
                     propSet = [
                         new PropertySpec
                         {
+                            type = "Datastore",
+                            pathSet = ["summary"]
+                        }
+                    ],
+                    objectSet = [
+                        new ObjectSpec
+                        {
+                            obj = res, //_res
+                            skip = true,
+                            skipSpecified = true,
+                            selectSet = [
+                                new TraversalSpec
+                                {
+                                    type = "ComputeResource",
+                                    path = "datastore"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                new()
+                {
+                    propSet = [
+                        new PropertySpec
+                        {
                             type = "ResourcePool",
                             pathSet = ["runtime", "config"]
                         }

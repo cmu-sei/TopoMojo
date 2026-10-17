@@ -322,7 +322,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 throw new InvalidOperationException("No vSphere host returned capacity.");
 
             // A host range can reach the same cluster through more than one client, so
-            // hosts are counted once by name. A pool limit only binds when every client
+            // hosts and datastores are counted once by name. A pool limit only binds when every client
             // has one; an unlimited pool anywhere leaves the hosts to decide.
             return new HypervisorCapacity
             {
@@ -330,6 +330,12 @@ namespace TopoMojo.Hypervisor.vSphere
                 AsOf = results.Min(x => x.AsOf),
                 Nodes = results
                     .SelectMany(x => x.Nodes)
+                    .GroupBy(x => x.Name)
+                    .Select(g => g.First())
+                    .OrderBy(x => x.Name)
+                    .ToArray(),
+                Storage = results
+                    .SelectMany(x => x.Storage)
                     .GroupBy(x => x.Name)
                     .Select(g => g.First())
                     .OrderBy(x => x.Name)

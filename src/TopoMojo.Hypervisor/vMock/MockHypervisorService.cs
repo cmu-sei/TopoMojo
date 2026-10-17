@@ -473,8 +473,8 @@ namespace TopoMojo.Hypervisor.vMock
 
         public Task<HypervisorCapacity> GetCapacity()
         {
-            // A fixed 64 GB host with a quarter in use, so the capacity check has
-            // something to show without a hypervisor.
+            // A fixed 64 GB host and 500 GB store, each a quarter in use, so the capacity
+            // check has something to show without a hypervisor.
             return Task.FromResult(new HypervisorCapacity
             {
                 Provider = "mock",
@@ -489,6 +489,17 @@ namespace TopoMojo.Hypervisor.vMock
                         MemoryUsedMb = 16384,
                         CpuCores = 16,
                         CpuUsagePercent = 10
+                    }
+                ],
+                Storage =
+                [
+                    new HypervisorCapacityStorage
+                    {
+                        Name = "mock",
+                        Node = "mock",
+                        Available = true,
+                        TotalMb = 512000,
+                        UsedMb = 128000
                     }
                 ]
             });

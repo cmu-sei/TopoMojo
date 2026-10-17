@@ -1054,6 +1054,16 @@ namespace TopoMojo.Hypervisor.vSphere
                     (HostListSummary)o.GetProperty("summary")))
                 .ToArray();
 
+            var stores = new[] { _config.VmStore, _config.DiskStore }
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => new DatastorePath(x.Replace("{host}", _hostPrefix)).Datastore);
+
+            var storage = MapCapacityStorage(
+                response.returnval
+                    .FindType("Datastore")
+                    .Select(o => (DatastoreSummary)o.GetProperty("summary")),
+                stores);
+
             var pool = response.returnval.FindType("ResourcePool").FirstOrDefault();
 
             return new HypervisorCapacity
@@ -1061,6 +1071,7 @@ namespace TopoMojo.Hypervisor.vSphere
                 Provider = "vsphere",
                 AsOf = DateTimeOffset.UtcNow,
                 Nodes = nodes,
+                Storage = storage,
                 PoolMemoryFreeMb = pool is null
                     ? null
                     : PoolMemoryFreeMb(
@@ -1091,6 +1102,30 @@ namespace TopoMojo.Hypervisor.vSphere
                     ? Math.Round(cpuUsedMhz * 100.0 / cpuTotalMhz, 1)
                     : 0
             };
+        }
+
+        internal static HypervisorCapacityStorage[] MapCapacityStorage(
+            IEnumerable<DatastoreSummary> summaries,
+            IEnumerable<string> stores)
+        {
+            const long mb = 1024 * 1024;
+
+            var names = stores.ToHashSet(StringComparer.Ordinal);
+
+            return summaries
+                .Where(x => x is not null && names.Contains(x.name))
+                .GroupBy(x => x.name)
+                .Select(g => g.First())
+                .Select(x => new HypervisorCapacityStorage
+                {
+                    Name = x.name,
+                    Shared = x.multipleHostAccessSpecified && x.multipleHostAccess,
+                    Available = x.accessible,
+                    TotalMb = x.capacity / mb,
+                    UsedMb = (x.capacity - x.freeSpace) / mb
+                })
+                .OrderBy(x => x.Name)
+                .ToArray();
         }
 
         /// <summary>
