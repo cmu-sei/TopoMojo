@@ -1039,6 +1039,111 @@ namespace TopoMojo.Hypervisor.vSphere
             _sic = null;
         }
 
+        public async Task<HypervisorCapacity> GetCapacity()
+        {
+            await Connect();
+
+            RetrievePropertiesResponse response = await _vim.RetrievePropertiesAsync(
+                _props,
+                FilterFactory.CapacityFilter(_res, _pool));
+
+            var nodes = response.returnval
+                .FindType("HostSystem")
+                .Select(o => MapCapacityNode(
+                    (string)o.GetProperty("name"),
+                    (HostListSummary)o.GetProperty("summary")))
+                .ToArray();
+
+            var stores = new[] { _config.VmStore, _config.DiskStore }
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => new DatastorePath(x.Replace("{host}", _hostPrefix)).Datastore);
+
+            var storage = MapCapacityStorage(
+                response.returnval
+                    .FindType("Datastore")
+                    .Select(o => (DatastoreSummary)o.GetProperty("summary")),
+                stores);
+
+            var pool = response.returnval.FindType("ResourcePool").FirstOrDefault();
+
+            return new HypervisorCapacity
+            {
+                Provider = "vsphere",
+                AsOf = DateTimeOffset.UtcNow,
+                Nodes = nodes,
+                Storage = storage,
+                PoolMemoryFreeMb = pool is null
+                    ? null
+                    : PoolMemoryFreeMb(
+                        (ResourceConfigSpec)pool.GetProperty("config"),
+                        (ResourcePoolRuntimeInfo)pool.GetProperty("runtime"))
+            };
+        }
+
+        internal static HypervisorCapacityNode MapCapacityNode(string name, HostListSummary summary)
+        {
+            const long mb = 1024 * 1024;
+
+            long memoryTotalMb = (summary?.hardware?.memorySize ?? 0) / mb;
+            int cores = summary?.hardware?.numCpuCores ?? 0;
+            long cpuTotalMhz = (long)cores * (summary?.hardware?.cpuMhz ?? 0);
+            int cpuUsedMhz = summary?.quickStats?.overallCpuUsage ?? 0;
+
+            return new HypervisorCapacityNode
+            {
+                Name = name,
+                Available = summary?.runtime is not null
+                    && summary.runtime.connectionState == HostSystemConnectionState.connected
+                    && !summary.runtime.inMaintenanceMode,
+                MemoryTotalMb = memoryTotalMb,
+                MemoryUsedMb = summary?.quickStats?.overallMemoryUsage ?? 0,
+                CpuCores = cores,
+                CpuUsagePercent = cpuTotalMhz > 0
+                    ? Math.Round(cpuUsedMhz * 100.0 / cpuTotalMhz, 1)
+                    : 0
+            };
+        }
+
+        internal static HypervisorCapacityStorage[] MapCapacityStorage(
+            IEnumerable<DatastoreSummary> summaries,
+            IEnumerable<string> stores)
+        {
+            const long mb = 1024 * 1024;
+
+            var names = stores.ToHashSet(StringComparer.Ordinal);
+
+            return summaries
+                .Where(x => x is not null && names.Contains(x.name))
+                .GroupBy(x => x.name)
+                .Select(g => g.First())
+                .Select(x => new HypervisorCapacityStorage
+                {
+                    Name = x.name,
+                    Shared = x.multipleHostAccessSpecified && x.multipleHostAccess,
+                    Available = x.accessible,
+                    TotalMb = x.capacity / mb,
+                    UsedMb = (x.capacity - x.freeSpace) / mb
+                })
+                .OrderBy(x => x.Name)
+                .ToArray();
+        }
+
+        /// <summary>
+        /// Memory left under the pool's limit, or null when the pool is unlimited and the
+        /// hosts alone decide.
+        /// </summary>
+        internal static long? PoolMemoryFreeMb(ResourceConfigSpec config, ResourcePoolRuntimeInfo runtime)
+        {
+            var allocation = config?.memoryAllocation;
+
+            if (allocation is null || !allocation.limitSpecified || allocation.limit < 0)
+                return null;
+
+            long usedMb = (runtime?.memory?.overallUsage ?? 0) / (1024 * 1024);
+
+            return Math.Max(0, allocation.limit - usedMb);
+        }
+
         private async Task<ObjectContent[]> LoadReferenceTree(VimPortTypeClient client)
         {
             var plan = new TraversalSpec

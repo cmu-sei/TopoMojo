@@ -203,6 +203,11 @@ namespace TopoMojo.Api
         public int DefaultWorkspaceLimit { get; set; } = 0;
         public int DefaultTemplateLimit { get; set; } = 3;
         public int ReplicaLimit { get; set; } = 5;
+
+        // share of each host's memory the capacity check keeps back for overcommit,
+        // other tenants, and the hypervisor itself
+        public int CapacityHeadroomPercent { get; set; } = 20;
+        public int CapacityCacheSeconds { get; set; } = 30;
         public bool AllowUnprivilegedVmReconfigure { get; set; }
         public bool AllowPrivilegedNetworkIsolationExemption { get; set; }
         public string DefaultUserScope { get; set; } = "everyone";

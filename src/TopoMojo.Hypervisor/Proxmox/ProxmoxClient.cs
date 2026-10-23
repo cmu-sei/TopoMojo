@@ -1125,6 +1125,68 @@ namespace TopoMojo.Hypervisor.Proxmox
             return targetNode.Node;
         }
 
+        public async Task<HypervisorCapacity> GetCapacity()
+        {
+            var nodes = await _pveClient.GetResourcesAsync(ClusterResourceType.Node);
+            var storage = await _pveClient.GetResourcesAsync(ClusterResourceType.Storage);
+
+            return new HypervisorCapacity
+            {
+                Provider = "proxmox",
+                AsOf = DateTimeOffset.UtcNow,
+                Nodes = nodes.Select(MapCapacityNode).OrderBy(x => x.Name).ToArray(),
+                Storage = MapCapacityStorage(storage, [_config.VmStore, _config.DiskStore])
+            };
+        }
+
+        /// <summary>
+        /// Picks the storage TopoMojo deploys to out of the cluster's storage list. Proxmox
+        /// lists shared storage once per node with the same figures, so it is reported once.
+        /// </summary>
+        internal static HypervisorCapacityStorage[] MapCapacityStorage(
+            IEnumerable<ClusterResource> resources,
+            IEnumerable<string> stores)
+        {
+            const long mb = 1024 * 1024;
+
+            var names = stores
+                .Select(x => x?.Trim('/').Split('/')[0])
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.Ordinal);
+
+            return resources
+                .Where(x => x.ResourceType == ClusterResourceType.Storage && names.Contains(x.Storage))
+                .GroupBy(x => x.Shared ? x.Storage : $"{x.Storage}/{x.Node}")
+                .Select(g => g.OrderByDescending(x => x.IsAvailable).First())
+                .Select(x => new HypervisorCapacityStorage
+                {
+                    Name = x.Storage,
+                    Node = x.Shared ? null : x.Node,
+                    Shared = x.Shared,
+                    Available = x.IsAvailable,
+                    TotalMb = (long)(x.DiskSize / mb),
+                    UsedMb = (long)(x.DiskUsage / mb)
+                })
+                .OrderBy(x => x.Name)
+                .ThenBy(x => x.Node)
+                .ToArray();
+        }
+
+        internal static HypervisorCapacityNode MapCapacityNode(IClusterResourceNode node)
+        {
+            const long mb = 1024 * 1024;
+
+            return new HypervisorCapacityNode
+            {
+                Name = node.Node,
+                Available = node.IsOnline,
+                MemoryTotalMb = (long)(node.MemorySize / mb),
+                MemoryUsedMb = (long)(node.MemoryUsage / mb),
+                CpuCores = (int)node.CpuSize,
+                CpuUsagePercent = Math.Round(node.CpuUsagePercentage * 100, 1)
+            };
+        }
+
         private async Task<string> GetRandomNode()
         {
             var nodes = await _pveClient.GetNodesAsync();

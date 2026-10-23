@@ -523,6 +523,11 @@ namespace TopoMojo.Hypervisor.Proxmox
             throw new NotImplementedException();
         }
 
+        public Task<HypervisorCapacity> GetCapacity()
+        {
+            return _pveClient.GetCapacity();
+        }
+
         private Task DeploymentHandler()
         {
             foreach (var ctx in DeploymentCollection.GetConsumingEnumerable())
