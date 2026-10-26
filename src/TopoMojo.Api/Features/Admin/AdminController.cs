@@ -234,5 +234,20 @@ public class AdminController(
         return Ok(await podService.GetAllIsoOptions());
     }
 
+    /// <summary>
+    /// List the disks or template vms a template can deploy from.
+    /// </summary>
+    /// <remarks>
+    /// Field names the template Detail field the names go in: "disks" (vSphere disk paths,
+    /// "[ds] folder/disk.vmdk") or "template" (Proxmox template vm names).
+    /// </remarks>
+    /// <returns></returns>
+    [HttpGet("api/admin/template-sources")]
+    [SwaggerOperation(OperationId = "GetTemplateSources")]
+    public async Task<ActionResult<TemplateSourceOptions>> GetTemplateSources()
+    {
+        return Ok(await podService.GetTemplateSourceOptions());
+    }
+
 
 }
