@@ -501,8 +501,20 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public async Task<string[]> GetFiles(string path, bool recursive)
         {
+            var files = await SearchFiles(path, recursive, false);
+            return [.. files.Select(f => f.Path)];
+        }
+
+        /// <summary>
+        /// Like GetFiles, with each file's last-modified time.
+        /// </summary>
+        public Task<List<DatastoreFile>> GetFilesWithModified(string path, bool recursive)
+            => SearchFiles(path, recursive, true);
+
+        private async Task<List<DatastoreFile>> SearchFiles(string path, bool recursive, bool withModified)
+        {
             await Connect();
-            List<string> list = [];
+            List<DatastoreFile> list = [];
             DatastorePath dsPath = new(path);
             string oldRoot = "";
             string pattern = dsPath.File ?? "*";
@@ -568,6 +580,7 @@ namespace TopoMojo.Hypervisor.vSphere
                     var spec = new HostDatastoreBrowserSearchSpec
                     {
                         matchPattern = [pattern],
+                        details = withModified ? new FileQueryFlags { modification = true } : null,
                     };
 
                     var results = new List<HostDatastoreBrowserSearchResults>();
@@ -638,12 +651,15 @@ namespace TopoMojo.Hypervisor.vSphere
                                 if (!fp.EndsWith('/'))
                                     fp += "/";
 
-                                list.AddRange(result.file.Select(o => fp + o.path));
+                                list.AddRange(result.file.Select(o => new DatastoreFile(
+                                    fp + o.path,
+                                    o.modificationSpecified ? new DateTimeOffset(o.modification) : null
+                                )));
 
                                 if (_config.DebugVerbose)
                                 {
                                     foreach (var s in list)
-                                        _logger.LogDebug("added file result {s}", s);
+                                        _logger.LogDebug("added file result {s}", s.Path);
                                 }
                             }
                         }
@@ -658,7 +674,7 @@ namespace TopoMojo.Hypervisor.vSphere
             if (_config.DebugVerbose)
                 _logger.LogDebug("search datastore found [{count}] results.", list.Count);
 
-            return [.. list];
+            return list;
         }
 
         public async Task CloneDisk(string source, string dest)

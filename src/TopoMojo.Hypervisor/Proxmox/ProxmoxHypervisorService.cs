@@ -518,6 +518,15 @@ namespace TopoMojo.Hypervisor.Proxmox
             return GetVmIsoOptions(Guid.Empty.ToString());
         }
 
+        public async Task<TemplateSourceOptions> GetTemplateSourceOptions()
+        {
+            return new TemplateSourceOptions
+            {
+                Field = "template",
+                Sources = await _pveClient.ListTemplateSources()
+            };
+        }
+
         public Task ReloadHost(string host)
         {
             throw new NotImplementedException();

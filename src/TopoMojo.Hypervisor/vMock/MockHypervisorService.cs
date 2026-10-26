@@ -448,6 +448,20 @@ namespace TopoMojo.Hypervisor.vMock
             return GetVmIsoOptions(Guid.Empty.ToString());
         }
 
+        public Task<TemplateSourceOptions> GetTemplateSourceOptions()
+        {
+            return Task.FromResult(new TemplateSourceOptions
+            {
+                Field = "disks",
+                Sources = [
+                    new() { Name = $"[ds] {Guid.Empty}/kali-2024.vmdk", WorkspaceId = Guid.Empty.ToString(), Modified = DateTimeOffset.UtcNow.AddDays(-30) },
+                    new() { Name = $"[ds] {Guid.Empty}/ubuntu-22.04.vmdk", WorkspaceId = Guid.Empty.ToString(), Modified = DateTimeOffset.UtcNow.AddDays(-12) },
+                    new() { Name = $"[ds] {Guid.Empty}/win10-base.vmdk", WorkspaceId = Guid.Empty.ToString(), Modified = DateTimeOffset.UtcNow.AddDays(-3) },
+                    new() { Name = "[ds] stock/pfsense-2.7.vmdk", WorkspaceId = "stock", Modified = DateTimeOffset.UtcNow.AddDays(-90) }
+                ]
+            });
+        }
+
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
             await Task.Delay(0);
