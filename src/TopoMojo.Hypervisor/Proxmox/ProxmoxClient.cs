@@ -198,19 +198,147 @@ namespace TopoMojo.Hypervisor.Proxmox
         /// dereferencing null.
         /// </summary>
         /// <summary>
-        /// Names of the template vms a template's Detail can clone from. Skips copies tagged for
-        /// deletion and the per-template copies made on unlink, which are named by template id.
+        /// Template vms a template's Detail can clone from, with when each was created.
         /// </summary>
-        internal static string[] ListBaseTemplateNames(IEnumerable<Vm> cached)
+        public async Task<TemplateSource[]> ListTemplateSources()
+        {
+            var vms = ListTemplateVms(_vmCache.Values);
+            var configs = await Throttled(vms, GetConfig);
+
+            // creation times of the disk volumes, one storage listing per node and storage
+            var listings = await Throttled(
+                configs
+                    .SelectMany((config, i) => ParseDiskVolumes(config).Select(v => (vms[i].Host, Storage: v.Split(':')[0])))
+                    .Distinct()
+                    .ToArray(),
+                async x => (x.Host, x.Storage, Items: await ListStorageContent(x.Host, x.Storage)));
+
+            var volumeCreated = listings
+                .SelectMany(l => l.Items.Select(item => (Key: (l.Host, item.Volume), item.Creation)))
+                .Where(x => x.Creation > 0)
+                .DistinctBy(x => x.Key)
+                .ToDictionary(x => x.Key, x => DateTimeOffset.FromUnixTimeSeconds(x.Creation));
+
+            return [.. vms.Select((vm, i) =>
+            {
+                // per-template copies made on unlink are named by template id
+                bool copy = Guid.TryParse(vm.Name, out _);
+
+                DateTimeOffset? created = ParseDiskVolumes(configs[i])
+                    .Select(v => volumeCreated.TryGetValue((vm.Host, v), out var t) ? t : (DateTimeOffset?)null)
+                    .Where(t => t.HasValue)
+                    .Min();
+
+                // a clone inherits its parent's meta ctime, so that only dates a base template
+                if (!created.HasValue && !copy && configs[i] is not null
+                    && configs[i].TryGetValue("meta", out object meta))
+                    created = ParseMetaCreated(meta?.ToString());
+
+                return new TemplateSource
+                {
+                    Name = vm.Name,
+                    TemplateId = copy ? vm.Name : null,
+                    Created = created
+                };
+            })];
+        }
+
+        private static async Task<TResult[]> Throttled<T, TResult>(IEnumerable<T> items, Func<T, Task<TResult>> action)
+        {
+            using var throttle = new SemaphoreSlim(8);
+
+            return await Task.WhenAll(items.Select(async item =>
+            {
+                await throttle.WaitAsync();
+                try
+                {
+                    return await action(item);
+                }
+                finally
+                {
+                    throttle.Release();
+                }
+            }));
+        }
+
+        private async Task<IDictionary<string, object>> GetConfig(Vm vm)
+        {
+            try
+            {
+                var result = await _pveClient.Nodes[vm.Host].Qemu[vm.Id].Config.VmConfig();
+                return result.IsSuccessStatusCode
+                    ? (IDictionary<string, object>)result.Response.data
+                    : null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to read config for template {name} ({id})", vm.Name, vm.Id);
+                return null;
+            }
+        }
+
+        private async Task<NodeStorageContent[]> ListStorageContent(string node, string storage)
+        {
+            try
+            {
+                return [.. await _pveClient.Nodes[node].Storage[storage].Content.GetAsync()];
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to list storage {storage} on {node}", storage, node);
+                return [];
+            }
+        }
+
+        /// <summary>
+        /// Disk volume ids ("local-lvm:base-9002-disk-0") in a vm config, skipping cd-roms.
+        /// </summary>
+        internal static string[] ParseDiskVolumes(IDictionary<string, object> config)
+        {
+            if (config is null)
+                return [];
+
+            return [.. config
+                .Where(x => DiskKeyRegex().IsMatch(x.Key))
+                .Select(x => x.Value?.ToString() ?? "")
+                .Where(v => !v.Contains("media=cdrom"))
+                .Select(v => v.Split(',')[0])
+                .Where(v => v.Contains(':') && v != "none")];
+        }
+
+        [GeneratedRegex(@"^(scsi|virtio|sata|ide|efidisk|tpmstate)\d+$")]
+        private static partial Regex DiskKeyRegex();
+
+        /// <summary>
+        /// Template vms a template's Detail can clone from, skipping copies tagged for deletion.
+        /// </summary>
+        internal static Vm[] ListTemplateVms(IEnumerable<Vm> cached)
         {
             return cached
                 .Where(x => x is not null && x.IsTemplate && !string.IsNullOrEmpty(x.Name))
                 .Where(x => x.Tags == null || !x.Tags.Contains(deleteTag))
-                .Where(x => !Guid.TryParse(x.Name, out _))
-                .Select(x => x.Name)
-                .Distinct()
-                .Order()
+                .DistinctBy(x => x.Name)
+                .OrderBy(x => x.Name)
                 .ToArray();
+        }
+
+        /// <summary>
+        /// Reads the creation time from a vm config's meta value, e.g. "creation-qemu=8.1.2,ctime=1712345678".
+        /// </summary>
+        internal static DateTimeOffset? ParseMetaCreated(string meta)
+        {
+            if (string.IsNullOrEmpty(meta))
+                return null;
+
+            string ctime = meta.Split(',')
+                .Select(x => x.Split('=', 2))
+                .Where(x => x.Length == 2 && x[0].Trim() == "ctime")
+                .Select(x => x[1].Trim())
+                .FirstOrDefault();
+
+            return long.TryParse(ctime, out long seconds)
+                ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+                : null;
         }
 
         internal static Vm SelectTemplateVm(IEnumerable<Vm> cached, string templateName)

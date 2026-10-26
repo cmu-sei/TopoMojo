@@ -4,8 +4,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swashbuckle.AspNetCore.Annotations;
+using TopoMojo.Api.Data.Abstractions;
 using TopoMojo.Api.Exceptions;
 using TopoMojo.Api.Hubs;
 using TopoMojo.Api.Models;
@@ -26,7 +28,9 @@ public class AdminController(
     HubCache hubCache,
     IMemoryCache localCache,
     IWebHostEnvironment env,
-    IHypervisorService podService
+    IHypervisorService podService,
+    ITemplateStore templateStore,
+    IWorkspaceStore workspaceStore
     ) : BaseController(logger, hub)
 {
 
@@ -240,13 +244,37 @@ public class AdminController(
     /// <remarks>
     /// Field names the template Detail field the names go in: "disks" (vSphere disk paths,
     /// "[ds] folder/disk.vmdk") or "template" (Proxmox template vm names).
+    /// Each source is labeled global or with the workspace (and template) it belongs to.
     /// </remarks>
     /// <returns></returns>
     [HttpGet("api/admin/template-sources")]
     [SwaggerOperation(OperationId = "GetTemplateSources")]
-    public async Task<ActionResult<TemplateSourceOptions>> GetTemplateSources()
+    public async Task<ActionResult<TemplateSourceReport>> GetTemplateSources()
     {
-        return Ok(await podService.GetTemplateSourceOptions());
+        var options = await podService.GetTemplateSourceOptions();
+        var sources = options.Sources ?? [];
+
+        string[] templateIds = [.. sources
+            .Select(s => TemplateSourceReport.NormalizeId(s.TemplateId))
+            .Where(id => id is not null)
+            .Distinct()];
+
+        var templates = await templateStore.List()
+            .Where(t => templateIds.Contains(t.Id))
+            .Select(t => new { t.Id, t.Name, t.WorkspaceId })
+            .ToDictionaryAsync(t => t.Id, t => new TemplateSourceReport.TemplateRef(t.Name, t.WorkspaceId));
+
+        string[] workspaceIds = [.. sources
+            .Select(s => TemplateSourceReport.NormalizeId(s.WorkspaceId))
+            .Concat(templates.Values.Select(t => TemplateSourceReport.NormalizeId(t.WorkspaceId)))
+            .Where(id => id is not null)
+            .Distinct()];
+
+        var workspaces = await workspaceStore.List()
+            .Where(w => workspaceIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, w => w.Name);
+
+        return Ok(TemplateSourceReport.Build(options, templates, workspaces));
     }
 
 

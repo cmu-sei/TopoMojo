@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using TopoMojo.Hypervisor.Exceptions;
 using TopoMojo.Hypervisor.Proxmox;
 using Xunit;
@@ -68,7 +71,7 @@ public sealed class ProxmoxTemplateLookupTests
     }
 
     [Fact]
-    public void ListBaseTemplateNames_ListsOnlyTemplatesATemplateCanCloneFrom()
+    public void ListTemplateVms_ListsTemplatesATemplateCanCloneFrom()
     {
         var cached = new[]
         {
@@ -82,7 +85,40 @@ public sealed class ProxmoxTemplateLookupTests
         };
 
         Assert.Equal(
-            new[] { "kali-rolling-v1", "ubuntu-22.04" },
-            ProxmoxClient.ListBaseTemplateNames(cached));
+            new[] { "104", "101", "100" },
+            ProxmoxClient.ListTemplateVms(cached).Select(x => x.Id));
+    }
+
+    [Theory]
+    [InlineData("creation-qemu=8.1.2,ctime=1712345678", 1712345678L)]
+    [InlineData("ctime=1712345678", 1712345678L)]
+    [InlineData("creation-qemu=8.1.2", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void ParseMetaCreated_ReadsCtime(string meta, long? expected)
+    {
+        Assert.Equal(
+            expected.HasValue ? DateTimeOffset.FromUnixTimeSeconds(expected.Value) : null,
+            ProxmoxClient.ParseMetaCreated(meta));
+    }
+
+    [Fact]
+    public void ParseDiskVolumes_ListsDiskVolumesButNotCdroms()
+    {
+        var config = new Dictionary<string, object>
+        {
+            ["scsi0"] = "local-lvm:base-9002-disk-0,size=8G",
+            ["virtio1"] = "local-lvm:base-9002-disk-1,cache=writeback",
+            ["efidisk0"] = "local-lvm:base-9002-disk-2,efitype=4m",
+            ["ide2"] = "local:iso/alpine.iso,media=cdrom",
+            ["sata1"] = "none,media=cdrom",
+            ["net0"] = "virtio=BC:24:11:00:00:01,bridge=vmbr0",
+            ["meta"] = "creation-qemu=8.1.2,ctime=1712345678"
+        };
+
+        Assert.Equal(
+            new[] { "local-lvm:base-9002-disk-0", "local-lvm:base-9002-disk-1", "local-lvm:base-9002-disk-2" },
+            ProxmoxClient.ParseDiskVolumes(config));
+        Assert.Empty(ProxmoxClient.ParseDiskVolumes(null));
     }
 }
