@@ -73,13 +73,25 @@ public class VmdkFormatTests
     }
 
     [Fact]
-    public void HostedDiskError_NamesTheDiskTypeAndConversion()
+    public void HostedDiskError_KeepsTheDiskAndConversionForAdmins()
     {
         var ex = VmdkFormat.HostedDiskError("[topomojo] uploads/win10.vmdk", "monolithicSparse");
 
-        Assert.Contains("[topomojo] uploads/win10.vmdk", ex.Message);
-        Assert.Contains("monolithicSparse", ex.Message);
-        Assert.Contains("vmkfstools -i win10.vmdk win10-esx.vmdk -d thin", ex.Message);
+        Assert.Equal(VmdkFormat.UserMessage, ex.Message);
+        Assert.DoesNotContain("[topomojo]", ex.Message);
+        Assert.Contains("[topomojo] uploads/win10.vmdk", ex.Detail);
+        Assert.Contains("monolithicSparse", ex.Detail);
+        Assert.Contains("vmkfstools -i win10.vmdk win10-esx.vmdk -d thin", ex.Detail);
+    }
+
+    [Fact]
+    public void UnsupportedDiskError_KeepsTheEsxiMessageForAdmins()
+    {
+        var ex = VmdkFormat.UnsupportedDiskError("Unsupported or invalid disk type 7 for 'scsi0:0'.");
+
+        Assert.Equal(VmdkFormat.UserMessage, ex.Message);
+        Assert.StartsWith("Unsupported or invalid disk type 7 for 'scsi0:0'.", ex.Detail);
+        Assert.Contains("vmkfstools -i", ex.Detail);
     }
 
     [Theory]

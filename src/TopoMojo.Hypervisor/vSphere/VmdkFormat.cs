@@ -47,12 +47,19 @@ namespace TopoMojo.Hypervisor.vSphere
             => createType is not null
             && !EsxiTypes.Contains(createType, StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Shown to the user; the disk, its format, and the fix go to the admin error log.
+        /// </summary>
+        public const string UserMessage =
+            "This template's disk is in a format the hypervisor can't use. Ask an administrator to convert it.";
+
         public static HypervisorException HostedDiskError(string path, string createType)
         {
             string file = new DatastorePath(path).File;
             string converted = file.Replace(".vmdk", "-esx.vmdk", StringComparison.OrdinalIgnoreCase);
 
             return new HypervisorException(
+                UserMessage,
                 $"Disk {path} is a hosted VMDK (createType \"{createType}\", as exported by VMware Workstation, "
                 + "Fusion, VirtualBox, or an OVA), which ESXi can't attach. Convert it on an ESXi host with "
                 + $"\"vmkfstools -i {file} {converted} -d thin\" and point the template at {converted}."
@@ -68,6 +75,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public static HypervisorException UnsupportedDiskError(string message)
             => new(
+                UserMessage,
                 $"{message} The disk is probably a hosted VMDK (exported by VMware Workstation, Fusion, "
                 + "VirtualBox, or an OVA). Convert it on an ESXi host with \"vmkfstools -i <disk>.vmdk "
                 + "<disk>-esx.vmdk -d thin\" and point the template at the converted disk."

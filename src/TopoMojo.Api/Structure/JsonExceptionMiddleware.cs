@@ -25,13 +25,19 @@ namespace TopoMojo.Api
             {
                 if (ex is not ResourceNotFound)
                 {
-                    logger.LogError(ex, "Error");
+                    // admin-only detail goes to the log, never to the response
+                    string detail = (ex as HypervisorException)?.Detail;
+
+                    if (detail is null)
+                        logger.LogError(ex, "Error");
+                    else
+                        logger.LogError(ex, "Error: {detail}", detail);
 
                     var errorList = cache.Get<List<TimestampedException>>(AppConstants.ErrorListCacheKey) ?? [];
                     errorList.Add(new TimestampedException
                     {
                         Timestamp = DateTimeOffset.UtcNow,
-                        Message = ex.Message,
+                        Message = detail is null ? ex.Message : $"{ex.Message} {detail}",
                         StackTrace = ex.StackTrace
                     });
 
