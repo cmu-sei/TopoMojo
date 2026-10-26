@@ -356,6 +356,18 @@ namespace TopoMojo.Hypervisor.vSphere
             if (progress.Length == 0)
                 return 100;
 
+            // a disk used in place, with no source to clone, must already be in a format ESXi opens
+            for (int i = 0; i < template.Disks.Length; i++)
+            {
+                var disk = template.Disks[i];
+                if (progress[i] < 100 || disk.Source.HasValue())
+                    continue;
+
+                string createType = await host.GetDiskCreateType(disk.Path);
+                if (VmdkFormat.IsHosted(createType))
+                    throw VmdkFormat.HostedDiskError(disk.Path, createType);
+            }
+
             int index = 0;
             foreach (var disk in template.Disks)
             {

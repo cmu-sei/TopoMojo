@@ -90,6 +90,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 TaskInfo info = await WaitForVimTask(task);
                 if (info.state == TaskInfoState.success || (info.error?.localizedMessage.Contains("powered on", StringComparison.CurrentCultureIgnoreCase) ?? false))
                     vm.State = VmPowerState.Running;
+                else if (VmdkFormat.IsUnsupportedDiskError(info.error?.localizedMessage))
+                    throw VmdkFormat.UnsupportedDiskError(info.error.localizedMessage);
                 else
                     throw new Exception(info.error.localizedMessage);
 
@@ -783,6 +785,41 @@ namespace TopoMojo.Hypervisor.vSphere
         /// <summary>
         /// Upload a file to vSphere datastore via HTTP PUT
         /// </summary>
+        /// <summary>
+        /// The createType of a vmdk on the datastore, read from its first bytes, or null if it
+        /// can't be read.
+        /// </summary>
+        public async Task<string> GetDiskCreateType(string datastorePath)
+        {
+            try
+            {
+                await Connect();
+
+                string url = BuildDatastoreUploadUrl(new DatastorePath(datastorePath));
+
+                using var response = await CreateAuthenticatedHttpClient()
+                    .GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Could not read disk {path} ({status})", datastorePath, response.StatusCode);
+                    return null;
+                }
+
+                // read only the header; a flat or sparse extent can be many gigabytes
+                using var stream = await response.Content.ReadAsStreamAsync();
+                byte[] buffer = new byte[VmdkFormat.HeaderLength];
+                int read = await stream.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false);
+
+                return VmdkFormat.ReadCreateType(buffer.AsSpan(0, read));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not read disk {path}", datastorePath);
+                return null;
+            }
+        }
+
         public async Task<string> UploadFileToDatastore(
             string datastorePath,
             string localFilePath)
