@@ -491,6 +491,43 @@ namespace TopoMojo.Hypervisor.vSphere
             };
         }
 
+        public async Task<TemplateSourceOptions> GetTemplateSourceOptions()
+        {
+            VimClient host = FindHostByRandom();
+
+            string[] files = await host.GetFiles(host.Options.DiskStore + "*.vmdk", true);
+
+            return new TemplateSourceOptions
+            {
+                Field = "disks",
+                Names = ToTemplateDiskPaths(files, host.Options)
+            };
+        }
+
+        /// <summary>
+        /// Maps datastore search results to the abstract paths templates use, dropping
+        /// deployed vm disks under the VmStore and the extent/snapshot files behind each descriptor.
+        /// </summary>
+        public static string[] ToTemplateDiskPaths(IEnumerable<string> files, HypervisorServiceConfiguration options)
+        {
+            var diskStore = new DatastorePath(options.DiskStore + "x");
+            var vmStore = new DatastorePath(options.VmStore + "x");
+            string diskRoot = diskStore.Folder.HasValue() ? diskStore.Folder + "/" : "";
+            string vmRoot = vmStore.Folder.HasValue() ? vmStore.Folder + "/" : "";
+
+            return files
+                .Select(f => new DatastorePath(f))
+                .Where(p => p.Datastore == diskStore.Datastore)
+                .Select(p => p.Folder.HasValue() ? $"{p.Folder.Trim('/')}/{p.File}" : p.File)
+                .Where(rel => rel.StartsWith(diskRoot))
+                .Where(rel => !(vmStore.Datastore == diskStore.Datastore && rel.StartsWith(vmRoot)))
+                .Where(rel => !DiskExtentRegex().IsMatch(rel))
+                .Select(rel => $"[ds] {rel[diskRoot.Length..]}")
+                .Distinct()
+                .Order()
+                .ToArray();
+        }
+
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
             await Task.Delay(0);
@@ -828,6 +865,8 @@ namespace TopoMojo.Hypervisor.vSphere
         private static partial Regex HostRangeRegex();
         [GeneratedRegex("(]|/)$")]
         private static partial Regex DatastoreEndsWithRegex();
+        [GeneratedRegex(@"-(flat|delta|sesparse|ctk|rdm|rdmp|digest|\d{6})\.vmdk$", RegexOptions.IgnoreCase)]
+        private static partial Regex DiskExtentRegex();
     }
 
 }

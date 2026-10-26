@@ -197,6 +197,22 @@ namespace TopoMojo.Hypervisor.Proxmox
         /// a template can drop out of the cache while the cluster otherwise looks healthy. Say so instead of
         /// dereferencing null.
         /// </summary>
+        /// <summary>
+        /// Names of the template vms a template's Detail can clone from. Skips copies tagged for
+        /// deletion and the per-template copies made on unlink, which are named by template id.
+        /// </summary>
+        internal static string[] ListBaseTemplateNames(IEnumerable<Vm> cached)
+        {
+            return cached
+                .Where(x => x is not null && x.IsTemplate && !string.IsNullOrEmpty(x.Name))
+                .Where(x => x.Tags == null || !x.Tags.Contains(deleteTag))
+                .Where(x => !Guid.TryParse(x.Name, out _))
+                .Select(x => x.Name)
+                .Distinct()
+                .Order()
+                .ToArray();
+        }
+
         internal static Vm SelectTemplateVm(IEnumerable<Vm> cached, string templateName)
         {
             var matches = cached

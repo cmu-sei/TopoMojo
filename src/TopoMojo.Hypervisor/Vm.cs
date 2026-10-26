@@ -60,6 +60,15 @@ namespace TopoMojo.Hypervisor
         public string[] Net { get; set; }
     }
 
+    public class TemplateSourceOptions
+    {
+        /// <summary>
+        /// Template Detail field the names go in: "disks" (a disk path) or "template" (a template vm).
+        /// </summary>
+        public string Field { get; set; }
+        public string[] Names { get; set; }
+    }
+
     public class VmOperation
     {
         public string Id { get; set; }
