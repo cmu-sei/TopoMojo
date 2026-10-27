@@ -73,7 +73,7 @@ public class VmdkFormatTests
     }
 
     [Fact]
-    public void HostedDiskError_KeepsTheDiskAndConversionForAdmins()
+    public void HostedDiskError_TellsAdminsToConvertThroughSource()
     {
         var ex = VmdkFormat.HostedDiskError("[topomojo] uploads/win10.vmdk", "monolithicSparse");
 
@@ -81,7 +81,9 @@ public class VmdkFormatTests
         Assert.DoesNotContain("[topomojo]", ex.Message);
         Assert.Contains("[topomojo] uploads/win10.vmdk", ex.Detail);
         Assert.Contains("monolithicSparse", ex.Detail);
-        Assert.Contains("vmkfstools -i win10.vmdk win10-esx.vmdk -d thin", ex.Detail);
+        Assert.Contains("\"Source\": \"[topomojo] uploads/win10.vmdk\"", ex.Detail);
+        Assert.Contains("\"Path\": \"[topomojo] uploads/win10-esx.vmdk\"", ex.Detail);
+        Assert.DoesNotContain("vmkfstools", ex.Detail);
     }
 
     [Fact]
@@ -91,7 +93,7 @@ public class VmdkFormatTests
 
         Assert.Equal(VmdkFormat.UserMessage, ex.Message);
         Assert.StartsWith("Unsupported or invalid disk type 7 for 'scsi0:0'.", ex.Detail);
-        Assert.Contains("vmkfstools -i", ex.Detail);
+        Assert.Contains("Initialize the template again", ex.Detail);
     }
 
     [Theory]
@@ -102,5 +104,14 @@ public class VmdkFormatTests
     public void IsUnsupportedDiskError_MatchesEsxiDiskTypeFailures(string message, bool expected)
     {
         Assert.Equal(expected, VmdkFormat.IsUnsupportedDiskError(message));
+    }
+
+    [Theory]
+    [InlineData("topomojo/aaaa", "disk 1.vmdk", "topomojo/aaaa/disk%201.vmdk")]
+    [InlineData("", "disk.vmdk", "disk.vmdk")]
+    [InlineData(null, "disk.vmdk", "disk.vmdk")]
+    public void DatastoreFileUrlPath_KeepsFolderSeparators(string folder, string file, string expected)
+    {
+        Assert.Equal(expected, TopoMojo.Hypervisor.vSphere.VimClient.DatastoreFileUrlPath(folder, file));
     }
 }

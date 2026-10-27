@@ -55,16 +55,23 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public static HypervisorException HostedDiskError(string path, string createType)
         {
-            string file = new DatastorePath(path).File;
-            string converted = file.Replace(".vmdk", "-esx.vmdk", StringComparison.OrdinalIgnoreCase);
+            string converted = ConvertedPath(path);
 
             return new HypervisorException(
                 UserMessage,
                 $"Disk {path} is a hosted VMDK (createType \"{createType}\", as exported by VMware Workstation, "
-                + "Fusion, VirtualBox, or an OVA), which ESXi can't attach. Convert it on an ESXi host with "
-                + $"\"vmkfstools -i {file} {converted} -d thin\" and point the template at {converted}."
+                + "Fusion, VirtualBox, or an OVA), which ESXi can't attach in place. " + ConvertHint(path, converted)
             );
         }
+
+        // The vCenter disk copy Initialize runs for a disk with a Source converts a hosted source,
+        // so no ESXi shell is needed (VMware Cloud on AWS has none).
+        private static string ConvertHint(string source, string converted)
+            => "To convert it, set the disk's Source to the uploaded file and its Path to a new file, then "
+            + $"Initialize the template again, e.g. \"Disks\": [{{ \"Source\": \"{source}\", \"Path\": \"{converted}\" }}].";
+
+        private static string ConvertedPath(string path)
+            => path is null ? "<disk>-esx.vmdk" : Regex.Replace(path, @"\.vmdk$", "-esx.vmdk", RegexOptions.IgnoreCase);
 
         /// <summary>
         /// ESXi's power-on/attach failure for a disk it can't open, e.g.
@@ -77,8 +84,7 @@ namespace TopoMojo.Hypervisor.vSphere
             => new(
                 UserMessage,
                 $"{message} The disk is probably a hosted VMDK (exported by VMware Workstation, Fusion, "
-                + "VirtualBox, or an OVA). Convert it on an ESXi host with \"vmkfstools -i <disk>.vmdk "
-                + "<disk>-esx.vmdk -d thin\" and point the template at the converted disk."
+                + "VirtualBox, or an OVA). " + ConvertHint("<uploaded disk>.vmdk", "<uploaded disk>-esx.vmdk")
             );
 
         private static string ReadEmbeddedDescriptor(ReadOnlySpan<byte> header)

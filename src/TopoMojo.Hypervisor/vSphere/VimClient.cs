@@ -795,14 +795,15 @@ namespace TopoMojo.Hypervisor.vSphere
             {
                 await Connect();
 
-                string url = BuildDatastoreUploadUrl(new DatastorePath(datastorePath));
+                string url = BuildDatastoreFileUrl(new DatastorePath(datastorePath));
 
                 using var response = await CreateAuthenticatedHttpClient()
                     .GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Could not read disk {path} ({status})", datastorePath, response.StatusCode);
+                    // the datastore answers 404 both for a missing file and for one the account can't read
+                    _logger.LogWarning("Could not read disk {path} ({status}); it may be missing or not readable by this account", datastorePath, response.StatusCode);
                     return null;
                 }
 
@@ -890,6 +891,25 @@ namespace TopoMojo.Hypervisor.vSphere
 
             _logger.LogDebug("Successfully deleted file: {path}", fullPath);
         }
+
+        /// <summary>
+        /// Like BuildDatastoreUploadUrl, but escapes each folder segment so nested folders
+        /// (topomojo/{workspace}/) keep their "/" separators.
+        /// </summary>
+        private string BuildDatastoreFileUrl(DatastorePath dsPath)
+        {
+            string host = new Uri(_config.Url).Authority;
+            string dcPath = Uri.EscapeDataString(GetDatacenterName());
+            string dsName = Uri.EscapeDataString(dsPath.Datastore);
+
+            return $"https://{host}/folder/{DatastoreFileUrlPath(dsPath.Folder, dsPath.File)}?dcPath={dcPath}&dsName={dsName}";
+        }
+
+        internal static string DatastoreFileUrlPath(string folder, string file)
+            => string.Join("/", (folder ?? "")
+                .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Append(file)
+                .Select(Uri.EscapeDataString));
 
         private string BuildDatastoreUploadUrl(DatastorePath dsPath)
         {
