@@ -132,6 +132,27 @@ public sealed class JanitorOrphanedDocumentTests
     }
 
     [Fact]
+    public async Task SweepWithATenantLeavesOtherInstancesHexIdsAlone()
+    {
+        using var fixture = new DocRootFixture();
+        // Ids of an instance with no tenant, and of a tenant whose prefix is hex, are both
+        // 32 hex characters; a "dev" instance sharing the document root must not take them.
+        string untenanted = Orphan;
+        string hexTenant = "ab" + Orphan[2..];
+        string ours = "dev" + Orphan[3..];
+        fixture.WriteDocuments(untenanted);
+        fixture.WriteDocuments(hexTenant);
+        fixture.WriteDocuments(ours);
+
+        var reports = await CreateJanitor(fixture, tenant: "dev").CleanupOrphanedDocuments(Live);
+
+        Assert.Equal([ours], reports.Select(r => r.Id));
+        Assert.False(File.Exists(fixture.DocPath(ours)));
+        Assert.True(File.Exists(fixture.DocPath(untenanted)));
+        Assert.True(File.Exists(fixture.DocPath(hexTenant)));
+    }
+
+    [Fact]
     public async Task DryRunReportsOrphansWithoutRemovingThem()
     {
         using var fixture = new DocRootFixture();

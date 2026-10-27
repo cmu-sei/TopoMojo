@@ -110,12 +110,18 @@ namespace TopoMojo.Api.Services
         }
 
         /// <summary>
-        /// Whether <paramref name="name"/> is shaped like a workspace id: 32 hex characters, the
-        /// configured tenant prefix followed by hex characters to a length of 32, or a hyphenated GUID.
+        /// Whether <paramref name="name"/> is shaped like one of this instance's workspace ids: a
+        /// hyphenated GUID, or 32 characters made of the configured tenant prefix followed by hex
+        /// characters (all 32 hex when no tenant is configured).
         /// </summary>
         /// <remarks>
-        /// The all-zero id is the export format's stock-template placeholder, not a workspace, so it
-        /// is never treated as one.
+        /// With a tenant configured, a 32-character name must start with it. Ids of an instance
+        /// with no tenant, or with another tenant whose prefix happens to be hex, are also 32 hex
+        /// characters, so accepting them would let a sweep over a shared document root delete
+        /// another instance's documents. An instance with no tenant can't tell a hex-prefixed
+        /// tenant's ids from its own, so tenants that share a document root should each set one.
+        /// The all-zero id is the export format's stock-template placeholder, not a workspace, so
+        /// it is never treated as one.
         /// </remarks>
         public static bool IsWorkspaceId(string name, string tenant)
         {
@@ -128,9 +134,11 @@ namespace TopoMojo.Api.Services
             if (name.Length != 32 || name.All(c => c == '0'))
                 return false;
 
-            string hex = !string.IsNullOrEmpty(tenant) && name.StartsWith(tenant, StringComparison.Ordinal)
-                ? name[tenant.Length..]
-                : name;
+            bool hasTenant = !string.IsNullOrEmpty(tenant);
+            if (hasTenant && !name.StartsWith(tenant, StringComparison.Ordinal))
+                return false;
+
+            string hex = hasTenant ? name[tenant.Length..] : name;
 
             return hex.Length > 0 && hex.All(Uri.IsHexDigit);
         }
