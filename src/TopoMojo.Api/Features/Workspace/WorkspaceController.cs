@@ -20,7 +20,9 @@ namespace TopoMojo.Api.Controllers
         ILogger<WorkspaceController> logger,
         IHubContext<AppHub, IHubEvent> hub,
         IHypervisorService podService,
-        WorkspaceService workspaceService
+        WorkspaceService workspaceService,
+        TransferService transferService,
+        FileUploadOptions fileUploadOptions
         ) : BaseController(logger, hub)
     {
         /// <summary>
@@ -318,6 +320,37 @@ namespace TopoMojo.Api.Controllers
             return Ok(
                 await workspaceService.Invite(id)
             );
+        }
+
+        /// <summary>
+        /// Download an export package of workspaces.
+        /// </summary>
+        /// <remarks>
+        /// Requires manager permission on every requested workspace.
+        /// The package can be uploaded to another TopoMojo
+        /// with the admin import.
+        /// </remarks>
+        /// <param name="ids">Workspace Ids</param>
+        /// <returns>A zip file</returns>
+        [HttpPost("api/workspace/download")]
+        [ProducesResponseType(typeof(FileResult), 200)]
+        [SwaggerOperation(OperationId = "DownloadManagedWorkspaces")]
+        [Authorize]
+        public async Task<ActionResult> DownloadManagedWorkspaces([FromBody] string[] ids)
+        {
+            if (!AuthorizeAny(
+                () => workspaceService.CanManageAll(ids, Actor.Id).Result
+            )) return Forbid();
+
+            var stream = await transferService.Download(
+                ids,
+                fileUploadOptions.DocRoot,
+                Actor.IsAdmin ? null : Actor.Id
+            );
+
+            Logger.LogInformation("{name} [{id}] downloaded workspaces {ids}", Actor.Name, Actor.Id, string.Join(",", ids));
+
+            return File(stream, "application/zip", "topomojo-export.zip");
         }
 
         /// <summary>
