@@ -154,10 +154,28 @@ namespace TopoMojo.Api.Services
             entity.Id = Guid.NewGuid().ToString("n");
             entity.Name = model.Name ?? $"{entity.Name}{suffix}";
             entity.IsPublished = false;
+            entity.Detail = LocalizeClonedDetail(entity.Detail, entity.WorkspaceId, entity.Id);
 
             await _store.Create(entity);
 
             return Mapper.Map<TemplateDetail>(entity);
+        }
+
+        /// <summary>
+        /// Gives a clone its own disks, copied from the original's on Initialize, the way a
+        /// workspace clone does. Otherwise the clone saves into the original's disk (vSphere) or
+        /// template vm (Proxmox). Stock templates have no workspace, so their copies go in the
+        /// all-zeros folder with the other stock disks.
+        /// </summary>
+        public static string LocalizeClonedDetail(string detail, string workspaceId, string cloneId)
+        {
+            // a linked template has no detail of its own to copy
+            if (string.IsNullOrEmpty(detail))
+                return detail;
+
+            TemplateUtility tu = new(detail);
+            tu.LocalizeDiskPaths(workspaceId ?? Guid.Empty.ToString(), cloneId);
+            return tu.ToString();
         }
 
         public async Task<Template> Update(ChangedTemplate template)
