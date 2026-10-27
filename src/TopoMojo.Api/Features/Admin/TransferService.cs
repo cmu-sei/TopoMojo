@@ -75,14 +75,30 @@ public class TransferService(
         );
     }
 
-    public async Task<Stream> Download(string[] ids, string docPath)
+    public Task<Stream> Download(string[] ids, string docPath)
+    {
+        return Download(ids, docPath, null);
+    }
+
+    /// <summary>
+    /// Build a download package on behalf of a workspace manager.
+    /// </summary>
+    /// <remarks>
+    /// Callers must first confirm that managerId can manage every requested id.
+    /// The requested workspaces are packaged in full. A parent workspace of a linked
+    /// template is packaged in full only if managerId can also manage it. Otherwise the
+    /// package holds just the linked parent templates, without that workspace's challenge,
+    /// document, or other templates. A null managerId packages everything (admin export).
+    /// </remarks>
+    public async Task<Stream> Download(string[] ids, string docPath, string managerId)
     {
         List<Workspace> list = [];
         List<Template> stock = [];
         List<string> allDisks = [];
+        HashSet<string> withoutDocs = [];
 
         // check if ALL workspaces were requested
-        if (ids.Length == 1 && ids[0].Equals("all", StringComparison.CurrentCultureIgnoreCase))
+        if (managerId is null && ids.Length == 1 && ids[0].Equals("all", StringComparison.CurrentCultureIgnoreCase))
         {
             ids = [.. workspaceStore.List().Select(w => w.Id)];
         }
@@ -105,11 +121,19 @@ public class TransferService(
 
         string[] parents = parentWorkspaces.Except(list.Select(w => w.Id)).ToArray();
 
+        // parent templates the requested workspaces link to
+        HashSet<string> linkedParents = [.. list.SelectMany(w => w.Templates)
+            .Where(t => t.Parent?.WorkspaceId is not null)
+            .Select(t => t.ParentId)
+        ];
+
         foreach (string id in parents)
         {
             var topo = await workspaceStore.LoadWithParents(id);
             if (topo != null)
             {
+                bool full = managerId is null || await workspaceStore.CanManage(id, managerId);
+
                 // removed linked, non-stock, templates
                 foreach (Template t in topo.Templates.ToArray())
                 {
@@ -123,6 +147,20 @@ public class TransferService(
                     // remove historical parent from unlinked templates
                     t.ParentId = null;
                 }
+
+                // a manager of the child doesn't get the rest of the parent workspace
+                if (!full)
+                {
+                    topo = new Workspace
+                    {
+                        Id = topo.Id,
+                        Name = topo.Name,
+                        WhenCreated = topo.WhenCreated,
+                        Templates = [.. topo.Templates.Where(t => linkedParents.Contains(t.Id))]
+                    };
+                    withoutDocs.Add(topo.Id);
+                }
+
                 list.Add(topo);
             }
         }
@@ -187,7 +225,8 @@ public class TransferService(
         return await CreateZipfile(
             list,
             allDisks.Distinct(),
-            docPath
+            docPath,
+            withoutDocs
         );
 
     }
@@ -295,7 +334,7 @@ public class TransferService(
         return [.. results];
     }
 
-    private async Task<Stream> CreateZipfile(IEnumerable<Workspace> data, IEnumerable<string> disks, string docPath)
+    private async Task<Stream> CreateZipfile(IEnumerable<Workspace> data, IEnumerable<string> disks, string docPath, ICollection<string> withoutDocs)
     {
         // write to zip in memory
         MemoryStream zipStream = new();
@@ -316,6 +355,9 @@ public class TransferService(
             // export markdown doc artifacts
             foreach (var topo in data)
             {
+                if (withoutDocs.Contains(topo.Id))
+                    continue;
+
                 string filePath = Path.Combine(docPath, topo.Id);
                 try
                 {
