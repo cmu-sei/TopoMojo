@@ -47,5 +47,102 @@ namespace TopoMojo.Api.Services
 
             return [.. removed];
         }
+
+        /// <summary>
+        /// List the top-level entries of the document root that look like workspace artifacts:
+        /// {id}.md files and {id}/ directories whose name is shaped like a workspace id.
+        /// </summary>
+        /// <remarks>
+        /// Anything else in the document root is not ours to judge and is never returned, nor is a
+        /// symlink, nor an entry that doesn't resolve inside the root.
+        /// </remarks>
+        public static DocumentEntry[] FindEntries(string docRoot, string tenant)
+        {
+            if (string.IsNullOrWhiteSpace(docRoot) || !Directory.Exists(docRoot))
+                return [];
+
+            List<DocumentEntry> entries = [];
+
+            foreach (string path in Directory.EnumerateFileSystemEntries(docRoot).Order(StringComparer.Ordinal))
+            {
+                string name = Path.GetFileName(path);
+                FileSystemInfo info = Directory.Exists(path)
+                    ? new DirectoryInfo(path)
+                    : new FileInfo(path);
+
+                if (info.LinkTarget is not null)
+                    continue;
+
+                bool isDirectory = info is DirectoryInfo;
+
+                string id = isDirectory
+                    ? name
+                    : name.EndsWith(".md", StringComparison.Ordinal) ? name[..^3] : null;
+
+                if (!IsWorkspaceId(id, tenant))
+                    continue;
+
+                string contained = PathGuard.ResolveContainedFilename(docRoot, name);
+
+                if (contained is null)
+                    continue;
+
+                entries.Add(new DocumentEntry(id, contained, isDirectory, info.LastWriteTimeUtc));
+            }
+
+            return [.. entries];
+        }
+
+        /// <summary>
+        /// Delete an entry returned by <see cref="FindEntries"/>.
+        /// </summary>
+        public static void Delete(DocumentEntry entry)
+        {
+            if (entry.IsDirectory)
+            {
+                if (Directory.Exists(entry.Path))
+                    Directory.Delete(entry.Path, recursive: true);
+            }
+            else if (File.Exists(entry.Path))
+            {
+                File.Delete(entry.Path);
+            }
+        }
+
+        /// <summary>
+        /// Whether <paramref name="name"/> is shaped like a workspace id: 32 hex characters, the
+        /// configured tenant prefix followed by hex characters to a length of 32, or a hyphenated GUID.
+        /// </summary>
+        /// <remarks>
+        /// The all-zero id is the export format's stock-template placeholder, not a workspace, so it
+        /// is never treated as one.
+        /// </remarks>
+        public static bool IsWorkspaceId(string name, string tenant)
+        {
+            if (string.IsNullOrEmpty(name))
+                return false;
+
+            if (name.Length == 36)
+                return Guid.TryParseExact(name, "D", out Guid guid) && guid != Guid.Empty;
+
+            if (name.Length != 32 || name.All(c => c == '0'))
+                return false;
+
+            string hex = !string.IsNullOrEmpty(tenant) && name.StartsWith(tenant, StringComparison.Ordinal)
+                ? name[tenant.Length..]
+                : name;
+
+            return hex.Length > 0 && hex.All(Uri.IsHexDigit);
+        }
+    }
+
+    /// <summary>
+    /// A workspace artifact in the document root: its {id}.md file or its {id}/ image directory.
+    /// </summary>
+    public sealed record DocumentEntry(string Id, string Path, bool IsDirectory, DateTime LastWriteUtc)
+    {
+        public string Name => IsDirectory
+            ? System.IO.Path.GetFileName(Path) + "/"
+            : System.IO.Path.GetFileName(Path);
     }
 }
