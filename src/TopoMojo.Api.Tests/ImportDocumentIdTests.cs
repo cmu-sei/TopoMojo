@@ -130,6 +130,26 @@ public sealed class ImportDocumentIdTests : IDisposable
         Assert.True(File.Exists(Image(sourceId)));
     }
 
+    [Theory]
+    [InlineData(Hex, "")]
+    // The source id is rewritten to the id of a workspace that already exists here.
+    [InlineData("xy" + "23456789abcdef0123456789abcdef", "tm")]
+    public async Task ADuplicateImportLeavesTheExistingWorkspacesDocuments(string sourceId, string tenant)
+    {
+        string existing = tenant + sourceId[tenant.Length..];
+        await new WorkspaceStore(_db).Create(new Data.Workspace { Id = existing, Name = "existing" });
+        File.WriteAllText(Doc(existing), "# existing");
+        Directory.CreateDirectory(Path.Combine(DocRoot, existing));
+        File.WriteAllText(Image(existing), "existing png");
+
+        await Import(tenant, [Data(sourceId), .. Documents(sourceId)]);
+
+        Assert.Equal("# existing", File.ReadAllText(Doc(existing)));
+        Assert.Equal("existing png", File.ReadAllText(Image(existing)));
+        if (sourceId != existing)
+            Assert.False(File.Exists(Doc(sourceId)));
+    }
+
     [Fact]
     public async Task EntriesThatBelongToNoImportedWorkspaceKeepTheirName()
     {

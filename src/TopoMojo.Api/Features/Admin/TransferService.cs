@@ -226,7 +226,7 @@ public class TransferService(
         entryStream.Write(contentBytes, 0, contentBytes.Length);
     }
 
-    private async Task<string[]> ImportSerializedWorkspaces(Stream stream, Dictionary<string, string> renamed = null)
+    private async Task<string[]> ImportSerializedWorkspaces(Stream stream, Dictionary<string, string> renamed = null, HashSet<string> skipped = null)
     {
         using StreamReader reader = new(stream, Encoding.UTF8);
 
@@ -235,7 +235,7 @@ public class TransferService(
             jsonSerializerSettings
         );
 
-        return [.. (await ImportWorkspaces(data, renamed))];
+        return [.. (await ImportWorkspaces(data, renamed, skipped))];
     }
 
     private void UpdateTenant(Workspace ws)
@@ -259,7 +259,7 @@ public class TransferService(
         }
     }
 
-    private async Task<string[]> ImportWorkspaces(IEnumerable<Workspace> data, Dictionary<string, string> renamed = null)
+    private async Task<string[]> ImportWorkspaces(IEnumerable<Workspace> data, Dictionary<string, string> renamed = null, HashSet<string> skipped = null)
     {
         List<string> results = [];
         var tids = await templateStore.List().Select(m => m.Id).ToArrayAsync();
@@ -284,6 +284,7 @@ public class TransferService(
             if (wids.Contains(topo.Id))
             {
                 results.Add($"Duplicate: {topo.Name} {topo.Id}");
+                skipped?.Add(sourceId);
                 continue;
             }
 
@@ -365,15 +366,20 @@ public class TransferService(
         // Import the workspaces first, so document entries can follow any workspace id that
         // import rewrote to this instance's tenant, whatever order the archive lists them in.
         Dictionary<string, string> renamed = new(StringComparer.Ordinal);
+        HashSet<string> skipped = new(StringComparer.Ordinal);
         var data = zipArchive.GetEntry("_data.json");
         if (data is not null)
-            results = await ImportSerializedWorkspaces(data.Open(), renamed);
+            results = await ImportSerializedWorkspaces(data.Open(), renamed, skipped);
 
         // Iterate through the entries in the ZIP archive
         foreach (var entry in zipArchive.Entries)
         {
             // skip disks and the workspace data imported above
             if (entry.FullName.Equals("_disks.txt") || entry.FullName.Equals("_data.json"))
+                continue;
+
+            // a duplicate wasn't imported, so its documents would overwrite the existing workspace's
+            if (skipped.Contains(DocumentEntryId(entry.FullName) ?? ""))
                 continue;
 
             // save all other files to docs
@@ -408,18 +414,24 @@ public class TransferService(
     /// </summary>
     private static string RenameDocumentEntry(string name, Dictionary<string, string> renamed)
     {
-        int slash = name.IndexOfAny(['/', '\\']);
-
-        string id = slash >= 0
-            ? name[..slash]
-            : name.EndsWith(".md", StringComparison.Ordinal) ? name[..^3] : null;
+        string id = DocumentEntryId(name);
 
         if (id is null || !renamed.TryGetValue(id, out string newId))
             return name;
 
+        return newId + name[id.Length..];
+    }
+
+    /// <summary>
+    /// The workspace id an {id}.md or {id}/... archive entry belongs to, or null for other entries.
+    /// </summary>
+    private static string DocumentEntryId(string name)
+    {
+        int slash = name.IndexOfAny(['/', '\\']);
+
         return slash >= 0
-            ? newId + name[slash..]
-            : newId + ".md";
+            ? name[..slash]
+            : name.EndsWith(".md", StringComparison.Ordinal) ? name[..^3] : null;
     }
 
 }
