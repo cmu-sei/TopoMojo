@@ -12,9 +12,8 @@ using Xunit;
 namespace TopoMojo.Api.Tests;
 
 /// <summary>
-/// Import writes a workspace's document entries under the id they had in the source instance, then
-/// rewrites the workspace id to this instance's tenant. The orphan sweep must not mistake those
-/// files for orphans of this instance.
+/// Import rewrites a workspace id to this instance's tenant. Whether the imported document files
+/// land under the source id or the rewritten one, the orphan sweep must not delete them.
 /// </summary>
 public sealed class ImportedDocumentSweepTests
 {
@@ -51,6 +50,9 @@ public sealed class ImportedDocumentSweepTests
         return await fixture.Db.Workspaces.Select(w => w.Id).SingleAsync();
     }
 
+    private static string[] Files(DocRootFixture fixture) =>
+        [.. Directory.GetFiles(fixture.Root, "*", SearchOption.AllDirectories).Order()];
+
     private static JanitorService CreateJanitor(DocRootFixture fixture, string tenant) => new(
         NullLogger<JanitorService>.Instance,
         new CoreOptions { DocPath = fixture.Root, Tenant = tenant },
@@ -74,12 +76,13 @@ public sealed class ImportedDocumentSweepTests
         using var fixture = new DocRootFixture();
 
         string importedId = await Import(fixture, sourceId, tenant);
+        string[] imported = Files(fixture);
         var reports = await CreateJanitor(fixture, tenant).CleanupOrphanedDocuments(Live);
 
         Assert.NotEqual(sourceId, importedId);
         Assert.Empty(reports);
-        Assert.True(File.Exists(fixture.DocPath(sourceId)));
-        Assert.True(File.Exists(Path.Combine(fixture.ImageDir(sourceId), "image.png")));
+        Assert.Equal(2, imported.Length);
+        Assert.Equal(imported, Files(fixture));
     }
 
     [Theory]
