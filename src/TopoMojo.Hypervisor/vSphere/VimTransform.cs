@@ -31,13 +31,12 @@ namespace TopoMojo.Hypervisor.vSphere
                 vmcs.files = new VirtualMachineFileInfo { vmPathName = $"{datastore}/{template.Name}/{template.Name}.vmx" };
             }
 
-            //can't actually be applied via ExtraConfig on 6.7
-            if (template.GuestSettings.Any(c => c.Key == "firmware" && c.Value == "efi"))
-                vmcs.firmware = "efi";
+            // firmware and nested virtualization can't actually be applied via ExtraConfig
+            string firmware = GetFirmware(template);
+            if (firmware is not null)
+                vmcs.firmware = firmware;
 
-            //can't actually be applied via ExtraConfig
-            if (template.GuestSettings.Length > 0
-                && template.GuestSettings.Any(s => s.Key.Contains("vhv.enable") && s.Value.Equals("true", StringComparison.CurrentCultureIgnoreCase)))
+            if (IsNestedVirtualizationEnabled(template))
             {
                 vmcs.nestedHVEnabled = true;
                 vmcs.nestedHVEnabledSpecified = true;
@@ -86,6 +85,37 @@ namespace TopoMojo.Hypervisor.vSphere
             vmcs.deviceChange = [.. devices];
 
             return vmcs;
+        }
+
+        /// <summary>
+        /// The template's Firmware setting wins; otherwise a legacy "firmware=efi" Guest Setting
+        /// (only reachable through the Detail JSON) selects efi. Null leaves the vSphere default.
+        /// </summary>
+        internal static string GetFirmware(VmTemplate template)
+        {
+            if (template.Firmware.HasValue())
+            {
+                string firmware = template.Firmware.Trim().ToLowerInvariant();
+                return firmware is "efi" or "bios" ? firmware : null;
+            }
+
+            return (template.GuestSettings ?? []).Any(c => c.Key == "firmware" && c.Value == "efi")
+                ? "efi"
+                : null;
+        }
+
+        /// <summary>
+        /// The template's NestedVirtualization setting wins; otherwise a legacy "vhv.enable=true"
+        /// Guest Setting enables it.
+        /// </summary>
+        internal static bool IsNestedVirtualizationEnabled(VmTemplate template)
+        {
+            if (template.NestedVirtualization.HasValue)
+                return template.NestedVirtualization.Value;
+
+            return (template.GuestSettings ?? []).Any(s =>
+                s.Key.Contains("vhv.enable")
+                && s.Value.Equals("true", StringComparison.CurrentCultureIgnoreCase));
         }
 
         private static VirtualDeviceConfigSpec GetCdrom(ref int key, int controllerkey, string iso)
