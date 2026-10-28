@@ -226,7 +226,7 @@ public class TransferService(
         entryStream.Write(contentBytes, 0, contentBytes.Length);
     }
 
-    private async Task<string[]> ImportSerializedWorkspaces(Stream stream)
+    private async Task<string[]> ImportSerializedWorkspaces(Stream stream, Dictionary<string, string> renamed = null)
     {
         using StreamReader reader = new(stream, Encoding.UTF8);
 
@@ -235,7 +235,7 @@ public class TransferService(
             jsonSerializerSettings
         );
 
-        return [.. (await ImportWorkspaces(data))];
+        return [.. (await ImportWorkspaces(data, renamed))];
     }
 
     private void UpdateTenant(Workspace ws)
@@ -259,7 +259,7 @@ public class TransferService(
         }
     }
 
-    private async Task<string[]> ImportWorkspaces(IEnumerable<Workspace> data)
+    private async Task<string[]> ImportWorkspaces(IEnumerable<Workspace> data, Dictionary<string, string> renamed = null)
     {
         List<string> results = [];
         var tids = await templateStore.List().Select(m => m.Id).ToArrayAsync();
@@ -277,6 +277,7 @@ public class TransferService(
             }
 
             // add or remove tenant prefix
+            string sourceId = topo.Id;
             UpdateTenant(topo);
 
             // prevent overwriting
@@ -289,6 +290,9 @@ public class TransferService(
             // add workspace to datacontext
             workspaceStore.DbContext.Workspaces.Add(topo);
             results.Add($"Success: {topo.Name} {topo.Id}");
+
+            if (renamed is not null && topo.Id != sourceId)
+                renamed[sourceId] = topo.Id;
         }
 
         await workspaceStore.DbContext.SaveChangesAsync();
@@ -358,26 +362,26 @@ public class TransferService(
         string[] results = [];
         using var zipArchive = new ZipArchive(stream, ZipArchiveMode.Read);
 
+        // Import the workspaces first, so document entries can follow any workspace id that
+        // import rewrote to this instance's tenant, whatever order the archive lists them in.
+        Dictionary<string, string> renamed = new(StringComparer.Ordinal);
+        var data = zipArchive.GetEntry("_data.json");
+        if (data is not null)
+            results = await ImportSerializedWorkspaces(data.Open(), renamed);
+
         // Iterate through the entries in the ZIP archive
         foreach (var entry in zipArchive.Entries)
         {
-            // skip disks
-            if (entry.FullName.Equals("_disks.txt"))
+            // skip disks and the workspace data imported above
+            if (entry.FullName.Equals("_disks.txt") || entry.FullName.Equals("_data.json"))
                 continue;
-
-            // deserialize workspace data
-            if (entry.FullName.Equals("_data.json"))
-            {
-                results = await ImportSerializedWorkspaces(entry.Open());
-                continue;
-            }
 
             // save all other files to docs
             if (!entry.FullName.EndsWith('/'))
             {
                 // Archives are shared between instances, so entry names are untrusted input. An entry
                 // named "../.." would otherwise be written outside docPath.
-                string dest = PathGuard.ResolveContained(docPath, entry.FullName);
+                string dest = PathGuard.ResolveContained(docPath, RenameDocumentEntry(entry.FullName, renamed));
 
                 if (dest is null)
                 {
@@ -396,6 +400,26 @@ public class TransferService(
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Rename a workspace's {id}.md or {id}/... archive entry to the id it was imported under.
+    /// Entries that don't belong to a renamed workspace keep their name.
+    /// </summary>
+    private static string RenameDocumentEntry(string name, Dictionary<string, string> renamed)
+    {
+        int slash = name.IndexOfAny(['/', '\\']);
+
+        string id = slash >= 0
+            ? name[..slash]
+            : name.EndsWith(".md", StringComparison.Ordinal) ? name[..^3] : null;
+
+        if (id is null || !renamed.TryGetValue(id, out string newId))
+            return name;
+
+        return slash >= 0
+            ? newId + name[slash..]
+            : newId + ".md";
     }
 
 }
