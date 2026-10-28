@@ -2,6 +2,7 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace TopoMojo.Hypervisor
 {
@@ -29,6 +30,20 @@ namespace TopoMojo.Hypervisor
         public VmNet[] Eth { get; set; }
         public VmDisk[] Disks { get; set; }
         public VmKeyValue[] GuestSettings { get; set; }
+
+        /// <summary>
+        /// "bios" or "efi". vSphere only; a Proxmox clone keeps its parent's firmware.
+        /// When null, a legacy "firmware=efi" entry in GuestSettings still applies.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string Firmware { get; set; }
+
+        /// <summary>
+        /// Exposes hardware-assisted virtualization to the guest. vSphere only.
+        /// When null, a legacy "vhv.enable=true" entry in GuestSettings still applies.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? NestedVirtualization { get; set; }
     }
 
     public class VmNet
