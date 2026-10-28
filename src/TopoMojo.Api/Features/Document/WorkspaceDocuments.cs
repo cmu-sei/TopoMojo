@@ -110,9 +110,9 @@ namespace TopoMojo.Api.Services
         }
 
         /// <summary>
-        /// Whether <paramref name="name"/> is shaped like one of this instance's workspace ids: a
-        /// hyphenated GUID, or 32 characters made of the configured tenant prefix followed by hex
-        /// characters (all 32 hex when no tenant is configured).
+        /// Whether <paramref name="name"/> is shaped like one of this instance's workspace ids: 32
+        /// characters made of the configured tenant prefix followed by hex characters (all 32 hex
+        /// when no tenant is configured), or, only when no tenant is configured, a hyphenated GUID.
         /// </summary>
         /// <remarks>
         /// With a tenant configured, a 32-character name must start with it. Ids of an instance
@@ -120,6 +120,9 @@ namespace TopoMojo.Api.Services
         /// characters, so accepting them would let a sweep over a shared document root delete
         /// another instance's documents. An instance with no tenant can't tell a hex-prefixed
         /// tenant's ids from its own, so tenants that share a document root should each set one.
+        /// A hyphenated GUID carries no tenant prefix, so with a tenant configured it can't be one
+        /// of this instance's ids; it is most likely a document imported under another
+        /// instance's id.
         /// The all-zero id is the export format's stock-template placeholder, not a workspace, so
         /// it is never treated as one.
         /// </remarks>
@@ -128,13 +131,14 @@ namespace TopoMojo.Api.Services
             if (string.IsNullOrEmpty(name))
                 return false;
 
+            bool hasTenant = !string.IsNullOrEmpty(tenant);
+
             if (name.Length == 36)
-                return Guid.TryParseExact(name, "D", out Guid guid) && guid != Guid.Empty;
+                return !hasTenant && Guid.TryParseExact(name, "D", out Guid guid) && guid != Guid.Empty;
 
             if (name.Length != 32 || name.All(c => c == '0'))
                 return false;
 
-            bool hasTenant = !string.IsNullOrEmpty(tenant);
             if (hasTenant && !name.StartsWith(tenant, StringComparison.Ordinal))
                 return false;
 

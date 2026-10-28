@@ -110,7 +110,7 @@ public sealed class JanitorOrphanedDocumentTests
     }
 
     [Fact]
-    public async Task SweepRecognizesHyphenatedGuidsAndTenantPrefixedIds()
+    public async Task SweepRecognizesTenantPrefixedIds()
     {
         using var fixture = new DocRootFixture();
         string guid = "11111111-2222-3333-4444-555555555555";
@@ -122,13 +122,27 @@ public sealed class JanitorOrphanedDocumentTests
 
         var reports = await CreateJanitor(fixture, tenant: "dev").CleanupOrphanedDocuments(Live);
 
-        Assert.Equal(
-            new[] { guid, tenanted }.OrderBy(x => x),
-            reports.Select(r => r.Id).OrderBy(x => x));
-        Assert.False(File.Exists(fixture.DocPath(guid)));
+        Assert.Equal(tenanted, Assert.Single(reports).Id);
         Assert.False(File.Exists(fixture.DocPath(tenanted)));
         // Another tenant's prefix isn't hex and isn't ours, so it isn't recognized.
         Assert.True(File.Exists(fixture.DocPath(otherTenant)));
+        // A hyphenated GUID has no tenant prefix, so it can't be one of this tenant's ids.
+        Assert.True(File.Exists(fixture.DocPath(guid)));
+        Assert.True(Directory.Exists(fixture.ImageDir(guid)));
+    }
+
+    [Fact]
+    public async Task SweepWithoutATenantRecognizesHyphenatedGuids()
+    {
+        using var fixture = new DocRootFixture();
+        string guid = "11111111-2222-3333-4444-555555555555";
+        fixture.WriteDocuments(guid);
+
+        var reports = await CreateJanitor(fixture).CleanupOrphanedDocuments(Live);
+
+        Assert.Equal(guid, Assert.Single(reports).Id);
+        Assert.False(File.Exists(fixture.DocPath(guid)));
+        Assert.False(Directory.Exists(fixture.ImageDir(guid)));
     }
 
     [Fact]
