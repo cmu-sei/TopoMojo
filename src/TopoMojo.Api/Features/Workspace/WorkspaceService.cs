@@ -296,6 +296,17 @@ namespace TopoMojo.Api.Services
 
             });
 
+            // The row is already gone, so a failure here shouldn't fail the request;
+            // the Janitor's orphaned-document sweep reclaims anything left behind.
+            try
+            {
+                WorkspaceDocuments.Remove(CoreOptions.DocPath, entity.Id);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to remove document files of deleted workspace {id}", entity.Id);
+            }
+
             return Mapper.Map<Workspace>(entity);
         }
 
