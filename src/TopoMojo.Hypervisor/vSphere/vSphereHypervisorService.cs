@@ -356,11 +356,9 @@ namespace TopoMojo.Hypervisor.vSphere
             if (progress.Length == 0)
                 return 100;
 
-            int index = 0;
-            foreach (var disk in template.Disks)
+            foreach (int index in MissingDiskIndexes(progress))
             {
-                if (progress[index] >= 0)
-                    continue;
+                var disk = template.Disks[index];
 
                 if (disk.Source.HasValue())
                 {
@@ -372,11 +370,14 @@ namespace TopoMojo.Hypervisor.vSphere
                     await host.CreateDisk(disk);
                     progress[index] = 100;
                 }
-                index += 1;
             }
 
             return 0;
         }
+
+        // Positions of the disks that don't exist yet (progress -1), in template order.
+        internal static int[] MissingDiskIndexes(int[] progress)
+            => [.. Enumerable.Range(0, progress.Length).Where(i => progress[i] < 0)];
 
         public async Task DeleteDisks(VmTemplate template)
         {
@@ -384,26 +385,19 @@ namespace TopoMojo.Hypervisor.vSphere
 
             VimClient host = FindHostByRandom();
 
-            int index = 0;
-            foreach (VmDisk disk in template.Disks)
-            {
-                // skip missing and pending
-                if (progress[index] < 100)
-                    continue;
+            foreach (int index in DeletableDiskIndexes(template.Disks, progress, template.IsolationTag))
+                await host.DeleteDisk(template.Disks[index].Path);
+        }
 
+        // Positions of the disks DeleteDisks may remove, in template order.
+        internal static int[] DeletableDiskIndexes(VmDisk[] disks, int[] progress, string isolationTag)
+            => [.. Enumerable.Range(0, disks.Length).Where(i =>
+                // skip missing and pending
+                progress[i] >= 100 &&
                 // protect stock disks; only delete a disk if it is local to the workspace
                 // i.e. the disk folder matches the workspaceId
-                if (
-                    string.IsNullOrEmpty(template.IsolationTag) ||
-                    disk.Path.Contains(template.IsolationTag).Equals(false)
-                ) continue;
-
-                // delete disk
-                await host.DeleteDisk(disk.Path);
-
-                index += 1;
-            }
-        }
+                !string.IsNullOrEmpty(isolationTag) &&
+                disks[i].Path.Contains(isolationTag))];
 
         public async Task<VmConsole> Display(string id)
         {
