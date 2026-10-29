@@ -785,42 +785,6 @@ namespace TopoMojo.Hypervisor.vSphere
         /// <summary>
         /// Upload a file to vSphere datastore via HTTP PUT
         /// </summary>
-        /// <summary>
-        /// The createType of a vmdk on the datastore, read from its first bytes, or null if it
-        /// can't be read.
-        /// </summary>
-        public async Task<string> GetDiskCreateType(string datastorePath)
-        {
-            try
-            {
-                await Connect();
-
-                string url = BuildDatastoreFileUrl(new DatastorePath(datastorePath));
-
-                using var response = await CreateAuthenticatedHttpClient()
-                    .GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    // the datastore answers 404 both for a missing file and for one the account can't read
-                    _logger.LogWarning("Could not read disk {path} ({status}); it may be missing or not readable by this account", datastorePath, response.StatusCode);
-                    return null;
-                }
-
-                // read only the header; a flat or sparse extent can be many gigabytes
-                using var stream = await response.Content.ReadAsStreamAsync();
-                byte[] buffer = new byte[VmdkFormat.HeaderLength];
-                int read = await stream.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false);
-
-                return VmdkFormat.ReadCreateType(buffer.AsSpan(0, read));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Could not read disk {path}", datastorePath);
-                return null;
-            }
-        }
-
         public async Task<string> UploadFileToDatastore(
             string datastorePath,
             string localFilePath)
@@ -891,25 +855,6 @@ namespace TopoMojo.Hypervisor.vSphere
 
             _logger.LogDebug("Successfully deleted file: {path}", fullPath);
         }
-
-        /// <summary>
-        /// Like BuildDatastoreUploadUrl, but escapes each folder segment so nested folders
-        /// (topomojo/{workspace}/) keep their "/" separators.
-        /// </summary>
-        private string BuildDatastoreFileUrl(DatastorePath dsPath)
-        {
-            string host = new Uri(_config.Url).Authority;
-            string dcPath = Uri.EscapeDataString(GetDatacenterName());
-            string dsName = Uri.EscapeDataString(dsPath.Datastore);
-
-            return $"https://{host}/folder/{DatastoreFileUrlPath(dsPath.Folder, dsPath.File)}?dcPath={dcPath}&dsName={dsName}";
-        }
-
-        internal static string DatastoreFileUrlPath(string folder, string file)
-            => string.Join("/", (folder ?? "")
-                .Split('/', StringSplitOptions.RemoveEmptyEntries)
-                .Append(file)
-                .Select(Uri.EscapeDataString));
 
         private string BuildDatastoreUploadUrl(DatastorePath dsPath)
         {
