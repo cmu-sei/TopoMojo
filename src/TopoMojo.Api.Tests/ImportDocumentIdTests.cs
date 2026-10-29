@@ -150,12 +150,29 @@ public sealed class ImportDocumentIdTests : IDisposable
             Assert.False(File.Exists(Doc(sourceId)));
     }
 
+    // Export only writes {id}.md and {id}/... for the workspaces it exports, so nothing else is written.
     [Fact]
-    public async Task EntriesThatBelongToNoImportedWorkspaceKeepTheirName()
+    public async Task EntriesThatBelongToNoImportedWorkspaceAreNotWritten()
     {
         await Import("tm", Data(Hex), ("README.md", "readme"), ("shared/logo.png", "logo"));
 
-        Assert.True(File.Exists(Path.Combine(DocRoot, "README.md")));
-        Assert.True(File.Exists(Path.Combine(DocRoot, "shared", "logo.png")));
+        Assert.False(File.Exists(Path.Combine(DocRoot, "README.md")));
+        Assert.False(Directory.Exists(Path.Combine(DocRoot, "shared")));
+    }
+
+    // An archive can't overwrite the document of a workspace already here unless it imports that workspace.
+    [Fact]
+    public async Task AnArchiveCantOverwriteAnotherWorkspacesDocuments()
+    {
+        string existing = "tm" + "fedcba9876543210fedcba98765432";
+        await new WorkspaceStore(_db).Create(new Data.Workspace { Id = existing, Name = "existing" });
+        File.WriteAllText(Doc(existing), "# existing");
+        Directory.CreateDirectory(Path.Combine(DocRoot, existing));
+        File.WriteAllText(Image(existing), "existing png");
+
+        await Import("tm", [Data(Hex), .. Documents(Hex), .. Documents(existing)]);
+
+        Assert.Equal("# existing", File.ReadAllText(Doc(existing)));
+        Assert.Equal("existing png", File.ReadAllText(Image(existing)));
     }
 }
