@@ -73,9 +73,12 @@ namespace TopoMojo.Api.Controllers
                 () => workspaceService.CanEdit(id, Actor.Id).Result
             )) return Forbid();
 
-            return Ok(
-                await workspaceService.Load(id)
-            );
+            var workspace = await workspaceService.Load(id);
+
+            workspace.CanDownload = Actor.IsAdmin
+                || await workspaceService.CanDownload([id], Actor.Id);
+
+            return Ok(workspace);
         }
 
         /// <summary>
@@ -326,7 +329,8 @@ namespace TopoMojo.Api.Controllers
         /// Download an export package of workspaces.
         /// </summary>
         /// <remarks>
-        /// Requires manager permission on every requested workspace.
+        /// Requires Core:AllowManagerWorkspaceDownload (off by default) and manager
+        /// permission on every requested workspace. Admins can always download.
         /// The package can be uploaded to another TopoMojo
         /// with the admin import.
         /// </remarks>
@@ -339,7 +343,7 @@ namespace TopoMojo.Api.Controllers
         public async Task<ActionResult> DownloadManagedWorkspaces([FromBody] string[] ids)
         {
             if (!AuthorizeAny(
-                () => workspaceService.CanManageAll(ids, Actor.Id).Result
+                () => workspaceService.CanDownload(ids, Actor.Id).Result
             )) return Forbid();
 
             var stream = await transferService.Download(

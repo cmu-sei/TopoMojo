@@ -50,25 +50,38 @@ public sealed class WorkspaceDownloadPermissionTests : IDisposable
     [Fact]
     public async Task ManagerCanDownloadTheirWorkspace()
     {
-        Assert.True(await NewWorkspaceService().CanManageAll([OwnWorkspaceId], ManagerId));
+        Assert.True(await NewWorkspaceService().CanDownload([OwnWorkspaceId], ManagerId));
+    }
+
+    // The package carries otherwise admin-only template Detail, so this is opt-in per environment.
+    [Fact]
+    public async Task ManagerIsDeniedWhenManagerDownloadIsOff()
+    {
+        Assert.False(await NewWorkspaceService(allowManagerDownload: false).CanDownload([OwnWorkspaceId], ManagerId));
+    }
+
+    [Fact]
+    public void ManagerDownloadIsOffByDefault()
+    {
+        Assert.False(new CoreOptions().AllowManagerWorkspaceDownload);
     }
 
     [Fact]
     public async Task ManagerCanDownloadSeveralManagedWorkspaces()
     {
-        Assert.True(await NewWorkspaceService().CanManageAll([OwnWorkspaceId, OtherOwnWorkspaceId], ManagerId));
+        Assert.True(await NewWorkspaceService().CanDownload([OwnWorkspaceId, OtherOwnWorkspaceId], ManagerId));
     }
 
     [Fact]
     public async Task EditorWhoIsNotManagerIsDenied()
     {
-        Assert.False(await NewWorkspaceService().CanManageAll([OwnWorkspaceId], EditorId));
+        Assert.False(await NewWorkspaceService().CanDownload([OwnWorkspaceId], EditorId));
     }
 
     [Fact]
     public async Task NonMemberIsDenied()
     {
-        Assert.False(await NewWorkspaceService().CanManageAll([OwnWorkspaceId], StrangerId));
+        Assert.False(await NewWorkspaceService().CanDownload([OwnWorkspaceId], StrangerId));
     }
 
     [Theory]
@@ -77,21 +90,21 @@ public sealed class WorkspaceDownloadPermissionTests : IDisposable
     [InlineData(OwnWorkspaceId, "99999999999999999999999999999999")]
     public async Task MixOfManagedAndOtherIdsIsDenied(string first, string second)
     {
-        Assert.False(await NewWorkspaceService().CanManageAll([first, second], ManagerId));
+        Assert.False(await NewWorkspaceService().CanDownload([first, second], ManagerId));
     }
 
     [Fact]
     public async Task EmptyOrNullListIsDenied()
     {
         var svc = NewWorkspaceService();
-        Assert.False(await svc.CanManageAll([], ManagerId));
-        Assert.False(await svc.CanManageAll(null, ManagerId));
+        Assert.False(await svc.CanDownload([], ManagerId));
+        Assert.False(await svc.CanDownload(null, ManagerId));
     }
 
     [Fact]
     public async Task AllKeywordIsDenied()
     {
-        Assert.False(await NewWorkspaceService().CanManageAll(["all"], ManagerId));
+        Assert.False(await NewWorkspaceService().CanDownload(["all"], ManagerId));
     }
 
     [Fact]
@@ -155,7 +168,7 @@ public sealed class WorkspaceDownloadPermissionTests : IDisposable
         );
     }
 
-    private WorkspaceService NewWorkspaceService()
+    private WorkspaceService NewWorkspaceService(bool allowManagerDownload = true)
     {
         return new WorkspaceService(
             new WorkspaceStore(NewContext()),
@@ -163,7 +176,7 @@ public sealed class WorkspaceDownloadPermissionTests : IDisposable
             null,
             NullLogger<WorkspaceService>.Instance,
             null,
-            new CoreOptions()
+            new CoreOptions { AllowManagerWorkspaceDownload = allowManagerDownload }
         );
     }
 

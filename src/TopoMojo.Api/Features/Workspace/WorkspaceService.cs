@@ -357,6 +357,23 @@ namespace TopoMojo.Api.Services
         }
 
         /// <summary>
+        /// Determine if a non-admin subject can download every listed workspace:
+        /// manager download is enabled and the subject manages each one.
+        /// </summary>
+        /// <remarks>
+        /// Off by default (Core:AllowManagerWorkspaceDownload), because the package carries
+        /// the Detail of referenced stock and parent templates, which is otherwise admin-only.
+        /// </remarks>
+        /// <param name="ids"></param>
+        /// <param name="subjectId"></param>
+        /// <returns></returns>
+        public async Task<bool> CanDownload(string[] ids, string subjectId)
+        {
+            return CoreOptions.AllowManagerWorkspaceDownload
+                && await CanManageAll(ids, subjectId);
+        }
+
+        /// <summary>
         /// Generate a new invitation code for a workspace.
         /// </summary>
         /// <param name="id"></param>
