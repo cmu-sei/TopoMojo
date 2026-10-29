@@ -33,11 +33,25 @@ namespace TopoMojo.Api.Models
             if (question.IsCorrect)
                 return;
 
+            question.IsCorrect = question.IsMatch(submission);
+            question.IsGraded = true;
+        }
+
+        /// <summary>
+        /// Single source of truth for answer matching, shared by live grading
+        /// (<see cref="Grade"/>) and penalty re-grading (CountIncorrectAttempts) so the
+        /// two cannot diverge if the matching rules ever change.
+        /// </summary>
+        public static bool IsMatch(this QuestionSpec question, string submission)
+        {
+            if (string.IsNullOrWhiteSpace(submission))
+                return false;
+
             string[] a = question.Answer.ToLower().Replace(" ", "").Split('|');
             string b = submission.ToLower();
             string c = b.Replace(" ", "");
 
-            question.IsCorrect = question.Grader switch
+            return question.Grader switch
             {
                 AnswerGrader.MatchAll => a.Intersect(b.Split(AppConstants.StringTokenSeparators, StringSplitOptions.RemoveEmptyEntries))
                     .ToArray().Length == a.Length,
@@ -45,7 +59,6 @@ namespace TopoMojo.Api.Models
                 AnswerGrader.MatchAlpha => a.First().WithoutSymbols().Equals(c.WithoutSymbols()),
                 _ => a.First().Equals(c),
             };
-            question.IsGraded = true;
         }
 
         public static void SetQuestionWeights(this VariantSpec spec)
@@ -63,7 +76,12 @@ namespace TopoMojo.Api.Models
                 float total = Math.Max(max, 100);
 
                 foreach (var q in questions)
+                {
                     q.Weight /= total;
+                    // Penalty is NOT normalized: it is a 0-1 fraction of the
+                    // question's own mark (deducted per wrong try), independent of
+                    // the challenge-total weight scale, so it must pass through as-is.
+                }
 
                 max = questions.Sum(q => q.Weight);
             }
