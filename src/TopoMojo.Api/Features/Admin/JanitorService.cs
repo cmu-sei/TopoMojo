@@ -205,7 +205,82 @@ namespace TopoMojo.Api.Services
 
             result.AddRange(await CleanupInactiveWorkspaces(opt));
 
+            result.AddRange(await CleanupOrphanedDocuments(opt));
+
             return [.. result];
+        }
+
+        /// <summary>
+        /// Remove workspace documents and image directories left in DocRoot by workspaces that no
+        /// longer exist. Only entries named like a workspace id are considered; anything else in
+        /// DocRoot is left alone.
+        /// </summary>
+        public async Task<JanitorReport[]> CleanupOrphanedDocuments(JanitorOptions options)
+        {
+            string docRoot = _fileUploadOptions.DocRoot;
+
+            // Enumerate before reading workspace ids. A workspace's files are only written after
+            // its row exists, so files for a workspace created mid-sweep are never taken as orphans.
+            DocumentEntry[] entries;
+            try
+            {
+                entries = WorkspaceDocuments.FindEntries(docRoot, _options.Tenant);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to list documents in {path}", docRoot);
+                return [];
+            }
+
+            if (entries.Length == 0)
+                return [];
+
+            var ids = (await _workspaceStore.List().Select(w => w.Id).ToArrayAsync())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var reports = new List<JanitorReport>();
+
+            foreach (var orphan in entries.Where(e => !ids.Contains(e.Id)).GroupBy(e => e.Id))
+            {
+                var removed = new List<DocumentEntry>();
+
+                foreach (var entry in orphan)
+                {
+                    if (options.DryRun)
+                    {
+                        removed.Add(entry);
+                        continue;
+                    }
+
+                    try
+                    {
+                        WorkspaceDocuments.Delete(entry);
+                        removed.Add(entry);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to remove orphaned document {path}", entry.Path);
+                    }
+                }
+
+                if (removed.Count == 0)
+                    continue;
+
+                if (!options.DryRun)
+                    _logger.LogInformation("Removed orphaned documents of workspace {id}", orphan.Key);
+
+                reports.Add(new JanitorReport
+                {
+                    Reason = "OrphanedDocument",
+                    Id = orphan.Key,
+                    Name = string.Join(", ", removed.Select(e => e.Name)),
+                    Age = removed.Max(e => e.LastWriteUtc),
+                    OwnerName = "Unknown",
+                    VmCount = 0
+                });
+            }
+
+            return [.. reports];
         }
 
         public Task CleanupStaleTempFiles()
