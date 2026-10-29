@@ -226,7 +226,7 @@ public class TransferService(
         entryStream.Write(contentBytes, 0, contentBytes.Length);
     }
 
-    private async Task<string[]> ImportSerializedWorkspaces(Stream stream)
+    private async Task<string[]> ImportSerializedWorkspaces(Stream stream, Dictionary<string, string> renamed = null)
     {
         using StreamReader reader = new(stream, Encoding.UTF8);
 
@@ -235,7 +235,7 @@ public class TransferService(
             jsonSerializerSettings
         );
 
-        return [.. (await ImportWorkspaces(data))];
+        return [.. (await ImportWorkspaces(data, renamed ?? []))];
     }
 
     private void UpdateTenant(Workspace ws)
@@ -259,7 +259,8 @@ public class TransferService(
         }
     }
 
-    private async Task<string[]> ImportWorkspaces(IEnumerable<Workspace> data)
+    /// <param name="renamed">Filled with source id -> imported id for each added workspace whose id changed.</param>
+    private async Task<string[]> ImportWorkspaces(IEnumerable<Workspace> data, Dictionary<string, string> renamed)
     {
         List<string> results = [];
         var tids = await templateStore.List().Select(m => m.Id).ToArrayAsync();
@@ -277,6 +278,7 @@ public class TransferService(
             }
 
             // add or remove tenant prefix
+            string sourceId = topo.Id;
             UpdateTenant(topo);
 
             // prevent overwriting
@@ -289,6 +291,9 @@ public class TransferService(
             // add workspace to datacontext
             workspaceStore.DbContext.Workspaces.Add(topo);
             results.Add($"Success: {topo.Name} {topo.Id}");
+
+            if (topo.Id != sourceId)
+                renamed[sourceId] = topo.Id;
         }
 
         await workspaceStore.DbContext.SaveChangesAsync();
@@ -358,26 +363,27 @@ public class TransferService(
         string[] results = [];
         using var zipArchive = new ZipArchive(stream, ZipArchiveMode.Read);
 
+        // Import the workspaces first, so documents of a workspace whose id changed
+        // (a different tenant) are saved under the new id.
+        Dictionary<string, string> renamed = [];
+        var data = zipArchive.GetEntry("_data.json");
+        if (data is not null)
+            results = await ImportSerializedWorkspaces(data.Open(), renamed);
+
         // Iterate through the entries in the ZIP archive
         foreach (var entry in zipArchive.Entries)
         {
-            // skip disks
-            if (entry.FullName.Equals("_disks.txt"))
+            // skip disks and the workspace data imported above
+            if (entry.FullName.Equals("_disks.txt") || entry.FullName.Equals("_data.json"))
                 continue;
-
-            // deserialize workspace data
-            if (entry.FullName.Equals("_data.json"))
-            {
-                results = await ImportSerializedWorkspaces(entry.Open());
-                continue;
-            }
 
             // save all other files to docs
             if (!entry.FullName.EndsWith('/'))
             {
                 // Archives are shared between instances, so entry names are untrusted input. An entry
                 // named "../.." would otherwise be written outside docPath.
-                string dest = PathGuard.ResolveContained(docPath, entry.FullName);
+                var (name, sourceId) = RenamedDocumentEntry(entry.FullName, renamed);
+                string dest = PathGuard.ResolveContained(docPath, name);
 
                 if (dest is null)
                 {
@@ -391,11 +397,41 @@ public class TransferService(
 
                 Directory.CreateDirectory(Path.GetDirectoryName(dest));
                 using FileStream writer = File.Create(dest);
-                await entry.Open().CopyToAsync(writer);
+
+                if (sourceId is not null && name.EndsWith(".md"))
+                {
+                    // image links are {apphost}docs/{id}/{file}
+                    using var reader = new StreamReader(entry.Open(), Encoding.UTF8);
+                    string markdown = (await reader.ReadToEndAsync())
+                        .Replace($"docs/{sourceId}/", $"docs/{renamed[sourceId]}/");
+                    await writer.WriteAsync(Encoding.UTF8.GetBytes(markdown));
+                }
+                else
+                {
+                    await entry.Open().CopyToAsync(writer);
+                }
             }
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// The doc root name for an archive entry: {id}.md or {id}/{file}, moved to the imported
+    /// id when import changed the workspace's id. Returns the source id when it moved.
+    /// </summary>
+    internal static (string Name, string SourceId) RenamedDocumentEntry(string entryName, IReadOnlyDictionary<string, string> renamed)
+    {
+        foreach (var (sourceId, importedId) in renamed)
+        {
+            if (entryName == sourceId + ".md")
+                return (importedId + ".md", sourceId);
+
+            if (entryName.StartsWith(sourceId + "/"))
+                return (importedId + entryName[sourceId.Length..], sourceId);
+        }
+
+        return (entryName, null);
     }
 
 }

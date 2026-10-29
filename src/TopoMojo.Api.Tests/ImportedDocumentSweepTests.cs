@@ -12,8 +12,8 @@ using Xunit;
 namespace TopoMojo.Api.Tests;
 
 /// <summary>
-/// Import rewrites a workspace id to this instance's tenant. Whether the imported document files
-/// land under the source id or the rewritten one, the orphan sweep must not delete them.
+/// Import rewrites a workspace id to this instance's tenant, and its document files follow the
+/// rewritten id. The orphan sweep must not delete imported documents either way.
 /// </summary>
 public sealed class ImportedDocumentSweepTests
 {
@@ -63,15 +63,15 @@ public sealed class ImportedDocumentSweepTests
     );
 
     [Theory]
-    // No tenant into a tenant: the row gets the tenant, the files keep the all-hex source id.
+    // No tenant into a tenant: the row and its files get the tenant.
     [InlineData(Hex, "tm")]
-    // Another tenant into ours: the files keep the other tenant's prefix.
+    // Another tenant into ours: the row and its files get our prefix.
     [InlineData("xy" + "23456789abcdef0123456789abcdef", "tm")]
     // A tenant into an instance with none: the row prefix becomes zeros.
     [InlineData("tm" + "23456789abcdef0123456789abcdef", "")]
     // A hyphenated GUID id from an instance with no tenant, into a tenant.
     [InlineData("11111111-2222-3333-4444-555555555555", "tm")]
-    public async Task SweepLeavesDocumentsImportedUnderAnotherInstancesId(string sourceId, string tenant)
+    public async Task SweepKeepsDocumentsImportedWithAnIdChange(string sourceId, string tenant)
     {
         using var fixture = new DocRootFixture();
 
