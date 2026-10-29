@@ -2,7 +2,12 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
+using TopoMojo.Api.Data;
 using TopoMojo.Api.Services;
 using TopoMojo.Hypervisor;
 using Xunit;
@@ -160,4 +165,70 @@ public class TemplateSharedDiskTests
 
     private static VmTemplate TemplateOf(string detail) => new TemplateUtility(detail).AsTemplate();
 
+}
+
+/// <summary>
+/// Delete itself: the hypervisor must never be asked to delete a disk another template still uses.
+/// </summary>
+public sealed class TemplateDeleteSharedDiskTests
+{
+    private const string WorkspaceId = "5cd41cbe3f7b4bd0a1f6f4d1e2a3b4c5";
+
+    private static string Detail(string diskPath) => $$"""
+    { "name": "win10", "eth": [ { "net": "lan", "type": "e1000" } ], "disks": [ { "path": "{{diskPath}}", "size": 40 } ] }
+    """;
+
+    private static async Task<List<VmTemplate>> DeleteTemplate(string deletedPath, string otherPath)
+    {
+        using var fixture = new DocRootFixture();
+        await fixture.AddWorkspace(WorkspaceId);
+        fixture.Db.Templates.AddRange(
+            new Data.Template { Id = "source", Name = "source", WorkspaceId = WorkspaceId, Detail = Detail(otherPath) },
+            new Data.Template { Id = "clone", Name = "clone", WorkspaceId = WorkspaceId, Detail = Detail(deletedPath) }
+        );
+        await fixture.Db.SaveChangesAsync();
+
+        var pod = DispatchProxy.Create<IHypervisorService, RecordingHypervisor>();
+        await new TemplateService(
+            new TemplateStore(fixture.Db),
+            pod,
+            NullLogger<TemplateService>.Instance,
+            DocRootFixture.Mapper,
+            new CoreOptions()
+        ).Delete("clone");
+
+        return ((RecordingHypervisor)(object)pod).DeletedDisks;
+    }
+
+    // a clone made before Clone localized disk paths still points at its source's disk
+    [Fact]
+    public async Task DeletingAnOldCloneLeavesTheSourcesDisk()
+    {
+        string path = $"[ds] {WorkspaceId}/source_0.vmdk";
+
+        var deleted = await DeleteTemplate(path, path);
+
+        Assert.Empty(Assert.Single(deleted).Disks);
+    }
+
+    [Fact]
+    public async Task DeletingATemplateWithItsOwnDiskDeletesIt()
+    {
+        var deleted = await DeleteTemplate($"[ds] {WorkspaceId}/clone_0.vmdk", $"[ds] {WorkspaceId}/source_0.vmdk");
+
+        Assert.Equal($"[ds] {WorkspaceId}/clone_0.vmdk", Assert.Single(Assert.Single(deleted).Disks).Path);
+    }
+
+    public class RecordingHypervisor : NullHypervisor
+    {
+        public List<VmTemplate> DeletedDisks { get; } = [];
+
+        protected override object Invoke(MethodInfo targetMethod, object[] args)
+        {
+            if (targetMethod.Name == nameof(IHypervisorService.DeleteDisks))
+                DeletedDisks.Add((VmTemplate)args[0]);
+
+            return base.Invoke(targetMethod, args);
+        }
+    }
 }
