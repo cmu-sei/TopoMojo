@@ -8,7 +8,7 @@ namespace TopoMojo.Hypervisor.Tests;
 public sealed class ProxmoxCreateTemplateTests
 {
     [Fact]
-    public void HasVmNamed_FindsACloneStillInProgress()
+    public void TemplateExists_FindsACloneStillInProgress()
     {
         // Until the clone finishes it isn't a template, which is why the vm cache leaves it out.
         var resources = new[]
@@ -17,11 +17,11 @@ public sealed class ProxmoxCreateTemplateTests
             new ClusterResource { VmId = 101, Name = "3f2c0b8e-clone", IsTemplate = false }
         };
 
-        Assert.True(ProxmoxClient.HasVmNamed(resources, "3f2c0b8e-clone"));
+        Assert.True(ProxmoxClient.TemplateExists([], resources, "3f2c0b8e-clone"));
     }
 
     [Fact]
-    public void HasVmNamed_IgnoresOtherAndUnnamedVms()
+    public void TemplateExists_IgnoresOtherAndUnnamedVms()
     {
         var resources = new[]
         {
@@ -29,7 +29,17 @@ public sealed class ProxmoxCreateTemplateTests
             new ClusterResource { VmId = 101, Name = null }
         };
 
-        Assert.False(ProxmoxClient.HasVmNamed(resources, "3f2c0b8e-clone"));
+        Assert.False(ProxmoxClient.TemplateExists([], resources, "3f2c0b8e-clone"));
+    }
+
+    [Fact]
+    public void TemplateExists_FindsACloneThatJustFinished()
+    {
+        // Proxmox lists a new vm several seconds after the clone task ends; the cache already has it.
+        var cached = new[] { new Vm { Id = "101", Name = "3f2c0b8e-clone" } };
+        var resources = new[] { new ClusterResource { VmId = 100, Name = "other" } };
+
+        Assert.True(ProxmoxClient.TemplateExists(cached, resources, "3f2c0b8e-clone"));
     }
 
     [Fact]

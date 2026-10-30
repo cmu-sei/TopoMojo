@@ -151,11 +151,11 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         private async Task<Vm> CloneTemplate(VmTemplate template, string name)
         {
-            // Ask Proxmox rather than the cache: a clone in progress isn't a template yet,
-            // so the cache leaves it out and a reload would otherwise allow a second copy.
+            // The cache alone misses a clone in progress, which isn't a template yet. Proxmox alone
+            // misses one that just finished, because its resource list trails by several seconds.
             var resources = await _pveClient.GetResourcesAsync(ClusterResourceType.Vm);
 
-            if (HasVmNamed(resources, name))
+            if (TemplateExists(_vmCache.Values, resources, name))
             {
                 throw new InvalidOperationException($"Template '{template.Template}' already exists");
             }
@@ -207,10 +207,12 @@ namespace TopoMojo.Hypervisor.Proxmox
         }
 
         /// <summary>
-        /// True when Proxmox has any vm with this name, template or not, including one still being cloned.
+        /// True when a vm with this name is cached, or Proxmox reports one, template or not, including
+        /// one still being cloned.
         /// </summary>
-        internal static bool HasVmNamed(IEnumerable<IClusterResourceVm> resources, string pveName)
-            => resources.Any(x => x is not null && x.Name == pveName);
+        internal static bool TemplateExists(IEnumerable<Vm> cached, IEnumerable<IClusterResourceVm> resources, string pveName)
+            => cached.Any(x => x is not null && x.Name == pveName)
+            || resources.Any(x => x is not null && x.Name == pveName);
 
         /// <summary>
         /// WaitForTaskToFinish throws when a task fails, but only returns false when it times out.
