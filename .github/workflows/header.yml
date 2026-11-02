@@ -16,3 +16,4 @@ jobs:
         uses: cmu-sei/Crucible-Github-Actions/actions/header@header-v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          license: bsd-3-clause  # TopoMojo is BSD 3-clause licensed (LICENSE.md)
