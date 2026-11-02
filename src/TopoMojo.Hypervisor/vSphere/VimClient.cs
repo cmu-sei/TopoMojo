@@ -90,6 +90,8 @@ namespace TopoMojo.Hypervisor.vSphere
                 TaskInfo info = await WaitForVimTask(task);
                 if (info.state == TaskInfoState.success || (info.error?.localizedMessage.Contains("powered on", StringComparison.CurrentCultureIgnoreCase) ?? false))
                     vm.State = VmPowerState.Running;
+                else if (VmdkFormat.IsUnsupportedDiskError(info.error?.localizedMessage))
+                    throw VmdkFormat.UnsupportedDiskError(info.error.localizedMessage);
                 else
                     throw new Exception(info.error.localizedMessage);
 
