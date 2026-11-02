@@ -1,25 +1,25 @@
-name: CI
+name: Build and Publish Image
 
 on:
+  pull_request:
+  push:
+    branches: [main]
   release:
-    types: ["published"]
+    types: [published]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-and-publish:
-    name: Build & Publish
+    name: Build and Publish
     uses: cmu-sei/Crucible-Github-Actions/.github/workflows/docker-build.yaml@docker-v1
     with:
       imageName: cmusei/topomojo-api
-      tagName: ${{ github.event.release.tag_name }}
       versionMode: csproj
-      versionFiles: |-
-        src/TopoMojo.Api/TopoMojo.Api.csproj
+      versionFiles: src/TopoMojo.Api/TopoMojo.Api.csproj
       buildArgs: |
         commit=${{ github.sha }}
-
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
