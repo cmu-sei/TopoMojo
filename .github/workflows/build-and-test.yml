@@ -17,6 +17,7 @@ jobs:
       contents: read
     with:
       test-project: src/TopoMojo.Api.Tests
+      build-project: src/TopoMojo.Api.Tests  # the solution's TopoMojo.Agent needs generated client code
       expect-postgres: false   # unit tests; no database
       dotnet-version: "10.0.x" # repo has no global.json
 
@@ -26,5 +27,6 @@ jobs:
       contents: read
     with:
       test-project: src/TopoMojo.Hypervisor.Tests
+      build-project: src/TopoMojo.Hypervisor.Tests  # the solution's TopoMojo.Agent needs generated client code
       expect-postgres: false   # unit tests; no database
       dotnet-version: "10.0.x" # repo has no global.json
