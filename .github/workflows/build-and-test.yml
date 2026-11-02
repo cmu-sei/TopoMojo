@@ -12,7 +12,7 @@ permissions: {}
 
 jobs:
   build-and-test:
-    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/dotnet-test.yaml@dotnet-test-v1
+    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/dotnet-test.yaml@dotnet-test-build-project
     permissions:
       contents: read
     with:
@@ -22,7 +22,7 @@ jobs:
       dotnet-version: "10.0.x" # repo has no global.json
 
   hypervisor-tests:
-    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/dotnet-test.yaml@dotnet-test-v1
+    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/dotnet-test.yaml@dotnet-test-build-project
     permissions:
       contents: read
     with:
