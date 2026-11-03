@@ -226,7 +226,7 @@ public class TransferService(
         entryStream.Write(contentBytes, 0, contentBytes.Length);
     }
 
-    private async Task<string[]> ImportSerializedWorkspaces(Stream stream)
+    private async Task<string[]> ImportSerializedWorkspaces(Stream stream, Dictionary<string, string> imported = null)
     {
         using StreamReader reader = new(stream, Encoding.UTF8);
 
@@ -235,7 +235,7 @@ public class TransferService(
             jsonSerializerSettings
         );
 
-        return [.. (await ImportWorkspaces(data))];
+        return [.. (await ImportWorkspaces(data, imported))];
     }
 
     private void UpdateTenant(Workspace ws)
@@ -259,7 +259,8 @@ public class TransferService(
         }
     }
 
-    private async Task<string[]> ImportWorkspaces(IEnumerable<Workspace> data)
+    /// <param name="imported">Filled with source id -> imported id for each workspace added, renamed or not.</param>
+    private async Task<string[]> ImportWorkspaces(IEnumerable<Workspace> data, Dictionary<string, string> imported = null)
     {
         List<string> results = [];
         var tids = await templateStore.List().Select(m => m.Id).ToArrayAsync();
@@ -277,6 +278,7 @@ public class TransferService(
             }
 
             // add or remove tenant prefix
+            string sourceId = topo.Id;
             UpdateTenant(topo);
 
             // prevent overwriting
@@ -289,6 +291,7 @@ public class TransferService(
             // add workspace to datacontext
             workspaceStore.DbContext.Workspaces.Add(topo);
             results.Add($"Success: {topo.Name} {topo.Id}");
+            imported?.Add(sourceId, topo.Id);
         }
 
         await workspaceStore.DbContext.SaveChangesAsync();
@@ -358,44 +361,54 @@ public class TransferService(
         string[] results = [];
         using var zipArchive = new ZipArchive(stream, ZipArchiveMode.Read);
 
-        // Iterate through the entries in the ZIP archive
+        // Import the workspaces first, so document entries can follow any workspace id that
+        // import rewrote to this instance's tenant, whatever order the archive lists them in.
+        Dictionary<string, string> imported = new(StringComparer.Ordinal);
+        var data = zipArchive.GetEntry("_data.json");
+        if (data is not null)
+            results = await ImportSerializedWorkspaces(data.Open(), imported);
+
+        // Write only the {id}.md and {id}/... entries of workspaces this import added, under the id
+        // each was imported as. Anything else (a duplicate's documents, another workspace's, _data.json,
+        // _disks.txt) is skipped, so an archive can't overwrite documents already on this instance.
         foreach (var entry in zipArchive.Entries)
         {
-            // skip disks
-            if (entry.FullName.Equals("_disks.txt"))
+            string id = DocumentEntryId(entry.FullName);
+            if (id is null || !imported.TryGetValue(id, out string newId) || entry.FullName.EndsWith('/'))
                 continue;
 
-            // deserialize workspace data
-            if (entry.FullName.Equals("_data.json"))
+            // Archives are shared between instances, so entry names are untrusted input. An entry
+            // named "../.." would otherwise be written outside docPath.
+            string dest = PathGuard.ResolveContained(docPath, newId + entry.FullName[id.Length..]);
+
+            if (dest is null)
             {
-                results = await ImportSerializedWorkspaces(entry.Open());
+                Logger.LogWarning(
+                    "Skipped import of zip entry {entryName}: resolves outside {docPath}",
+                    entry.FullName,
+                    docPath
+                );
                 continue;
             }
 
-            // save all other files to docs
-            if (!entry.FullName.EndsWith('/'))
-            {
-                // Archives are shared between instances, so entry names are untrusted input. An entry
-                // named "../.." would otherwise be written outside docPath.
-                string dest = PathGuard.ResolveContained(docPath, entry.FullName);
-
-                if (dest is null)
-                {
-                    Logger.LogWarning(
-                        "Skipped import of zip entry {entryName}: resolves outside {docPath}",
-                        entry.FullName,
-                        docPath
-                    );
-                    continue;
-                }
-
-                Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                using FileStream writer = File.Create(dest);
-                await entry.Open().CopyToAsync(writer);
-            }
+            Directory.CreateDirectory(Path.GetDirectoryName(dest));
+            using FileStream writer = File.Create(dest);
+            await entry.Open().CopyToAsync(writer);
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// The workspace id an {id}.md or {id}/... archive entry belongs to, or null for other entries.
+    /// </summary>
+    private static string DocumentEntryId(string name)
+    {
+        int slash = name.IndexOfAny(['/', '\\']);
+
+        return slash >= 0
+            ? name[..slash]
+            : name.EndsWith(".md", StringComparison.Ordinal) ? name[..^3] : null;
     }
 
 }
