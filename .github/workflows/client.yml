@@ -4,50 +4,38 @@ on:
   workflow_dispatch:
     inputs:
       clientVersion:
-        description: 'Version of the Client package'
+        description: "Version of the Client package"
         required: true
 
+permissions: {}
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  # Builds and packs only (auth-mode: trusted). nuget.org rejects a trusted-
+  # publishing token issued to a reusable workflow in another repository, so
+  # the push happens in the publish job below, which this file defines.
+  pack:
+    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/nuget-release.yaml@nuget-v1
+    permissions:
+      contents: read
+    with:
+      version: ${{ inputs.clientVersion }}
+      project: src/TopoMojo.Api.Client/TopoMojo.Api.Client.csproj
+      openapi-project: src/TopoMojo.Api
+      openapi-output: openapi.json     # nswag.json reads openapi.json
+      dotnet-version: "10.0.x"         # repo has no global.json
+      description: NSwag generated client for Crucible's TopoMojo.Api
+      auth-mode: trusted
 
+  publish:
+    needs: pack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write          # tag + GitHub release with the .nupkg
+      id-token: write          # NuGet trusted publishing (OIDC -> short-lived push key)
     steps:
-      - name: Setup dotnet
-        uses: actions/setup-dotnet@v2
+      - uses: cmu-sei/Crucible-Github-Actions/actions/nuget-publish@nuget-v1
         with:
-          dotnet-version: '8.0.x'
-
-      - name: Setup Package Name
-        id: package_name
-        run: |
-          echo ::set-output name=client_name::TopoMojo.Api.Client
-          echo ::set-output name=api_name::TopoMojo.Api
-          echo ::set-output name=source_path::src
-
-      - uses: actions/checkout@v2
-
-      - name: Build Package
-        run: |
-          cd ${{ steps.package_name.outputs.source_path }}/${{ steps.package_name.outputs.api_name }}
-          dotnet tool restore
-          dotnet build -c Release /p:version=${{ github.event.inputs.clientVersion }}
-
-      - name: Run Swagger
-        run: |
-          cd ${{ steps.package_name.outputs.source_path }}/${{ steps.package_name.outputs.api_name }}
-          dotnet swagger tofile --output ../${{ steps.package_name.outputs.client_name }}/openapi.json bin/Release/*/${{ steps.package_name.outputs.api_name }}.dll v1
-
-      - name: Run NSwag
-        run: |
-          cd ${{ steps.package_name.outputs.source_path }}/${{ steps.package_name.outputs.client_name }}
-          npm install nswag@14.1.0
-          ./node_modules/.bin/nswag run /runtime:Net80
-
-      - name: Create NuGet Package
-        run: |
-          dotnet pack ${{ steps.package_name.outputs.source_path }}/${{ steps.package_name.outputs.client_name }} -c Release /p:version=${{ github.event.inputs.clientVersion }} --include-source -o ./
-
-      - name: Publish to Nuget.org as Unlisted
-        run: |
-          dotnet nuget push ${{ steps.package_name.outputs.client_name }}.${{ github.event.inputs.clientVersion }}.nupkg -k ${{ secrets.NUGET_APIKEY }} -s https://api.nuget.org/v3/index.json
-          # dotnet nuget delete ${{ steps.package_name.outputs.client_name }} ${{ github.event.inputs.clientVersion }} --non-interactive -k ${{ secrets.NUGET_APIKEY_UNLIST }} -s https://api.nuget.org/v3/index.json
+          package-id: ${{ needs.pack.outputs.package-id }}
+          version: ${{ needs.pack.outputs.version }}
+          nuget-user: ${{ vars.NUGET_USER }}

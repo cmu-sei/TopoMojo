@@ -1,3 +1,5 @@
 *.cs
 *.json
 !nswag.json
+!package.json
+!package-lock.json

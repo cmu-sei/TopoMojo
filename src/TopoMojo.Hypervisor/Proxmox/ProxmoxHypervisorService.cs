@@ -488,8 +488,23 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task DeleteDisks(VmTemplate template)
         {
+            // Like vSphere, which only deletes disks in the template's own workspace folder, only
+            // delete a template vm this template owns. A stock template names a shared template vm
+            // other templates clone from, and a linked or cloned template names its parent's.
+            if (!OwnsTemplateVm(template))
+                return;
+
             await _pveClient.DeleteTemplate(template.Template);
         }
+
+        /// <summary>
+        /// Whether the template's Proxmox template vm is its own copy, which unlinking names by the
+        /// template id (see TemplateUtility.LocalizeDiskPaths).
+        /// </summary>
+        internal static bool OwnsTemplateVm(VmTemplate template)
+            => !string.IsNullOrEmpty(template.Template)
+            && !string.IsNullOrEmpty(template.Id)
+            && string.Equals(template.Template, template.Id, StringComparison.OrdinalIgnoreCase);
 
         public Task<Vm> Answer(string id, VmAnswer answer)
         {

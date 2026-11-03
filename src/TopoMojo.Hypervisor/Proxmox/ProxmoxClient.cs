@@ -76,6 +76,7 @@ namespace TopoMojo.Hypervisor.Proxmox
         private ClusterHaStatusCurrent[] _haStatus = [];
         private DateTimeOffset _haStatusRead;
         private readonly ConcurrentDictionary<string, Vm> _vmCache;
+        private static readonly ConcurrentDictionary<string, byte> _creatingTemplates = new();
         private readonly IProxmoxNameService _nameService;
         private readonly IProxmoxVlanManager _vlanManager;
         private readonly HypervisorServiceConfiguration _config = null;
@@ -132,14 +133,29 @@ namespace TopoMojo.Hypervisor.Proxmox
 
         public async Task<Vm> CreateTemplate(VmTemplate template)
         {
-            // await ReloadVmCache();
+            var name = _nameService.ToPveName(template.Template);
 
-            var vmTemplate = _vmCache
-                .Where(x => x.Value.Name == template.Template)
-                .FirstOrDefault()
-                .Value;
+            // A second Initialize can arrive before the first one's clone shows up anywhere.
+            if (!_creatingTemplates.TryAdd(name, 0))
+                throw new InvalidOperationException($"Template '{template.Template}' is already being created");
 
-            if (vmTemplate != null)
+            try
+            {
+                return await CloneTemplate(template, name);
+            }
+            finally
+            {
+                _creatingTemplates.TryRemove(name, out _);
+            }
+        }
+
+        private async Task<Vm> CloneTemplate(VmTemplate template, string name)
+        {
+            // The cache alone misses a clone in progress, which isn't a template yet. Proxmox alone
+            // misses one that just finished, because its resource list trails by several seconds.
+            var resources = await _pveClient.GetResourcesAsync(ClusterResourceType.Vm);
+
+            if (TemplateExists(_vmCache.Values, resources, name))
             {
                 throw new InvalidOperationException($"Template '{template.Template}' already exists");
             }
@@ -152,7 +168,6 @@ namespace TopoMojo.Hypervisor.Proxmox
 
             var nextId = await GetNextId();
             var pveId = int.Parse(nextId);
-            var name = _nameService.ToPveName(template.Template);
 
             // full clone parent template
             var task = await _pveClient.Nodes[parentTemplate.Host].Qemu[parentTemplate.Id].Clone.CloneVm(
@@ -160,11 +175,11 @@ namespace TopoMojo.Hypervisor.Proxmox
                 full: true,
                 name: name,
                 target: parentTemplate.Host);
-            await _pveClient.WaitForTaskToFinish(task);
+            EnsureFinished(await _pveClient.WaitForTaskToFinish(task), "clone", template.Template);
 
             // convert new vm to template
             task = await _pveClient.Nodes[parentTemplate.Host].Qemu[nextId].Template.Template();
-            await _pveClient.WaitForTaskToFinish(task);
+            EnsureFinished(await _pveClient.WaitForTaskToFinish(task), "convert", template.Template);
 
             if (!string.IsNullOrEmpty(template.IsolationTag))
             {
@@ -173,7 +188,7 @@ namespace TopoMojo.Hypervisor.Proxmox
                         .Qemu[nextId]
                         .Config
                         .UpdateVmAsync(tags: template.IsolationTag);
-                await _pveClient.WaitForTaskToFinish(task);
+                EnsureFinished(await _pveClient.WaitForTaskToFinish(task), "tag", template.Template);
             }
 
             Vm vm = new()
@@ -189,6 +204,23 @@ namespace TopoMojo.Hypervisor.Proxmox
             _vmCache.AddOrUpdate(vm.Id, vm, (k, v) => v = vm);
 
             return vm;
+        }
+
+        /// <summary>
+        /// True when a vm with this name is cached, or Proxmox reports one, template or not, including
+        /// one still being cloned.
+        /// </summary>
+        internal static bool TemplateExists(IEnumerable<Vm> cached, IEnumerable<IClusterResourceVm> resources, string pveName)
+            => cached.Any(x => x is not null && x.Name == pveName)
+            || resources.Any(x => x is not null && x.Name == pveName);
+
+        /// <summary>
+        /// WaitForTaskToFinish throws when a task fails, but only returns false when it times out.
+        /// </summary>
+        internal static void EnsureFinished(bool finished, string step, string templateName)
+        {
+            if (!finished)
+                throw new HypervisorException($"Timed out waiting for the {step} task of template '{templateName}' to finish.");
         }
 
         /// <summary>

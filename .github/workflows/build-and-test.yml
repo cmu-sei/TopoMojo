@@ -1,0 +1,32 @@
+# Builds the API and runs its two unit-test projects with the shared Crucible workflow, one job each;
+# see the .NET Build and Test section of https://github.com/cmu-sei/Crucible-Github-Actions.
+name: Build and Test
+
+# Pull requests validate proposed changes. Pushes to main verify the result after merge.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  build-and-test:
+    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/dotnet-test.yaml@dotnet-test-v1
+    permissions:
+      contents: read
+    with:
+      test-project: src/TopoMojo.Api.Tests
+      build-project: src/TopoMojo.Api.Tests  # the solution's TopoMojo.Agent needs generated client code
+      expect-postgres: false   # unit tests; no database
+      dotnet-version: "10.0.x" # repo has no global.json
+
+  hypervisor-tests:
+    uses: cmu-sei/Crucible-Github-Actions/.github/workflows/dotnet-test.yaml@dotnet-test-v1
+    permissions:
+      contents: read
+    with:
+      test-project: src/TopoMojo.Hypervisor.Tests
+      build-project: src/TopoMojo.Hypervisor.Tests  # the solution's TopoMojo.Agent needs generated client code
+      expect-postgres: false   # unit tests; no database
+      dotnet-version: "10.0.x" # repo has no global.json
