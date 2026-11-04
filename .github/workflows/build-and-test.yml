@@ -19,7 +19,7 @@ jobs:
       test-project: src/TopoMojo.Api.Tests
       build-project: src/TopoMojo.Api.Tests  # the solution's TopoMojo.Agent needs generated client code
       expect-postgres: false   # unit tests; no database
-      dotnet-version: "10.0.x" # repo has no global.json
+      dotnet-version: "10.0.x" # global.json sets only the test runner, not the SDK
 
   hypervisor-tests:
     uses: cmu-sei/Crucible-Github-Actions/.github/workflows/dotnet-test.yaml@dotnet-test-v1
@@ -29,4 +29,4 @@ jobs:
       test-project: src/TopoMojo.Hypervisor.Tests
       build-project: src/TopoMojo.Hypervisor.Tests  # the solution's TopoMojo.Agent needs generated client code
       expect-postgres: false   # unit tests; no database
-      dotnet-version: "10.0.x" # repo has no global.json
+      dotnet-version: "10.0.x" # global.json sets only the test runner, not the SDK

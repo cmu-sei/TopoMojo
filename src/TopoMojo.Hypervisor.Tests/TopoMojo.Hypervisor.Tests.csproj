@@ -6,11 +6,14 @@
     <!-- xunit v3 test projects are executables and supply their own entry point. -->
     <OutputType>Exe</OutputType>
     <GenerateProgramFile>false</GenerateProgramFile>
+    <!--
+      Microsoft.Testing.Platform (global.json test.runner): the test project runs as its own test app, under
+      `dotnet test` and `dotnet run` alike. xunit.v3 4 and later only run this way on the .NET 10 SDK.
+    -->
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="xunit.v3" Version="3.2.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="xunit.v3" Version="4.0.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TopoMojo.Hypervisor\TopoMojo.Hypervisor.csproj" />
