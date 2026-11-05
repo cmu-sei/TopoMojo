@@ -8,6 +8,11 @@ namespace TopoMojo.Api.Controllers;
 public class TemplateSourceReport
 {
     /// <summary>
+    /// False when Core:EnableTemplateSources is off; the hypervisor isn't asked and Sources is empty.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
     /// Template Detail field the names go in: "disks" (vSphere disk paths) or "template" (Proxmox template vms).
     /// </summary>
     public string Field { get; set; }

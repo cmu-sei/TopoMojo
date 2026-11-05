@@ -30,7 +30,8 @@ public class AdminController(
     IWebHostEnvironment env,
     IHypervisorService podService,
     ITemplateStore templateStore,
-    IWorkspaceStore workspaceStore
+    IWorkspaceStore workspaceStore,
+    CoreOptions coreOptions
     ) : BaseController(logger, hub)
 {
 
@@ -239,18 +240,40 @@ public class AdminController(
     }
 
     /// <summary>
+    /// Show which optional admin features this installation has turned on.
+    /// </summary>
+    /// <remarks>
+    /// Lets the admin dashboard hide a tab without calling the feature itself.
+    /// </remarks>
+    /// <returns></returns>
+    [HttpGet("api/admin/features")]
+    [SwaggerOperation(OperationId = "GetAdminFeatures")]
+    public ActionResult<AdminFeatures> GetAdminFeatures()
+    {
+        return Ok(new AdminFeatures
+        {
+            TemplateSources = coreOptions.EnableTemplateSources
+        });
+    }
+
+    /// <summary>
     /// List the disks or template vms a template can deploy from.
     /// </summary>
     /// <remarks>
     /// Field names the template Detail field the names go in: "disks" (vSphere disk paths,
     /// "[ds] folder/disk.vmdk") or "template" (Proxmox template vm names).
     /// Each source is labeled global or with the workspace (and template) it belongs to.
+    /// When Core:EnableTemplateSources is off, returns Enabled false with no sources
+    /// and doesn't query the hypervisor.
     /// </remarks>
     /// <returns></returns>
     [HttpGet("api/admin/template-sources")]
     [SwaggerOperation(OperationId = "GetTemplateSources")]
     public async Task<ActionResult<TemplateSourceReport>> GetTemplateSources()
     {
+        if (!coreOptions.EnableTemplateSources)
+            return Ok(new TemplateSourceReport { Enabled = false });
+
         var options = await podService.GetTemplateSourceOptions();
         var sources = options.Sources ?? [];
 
