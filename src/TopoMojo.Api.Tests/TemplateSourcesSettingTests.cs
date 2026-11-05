@@ -1,6 +1,7 @@
 // Copyright 2026 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,13 +18,18 @@ public sealed class TemplateSourcesSettingTests
 {
     // Only the options matter here. The hypervisor and the stores are null, so the test
     // fails with a NullReferenceException if the disabled path ever reaches them.
-    private static AdminController Controller(CoreOptions options) => new(
-        NullLogger<AdminController>.Instance,
-        null, null, null, null, null, null, null,
-        podService: null,
-        templateStore: null,
-        workspaceStore: null,
-        coreOptions: options);
+    // Filled by parameter type rather than position: other open PRs add constructor
+    // dependencies, and this test shouldn't break whichever merges first. Anything not
+    // given is null.
+    private static AdminController Controller(CoreOptions options)
+    {
+        object[] given = [NullLogger<AdminController>.Instance, options];
+        var ctor = typeof(AdminController).GetConstructors().Single();
+        var args = ctor.GetParameters()
+            .Select(p => given.FirstOrDefault(p.ParameterType.IsInstanceOfType))
+            .ToArray();
+        return (AdminController)ctor.Invoke(args);
+    }
 
     [Fact]
     public void TemplateSourcesAreOffByDefault()
