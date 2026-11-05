@@ -168,16 +168,22 @@ public sealed class WorkspaceDownloadPermissionTests : IDisposable
         );
     }
 
+    // Filled by parameter type rather than position: other open PRs add constructor
+    // dependencies, and this test shouldn't break whichever merges first. Anything not
+    // given is null.
     private WorkspaceService NewWorkspaceService(bool allowManagerDownload = true)
     {
-        return new WorkspaceService(
+        object[] given =
+        [
             new WorkspaceStore(NewContext()),
-            null,
-            null,
             NullLogger<WorkspaceService>.Instance,
-            null,
             new CoreOptions { AllowManagerWorkspaceDownload = allowManagerDownload }
-        );
+        ];
+        var ctor = typeof(WorkspaceService).GetConstructors().Single();
+        var args = ctor.GetParameters()
+            .Select(p => given.FirstOrDefault(p.ParameterType.IsInstanceOfType))
+            .ToArray();
+        return (WorkspaceService)ctor.Invoke(args);
     }
 
     private async Task<Package> Download(string[] ids, string managerId)
