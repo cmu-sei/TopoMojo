@@ -51,6 +51,10 @@ namespace TopoMojo.Api.Validators
                         await Validate(key, search);
                         break;
 
+                    case WorkspaceCapacityRequest model:
+                        Validate(key, model);
+                        break;
+
                     default:
                         logger.LogWarning("No validation found for {key} {value}", key, value.GetType().Name);
                         break;
@@ -88,6 +92,14 @@ namespace TopoMojo.Api.Validators
             await Exists(key, model.Id);
             if (model.Name.IsEmpty())
                 Problems.Add(new Problem(key, "Missing value for required property 'name'"));
+        }
+
+        private void Validate(string key, WorkspaceCapacityRequest model)
+        {
+            if (model.Count < 1 || model.Count > WorkspaceCapacityRequest.MaxCount)
+                Problems.Add(new Problem(key, $"count must be between 1 and {WorkspaceCapacityRequest.MaxCount}"));
+            if (model.Players < 1)
+                Problems.Add(new Problem(key, "players must be at least 1"));
         }
 
         private static async Task Validate(string key, ChallengeSpec model)

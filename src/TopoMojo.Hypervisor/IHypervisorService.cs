@@ -36,6 +36,11 @@ namespace TopoMojo.Hypervisor
         Task<VmOptions> GetVmNetOptions(string key);
         string Version { get; }
         Task ReloadHost(string host);
+        /// <summary>
+        /// Reads current memory and cpu figures for the compute this hypervisor deploys to.
+        /// Each call queries the hypervisor; callers cache.
+        /// </summary>
+        Task<HypervisorCapacity> GetCapacity();
         HypervisorServiceConfiguration Options { get; }
         /// <summary>
         /// Characters that separate one Guest Setting from the next in a template's Guest Settings

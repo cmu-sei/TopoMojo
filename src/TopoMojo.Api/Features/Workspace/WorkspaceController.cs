@@ -247,6 +247,33 @@ namespace TopoMojo.Api.Controllers
         }
 
         /// <summary>
+        /// Estimate how many more gamespaces of this workspace the hypervisor has room for.
+        /// </summary>
+        /// <remarks>
+        /// Advisory only: nothing is reserved, and other workloads on the same hypervisor
+        /// can take the capacity between this check and a launch. Memory decides the fit,
+        /// after Core:CapacityHeadroomPercent is held back on each host.
+        /// ?count= is the number of gamespaces to launch; ?players= sizes templates whose
+        /// replicas follow the player count. Per-host figures are returned to admins only.
+        /// </remarks>
+        /// <param name="id">Workspace Id</param>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        [HttpGet("api/workspace/{id}/capacity")]
+        [SwaggerOperation(OperationId = "GetWorkspaceCapacity")]
+        [Authorize]
+        public async Task<ActionResult<WorkspaceCapacity>> GetWorkspaceCapacity(string id, [FromQuery] WorkspaceCapacityRequest request)
+        {
+            if (!AuthorizeAny(
+                () => workspaceService.CanEdit(id, Actor.Id).Result
+            )) return Forbid();
+
+            return Ok(
+                await workspaceService.GetCapacity(id, request, Actor.IsAdmin)
+            );
+        }
+
+        /// <summary>
         /// Load templates availabe to workspace.
         /// </summary>
         /// <param name="id">Workspace Id</param>

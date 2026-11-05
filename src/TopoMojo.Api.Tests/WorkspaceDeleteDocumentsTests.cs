@@ -3,6 +3,7 @@
 
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using TopoMojo.Api.Services;
 using Xunit;
@@ -15,6 +16,7 @@ public sealed class WorkspaceDeleteDocumentsTests
         fixture.Store,
         null,
         NullHypervisor.Create(),
+        new MemoryCache(new MemoryCacheOptions()),
         NullLogger<WorkspaceService>.Instance,
         DocRootFixture.Mapper,
         new CoreOptions { DocPath = fixture.Root }

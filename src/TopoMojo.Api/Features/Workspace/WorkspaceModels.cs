@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using TopoMojo.Api.Extensions;
+using TopoMojo.Hypervisor;
 
 namespace TopoMojo.Api.Models
 {
@@ -117,5 +118,60 @@ namespace TopoMojo.Api.Models
         public int ActiveGamespaceCount { get; set; }
         public int LaunchCount { get; set; }
         public DateTimeOffset LastActivity { get; set; }
+    }
+
+    public class WorkspaceCapacityRequest
+    {
+        public const int MaxCount = 1000;
+
+        /// <summary>
+        /// Number of gamespaces the facilitator intends to launch.
+        /// </summary>
+        public int Count { get; set; } = 1;
+
+        /// <summary>
+        /// Players per gamespace. Only matters for templates whose replicas follow the
+        /// player count.
+        /// </summary>
+        public int Players { get; set; } = 1;
+    }
+
+    public class WorkspaceCapacity
+    {
+        public string WorkspaceId { get; set; }
+        public string Provider { get; set; }
+        public DateTimeOffset AsOf { get; set; }
+        public int Requested { get; set; }
+
+        /// <summary>
+        /// Additional gamespaces that fit in free memory after headroom. Null when the
+        /// workspace has no templates, so nothing limits it.
+        /// </summary>
+        public int? Fits { get; set; }
+        public bool Sufficient { get; set; }
+
+        /// <summary>
+        /// "memory" when host memory limits the fit, "pool" when the resource pool limit
+        /// does. Null when nothing limits it.
+        /// </summary>
+        public string LimitedBy { get; set; }
+        public int HeadroomPercent { get; set; }
+        public WorkspaceDemand PerInstance { get; set; }
+        public long MemoryFreeMb { get; set; }
+        public long MemoryTotalMb { get; set; }
+        public int CpuCores { get; set; }
+        public double CpuUsagePercent { get; set; }
+
+        /// <summary>
+        /// Per-host figures. Admins only; empty for everyone else.
+        /// </summary>
+        public HypervisorCapacityNode[] Nodes { get; set; } = [];
+    }
+
+    public class WorkspaceDemand
+    {
+        public int VmCount { get; set; }
+        public long MemoryMb { get; set; }
+        public int Vcpu { get; set; }
     }
 }
