@@ -33,6 +33,11 @@ namespace TopoMojo.Hypervisor
         // Task<TemplateOptions> GetTemplateOptions(string key);
         Task<VmOptions> GetVmIsoOptions(string key);
         Task<VmOptions> GetAllIsoOptions();
+        /// <summary>
+        /// What a template's Detail can name as its source: disk paths ("[ds] folder/disk.vmdk")
+        /// on hypervisors that deploy from disk files, template vm names on those that clone a template vm.
+        /// </summary>
+        Task<TemplateSourceOptions> GetTemplateSourceOptions();
         Task<VmOptions> GetVmNetOptions(string key);
         string Version { get; }
         Task ReloadHost(string host);
