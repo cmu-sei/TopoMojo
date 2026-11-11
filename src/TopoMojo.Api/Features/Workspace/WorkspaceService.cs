@@ -505,6 +505,33 @@ namespace TopoMojo.Api.Services
         }
 
         /// <summary>
+        /// Current hypervisor figures with the hosts and stores over the warning or
+        /// critical level.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<HypervisorCapacityReport> GetHypervisorCapacityReport()
+        {
+            var capacity = await GetHypervisorCapacity();
+
+            var (warn, critical) = CapacityCalculator.Thresholds(
+                CoreOptions.CapacityWarnPercent,
+                CoreOptions.CapacityCriticalPercent
+            );
+
+            return new HypervisorCapacityReport
+            {
+                Provider = capacity.Provider,
+                AsOf = capacity.AsOf,
+                Nodes = capacity.Nodes,
+                Storage = capacity.Storage,
+                PoolMemoryFreeMb = capacity.PoolMemoryFreeMb,
+                WarnPercent = warn,
+                CriticalPercent = critical,
+                Alerts = CapacityCalculator.Alerts(capacity, warn, critical)
+            };
+        }
+
+        /// <summary>
         /// Delete all existing gamespaces of a workspace.
         /// </summary>
         /// <param name="id"></param>

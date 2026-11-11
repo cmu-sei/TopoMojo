@@ -208,6 +208,11 @@ namespace TopoMojo.Api
         // other tenants, and the hypervisor itself
         public int CapacityHeadroomPercent { get; set; } = 20;
         public int CapacityCacheSeconds { get; set; } = 30;
+
+        // memory or storage use, in percent of a host or store, that the admin dashboard
+        // flags as nearly full (warning) and full (critical)
+        public int CapacityWarnPercent { get; set; } = 75;
+        public int CapacityCriticalPercent { get; set; } = 90;
         public bool AllowUnprivilegedVmReconfigure { get; set; }
         public bool AllowPrivilegedNetworkIsolationExemption { get; set; }
         public string DefaultUserScope { get; set; } = "everyone";

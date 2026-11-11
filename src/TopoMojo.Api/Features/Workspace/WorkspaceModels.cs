@@ -168,6 +168,44 @@ namespace TopoMojo.Api.Models
         public HypervisorCapacityNode[] Nodes { get; set; } = [];
     }
 
+    public class CapacityAlert
+    {
+        public const string Warning = "warning";
+        public const string Critical = "critical";
+
+        /// <summary>
+        /// Host name for memory, store name for storage.
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// The host that owns local storage. Null for memory and for shared storage.
+        /// </summary>
+        public string Node { get; set; }
+
+        /// <summary>
+        /// "memory" or "storage".
+        /// </summary>
+        public string Resource { get; set; }
+        public double Percent { get; set; }
+
+        /// <summary>
+        /// "warning" or "critical".
+        /// </summary>
+        public string Level { get; set; }
+    }
+
+    /// <summary>
+    /// The hypervisor snapshot plus the dashboard's warning and critical levels and the
+    /// hosts and stores over them.
+    /// </summary>
+    public class HypervisorCapacityReport : HypervisorCapacity
+    {
+        public int WarnPercent { get; set; }
+        public int CriticalPercent { get; set; }
+        public CapacityAlert[] Alerts { get; set; } = [];
+    }
+
     public class WorkspaceDemand
     {
         public int VmCount { get; set; }

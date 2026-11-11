@@ -38,6 +38,60 @@ namespace TopoMojo.Api.Services
                 .First();
         }
 
+        /// <summary>
+        /// Hosts and stores whose memory or storage use is at or over the warning level.
+        /// Unavailable hosts and stores are left out; the dashboard marks them on its own.
+        /// </summary>
+        public static CapacityAlert[] Alerts(HypervisorCapacity capacity, int warnPercent, int criticalPercent)
+        {
+            (warnPercent, criticalPercent) = Thresholds(warnPercent, criticalPercent);
+
+            var memory = capacity.Nodes
+                .Where(n => n.Available)
+                .Select(n => Alert(n.Name, null, "memory", n.MemoryUsedMb, n.MemoryTotalMb, warnPercent, criticalPercent));
+
+            var storage = capacity.Storage
+                .Where(s => s.Available)
+                .Select(s => Alert(s.Name, s.Node, "storage", s.UsedMb, s.TotalMb, warnPercent, criticalPercent));
+
+            return memory
+                .Concat(storage)
+                .Where(a => a is not null)
+                .OrderByDescending(a => a.Level == CapacityAlert.Critical)
+                .ThenByDescending(a => a.Percent)
+                .ToArray();
+        }
+
+        /// <summary>
+        /// Warning and critical levels kept within 1-100, with critical never below warning.
+        /// </summary>
+        public static (int warn, int critical) Thresholds(int warnPercent, int criticalPercent)
+        {
+            int warn = Math.Clamp(warnPercent, 1, 100);
+            int critical = Math.Clamp(criticalPercent, warn, 100);
+            return (warn, critical);
+        }
+
+        private static CapacityAlert Alert(string name, string node, string resource, long usedMb, long totalMb, int warn, int critical)
+        {
+            if (totalMb <= 0)
+                return null;
+
+            double percent = Math.Round(usedMb * 100.0 / totalMb, 1);
+
+            if (percent < warn)
+                return null;
+
+            return new CapacityAlert
+            {
+                Name = name,
+                Node = node,
+                Resource = resource,
+                Percent = percent,
+                Level = percent >= critical ? CapacityAlert.Critical : CapacityAlert.Warning
+            };
+        }
+
         public static WorkspaceCapacity Fit(
             WorkspaceDemand demand,
             HypervisorCapacity capacity,

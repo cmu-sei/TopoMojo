@@ -120,14 +120,16 @@ public class AdminController(
     /// </summary>
     /// <remarks>
     /// Figures are cached for Core:CapacityCacheSeconds, shared with the workspace
-    /// capacity estimate.
+    /// capacity estimate. Alerts lists the hosts and stores whose memory or storage use
+    /// is at or over Core:CapacityWarnPercent; those at or over Core:CapacityCriticalPercent
+    /// are "critical".
     /// </remarks>
     /// <returns></returns>
     [HttpGet("api/admin/capacity")]
     [SwaggerOperation(OperationId = "GetHypervisorCapacity")]
-    public async Task<ActionResult<HypervisorCapacity>> GetHypervisorCapacity()
+    public async Task<ActionResult<HypervisorCapacityReport>> GetHypervisorCapacity()
     {
-        return Ok(await workspaceService.GetHypervisorCapacity());
+        return Ok(await workspaceService.GetHypervisorCapacityReport());
     }
 
     /// <summary>
