@@ -39,6 +39,92 @@ namespace TopoMojo.Api.Services
         }
 
         /// <summary>
+        /// Memory and vcpus for vms that are about to deploy, one vm per template (replicas
+        /// already expanded). Ram 0 counts as 1 GB, the way it deploys.
+        /// </summary>
+        public static WorkspaceDemand Demand(IEnumerable<VmTemplate> vms)
+        {
+            var demand = new WorkspaceDemand();
+
+            foreach (var vm in vms)
+            {
+                demand.VmCount += 1;
+                demand.MemoryMb += (long)(vm.Ram > 0 ? vm.Ram : 1) * 1024;
+                demand.Vcpu += Vcpu(vm.Cpu);
+            }
+
+            return demand;
+        }
+
+        /// <summary>
+        /// Whether one more deploy of this size fits, after headroom on each host and after
+        /// memory already promised to deploys that the snapshot doesn't show yet.
+        /// </summary>
+        /// <remarks>
+        /// The pool limit and the hosts' total are both reduced by the reserved memory.
+        /// With host affinity the deploy also has to fit whole on one host; reserved memory
+        /// isn't taken off any one host, since which host an in-flight deploy landed on
+        /// isn't known.
+        /// A snapshot with no hosts (the hypervisor reported nothing) never refuses.
+        /// </remarks>
+        public static CapacityCheckResult Check(
+            WorkspaceDemand demand,
+            HypervisorCapacity capacity,
+            long reservedMb,
+            int headroomPercent,
+            bool hostAffinity)
+        {
+            headroomPercent = Math.Clamp(headroomPercent, 0, 90);
+            reservedMb = Math.Max(0, reservedMb);
+
+            var free = capacity.Nodes
+                .Select(n => NodeFreeMb(n, headroomPercent))
+                .ToArray();
+
+            long hostFreeMb = Math.Max(0, free.Sum() - reservedMb);
+            long? poolFreeMb = capacity.PoolMemoryFreeMb.HasValue
+                ? Math.Max(0, capacity.PoolMemoryFreeMb.Value - reservedMb)
+                : null;
+            long largestHostMb = free.DefaultIfEmpty(0).Max();
+
+            var result = new CapacityCheckResult
+            {
+                Fits = true,
+                NeededMb = demand.MemoryMb,
+                FreeMb = poolFreeMb.HasValue ? Math.Min(hostFreeMb, poolFreeMb.Value) : hostFreeMb,
+                ReservedMb = reservedMb,
+                HeadroomPercent = headroomPercent
+            };
+
+            if (demand.MemoryMb <= 0 || capacity.Nodes.Length == 0)
+                return result;
+
+            if (poolFreeMb.HasValue && poolFreeMb.Value < demand.MemoryMb && poolFreeMb.Value <= hostFreeMb)
+            {
+                result.Fits = false;
+                result.LimitedBy = "pool";
+                result.Message = $"Not enough memory left in the resource pool: this deploy needs {Gb(demand.MemoryMb)} GB "
+                    + $"and the pool limit leaves {Gb(poolFreeMb.Value)} GB.";
+            }
+            else if (hostFreeMb < demand.MemoryMb)
+            {
+                result.Fits = false;
+                result.LimitedBy = "memory";
+                result.Message = $"Not enough hypervisor memory: this deploy needs {Gb(demand.MemoryMb)} GB "
+                    + $"and {Gb(hostFreeMb)} GB is free after {headroomPercent}% headroom.";
+            }
+            else if (hostAffinity && largestHostMb < demand.MemoryMb)
+            {
+                result.Fits = false;
+                result.LimitedBy = "host";
+                result.Message = $"No single host has room: host affinity keeps this deploy's {Gb(demand.MemoryMb)} GB "
+                    + $"on one host and the most any host has free is {Gb(largestHostMb)} GB after {headroomPercent}% headroom.";
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Hosts and stores whose memory or storage use is at or over the warning level.
         /// Unavailable hosts and stores are left out; the dashboard marks them on its own.
         /// </summary>
@@ -91,6 +177,8 @@ namespace TopoMojo.Api.Services
                 Level = percent >= critical ? CapacityAlert.Critical : CapacityAlert.Warning
             };
         }
+
+        private static string Gb(long mb) => (mb / 1024.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
 
         public static WorkspaceCapacity Fit(
             WorkspaceDemand demand,

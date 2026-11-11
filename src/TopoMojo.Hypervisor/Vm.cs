@@ -2,6 +2,7 @@
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
 using System;
+using System.Text.Json.Serialization;
 
 namespace TopoMojo.Hypervisor
 {
@@ -22,6 +23,23 @@ namespace TopoMojo.Hypervisor
         public VmTask Task { get; set; }
         public HypervisorType HypervisorType { get; set; } = HypervisorType.Vsphere;
         public bool IsTemplate { get; set; }
+
+        /// <summary>
+        /// Set by the API on a deploy that may not fit in free hypervisor memory. Left out
+        /// of responses otherwise.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string CapacityWarning { get; set; }
+
+        /// <summary>
+        /// A copy carrying a capacity warning, leaving the hypervisor's cached vm alone.
+        /// </summary>
+        public Vm WithCapacityWarning(string warning)
+        {
+            var copy = (Vm)MemberwiseClone();
+            copy.CapacityWarning = warning;
+            return copy;
+        }
     }
 
     public enum VmPowerState { Off, Running, Suspended }

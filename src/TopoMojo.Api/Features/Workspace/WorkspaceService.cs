@@ -27,7 +27,6 @@ namespace TopoMojo.Api.Services
         private readonly IGamespaceStore _gamespaceStore = gamespaceStore;
         private readonly IHypervisorService _pod = podService;
         private readonly IMemoryCache _cache = localCache;
-        private const string CapacityCacheKey = "hypervisor:capacity";
 
         /// <summary>
         /// List workspace summaries.
@@ -495,13 +494,7 @@ namespace TopoMojo.Api.Services
         /// <returns></returns>
         public async Task<HypervisorCapacity> GetHypervisorCapacity()
         {
-            return await _cache.GetOrCreateAsync(CapacityCacheKey, entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(
-                    Math.Max(CoreOptions.CapacityCacheSeconds, 1)
-                );
-                return _pod.GetCapacity();
-            });
+            return await HypervisorCapacityCache.Get(_cache, _pod, CoreOptions);
         }
 
         /// <summary>

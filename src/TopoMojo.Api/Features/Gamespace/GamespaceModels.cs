@@ -55,6 +55,13 @@ namespace TopoMojo.Api.Models
         public ChallengeView Challenge { get; set; }
         public int Variant { get; set; }
 
+        /// <summary>
+        /// Set on the response to a start or register that deployed vms the hypervisor may
+        /// not have room for (Core:CapacityCheck Warn). Left out of the response otherwise.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string CapacityWarning { get; set; }
+
     }
 
     public class GameStateSummary

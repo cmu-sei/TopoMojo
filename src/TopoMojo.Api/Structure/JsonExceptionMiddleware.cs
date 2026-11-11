@@ -23,7 +23,8 @@ namespace TopoMojo.Api
             }
             catch (Exception ex)
             {
-                if (ex is not ResourceNotFound)
+                // CapacityGuard logs its own refusals as warnings
+                if (ex is not ResourceNotFound && ex is not CapacityExceeded)
                 {
                     // admin-only detail goes to the log, never to the response
                     string detail = (ex as HypervisorException)?.Detail;
@@ -72,6 +73,12 @@ namespace TopoMojo.Api
 
                     if (ex is HypervisorException)
                     {
+                        message = ex.Message;
+                    }
+
+                    if (ex is CapacityExceeded)
+                    {
+                        context.Response.StatusCode = 409;
                         message = ex.Message;
                     }
 

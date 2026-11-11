@@ -25,7 +25,8 @@ public class VmController(
     TemplateService templateService,
     UserService userService,
     IHypervisorService podService,
-    CoreOptions options
+    CoreOptions options,
+    CapacityGuard capacityGuard
     ) : BaseController(logger, hub)
 {
 
@@ -353,18 +354,49 @@ public class VmController(
             () => CanManageVm(name, Actor).Result
         )) return Forbid();
 
-        Vm vm = await podService.Deploy(template, Actor.IsBuilder);
+        // Workspace vms are deployed by authors one at a time, so an admin may go past
+        // a Block here (with the warning) to keep building. Gamespace launches have no
+        // such override; see GamespaceService.Deploy.
+        var reservation = CapacityReservation.None;
 
-        if (template.HostAffinity)
+        if (options.CapacityCheck != CapacityCheckMode.Off
+            && !(await podService.Find(name)).Any(v => v.Name == name))
         {
-            await podService.SetAffinity(
-                template.IsolationTag,
-                [vm],
-                true
+            reservation = await capacityGuard.Reserve(
+                $"workspace vm {name}",
+                CapacityCalculator.Demand([template]),
+                hostAffinity: true, // one vm always lands on one host
+                allowOverride: Actor.IsAdmin
             );
-
-            vm.State = VmPowerState.Running;
         }
+
+        Vm vm;
+
+        try
+        {
+            vm = await podService.Deploy(template, Actor.IsBuilder);
+
+            if (template.HostAffinity)
+            {
+                await podService.SetAffinity(
+                    template.IsolationTag,
+                    [vm],
+                    true
+                );
+
+                vm.State = VmPowerState.Running;
+            }
+        }
+        catch
+        {
+            reservation.Release();
+            throw;
+        }
+
+        reservation.Complete();
+
+        if (reservation.Warning is not null)
+            vm = vm.WithCapacityWarning(reservation.Warning);
 
         // SendBroadcast(vm, "deploy");
         VmState state = new()

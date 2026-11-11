@@ -23,7 +23,8 @@ namespace TopoMojo.Api.Services
         IGamespaceStore gamespaceStore,
         IWorkspaceStore workspaceStore,
         ILockService lockService,
-        IDistributedCache distributedCache
+        IDistributedCache distributedCache,
+        CapacityGuard capacityGuard
         ) : BaseService(logger, mapper, options)
     {
         private readonly IHypervisorService _pod = podService;
@@ -32,6 +33,7 @@ namespace TopoMojo.Api.Services
         private readonly ILockService _locker = lockService;
         private readonly Random _random = new();
         private readonly IDistributedCache _distCache = distributedCache;
+        private readonly CapacityGuard _capacity = capacityGuard;
 
         public async Task<Gamespace[]> List(GamespaceSearch search, string subjectId, bool sudo, bool observer, string scope, CancellationToken ct = default)
         {
@@ -121,10 +123,14 @@ namespace TopoMojo.Api.Services
                 }
             }
 
-            if (request.StartGamespace)
-                await Deploy(gamespace, actor.IsBuilder);
+            string capacityWarning = null;
 
-            return await LoadState(gamespace, request.AllowPreview);
+            if (request.StartGamespace)
+                capacityWarning = await Deploy(gamespace, actor.IsBuilder);
+
+            var state = await LoadState(gamespace, request.AllowPreview);
+            state.CapacityWarning = capacityWarning;
+            return state;
         }
 
         public async Task<GameState> Load(string id, string subjectId)
@@ -201,10 +207,14 @@ namespace TopoMojo.Api.Services
         {
             var ctx = await LoadContext(id);
 
-            if (ctx.WorkspaceExists && !ctx.Gamespace.IsExpired)
-                await Deploy(ctx.Gamespace, sudo);
+            string capacityWarning = null;
 
-            return await LoadState(ctx.Gamespace);
+            if (ctx.WorkspaceExists && !ctx.Gamespace.IsExpired)
+                capacityWarning = await Deploy(ctx.Gamespace, sudo);
+
+            var state = await LoadState(ctx.Gamespace);
+            state.CapacityWarning = capacityWarning;
+            return state;
         }
 
         public async Task<GameState> Stop(string id)
@@ -474,7 +484,12 @@ namespace TopoMojo.Api.Services
             return result;
         }
 
-        private async Task Deploy(TopoMojo.Api.Data.Gamespace gamespace, bool sudo = false)
+        /// <summary>
+        /// Deploy a gamespace's vms. Returns the capacity check's warning when the vms may
+        /// not fit and Core:CapacityCheck let the deploy go ahead; null otherwise.
+        /// </summary>
+        /// <exception cref="CapacityExceeded">Core:CapacityCheck is Block and the vms don't fit</exception>
+        private async Task<string> Deploy(TopoMojo.Api.Data.Gamespace gamespace, bool sudo = false)
         {
             var tasks = new List<Task<Vm>>();
 
@@ -527,34 +542,67 @@ namespace TopoMojo.Api.Services
                 }
             }
 
-            await _pod.Deploy(new DeploymentContext(
-                gamespace.Id,
-                gamespace.Workspace.HostAffinity,
-                sudo,
-                templates.Select(t => t
-                        .ToVirtualTemplate(gamespace.Id, _pod.GuestSettingSeparators)
-                        .SetHostAffinity(gamespace.Workspace.HostAffinity)
-                ).ToArray()
-            ), true);
-            // TODO: allow clients to specify `WaitForDeployment` bool #27
+            var vms = templates.Select(t => t
+                    .ToVirtualTemplate(gamespace.Id, _pod.GuestSettingSeparators)
+                    .SetHostAffinity(gamespace.Workspace.HostAffinity)
+            ).ToArray();
 
-            for (int i = 0; i < 18; i++)
+            var reservation = CapacityReservation.None;
+
+            if (CoreOptions.CapacityCheck != CapacityCheckMode.Off)
             {
-                var existing = await _pod.Find(gamespace.Id);
-                if (existing.Length == templates.Count)
+                // a restart or a repeat register redeploys only the vms that are missing
+                var deployed = (await _pod.Find(gamespace.Id))
+                    .Select(vm => vm.Name.Untagged())
+                    .ToHashSet();
+
+                // No admin override on gamespace launches: Gameboard and other clients
+                // launch through here with API keys that often belong to admins, and
+                // Block has to hold for them.
+                reservation = await _capacity.Reserve(
+                    $"gamespace {gamespace.Id}",
+                    CapacityCalculator.Demand(vms.Where(vm => !deployed.Contains(vm.Name))),
+                    gamespace.Workspace.HostAffinity
+                );
+            }
+
+            try
+            {
+                await _pod.Deploy(new DeploymentContext(
+                    gamespace.Id,
+                    gamespace.Workspace.HostAffinity,
+                    sudo,
+                    vms
+                ), true);
+                // TODO: allow clients to specify `WaitForDeployment` bool #27
+
+                for (int i = 0; i < 18; i++)
                 {
-                    if (gamespace.StartTime.Year <= 1)
+                    var existing = await _pod.Find(gamespace.Id);
+                    if (existing.Length == templates.Count)
                     {
-                        gamespace.StartTime = DateTimeOffset.UtcNow;
-                        await _store.Update(gamespace);
+                        if (gamespace.StartTime.Year <= 1)
+                        {
+                            gamespace.StartTime = DateTimeOffset.UtcNow;
+                            await _store.Update(gamespace);
+                        }
+                        break;
                     }
-                    break;
-                }
-                else
-                {
-                    await Task.Delay(5000);
+                    else
+                    {
+                        await Task.Delay(5000);
+                    }
                 }
             }
+            catch
+            {
+                reservation.Release();
+                throw;
+            }
+
+            reservation.Complete();
+
+            return reservation.Warning;
         }
 
         private async Task<GameState> LoadState(Data.Workspace workspace)

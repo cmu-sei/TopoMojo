@@ -168,6 +168,22 @@ namespace TopoMojo.Api.Models
         public HypervisorCapacityNode[] Nodes { get; set; } = [];
     }
 
+    public class CapacityCheckResult
+    {
+        public bool Fits { get; set; }
+
+        /// <summary>
+        /// "memory", "pool", or "host" (host affinity and no single host has room) when it
+        /// doesn't fit.
+        /// </summary>
+        public string LimitedBy { get; set; }
+        public long NeededMb { get; set; }
+        public long FreeMb { get; set; }
+        public long ReservedMb { get; set; }
+        public int HeadroomPercent { get; set; }
+        public string Message { get; set; }
+    }
+
     public class CapacityAlert
     {
         public const string Warning = "warning";

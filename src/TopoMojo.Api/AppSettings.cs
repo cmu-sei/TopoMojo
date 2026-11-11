@@ -209,6 +209,9 @@ namespace TopoMojo.Api
         public int CapacityHeadroomPercent { get; set; } = 20;
         public int CapacityCacheSeconds { get; set; } = 30;
 
+        // what a gamespace or workspace vm deploy does when the hypervisor looks too full
+        public CapacityCheckMode CapacityCheck { get; set; } = CapacityCheckMode.Warn;
+
         // memory or storage use, in percent of a host or store, that the admin dashboard
         // flags as nearly full (warning) and full (critical)
         public int CapacityWarnPercent { get; set; } = 75;
@@ -223,6 +226,16 @@ namespace TopoMojo.Api
         public string Tenant { get; set; } = "";
         public JanitorOptions Expirations { get; set; } = new JanitorOptions();
 
+    }
+
+    public enum CapacityCheckMode
+    {
+        // deploy without checking
+        Off,
+        // deploy, and return and log a warning when the gamespace doesn't fit
+        Warn,
+        // refuse a deploy that doesn't fit
+        Block
     }
 
     public class JanitorOptions

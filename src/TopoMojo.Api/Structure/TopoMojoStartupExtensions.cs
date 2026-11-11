@@ -24,6 +24,9 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddSingleton<CoreOptions>(_ => appSettings.Core);
             services.AddSingleton(_ => appSettings.Oidc);
 
+            // singleton: it holds the memory of deploys still in flight
+            services.AddSingleton<CapacityGuard>();
+
             // Auto-discover from EntityService pattern
             foreach (var t in Assembly
                 .GetExecutingAssembly()
