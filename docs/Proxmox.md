@@ -39,7 +39,7 @@ You will need to configure a reverse proxy on the node that TopoMojo will commun
     - `sudo systemctl enable nginx`
 - Use the following NGINX configuration as a reference. This will allow your Proxmox Web UI and API to be reached over port 443 as well as allow console access to work through TopoMojo.
     - Replace "pve.local" with your Node's hostname
-    - Replace <api_token> with the API Token you generated earlier. This should be in the format `user@system!TokenId=Secret` e.g. `root@pam!Topo=4c4fbe1e-b31e-55a9-9fg0-2de4a411cd23`
+    - Replace <api_token> with the API Token you generated earlier. This should be in the format `user@system!TokenId=Secret` e.g. `user@pam!topomojo=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 
 ```
 upstream proxmox {
@@ -105,7 +105,7 @@ This section describes the appsettings that will need to be set to configure Top
     - Set this to the url of your main Proxmox node. (i.e. https://my.prox.local)
 - Pod__AccessToken
     - Set this to the access token generated above. It should be the same one set in your NGINX config.
-    - E.g. `root@pam!Topo=4c4fbe1e-b31e-55a9-9fg0-2de4a411cd23`
+    - E.g. `user@pam!topomojo=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 - Pod__SDNZone
     - Set this to the name of the SDN Zone you created in Proxmox
 
