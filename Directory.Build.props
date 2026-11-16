@@ -1,0 +1,13 @@
+<Project>
+
+  <ItemGroup>
+    <!--
+      VimClient pulls in the .NET Core 2.1 framework package. Published for a runtime, as the
+      Dockerfile does, it adds a 2.1 libhostfxr.so to the output that stops ./TopoMojo.Api from
+      starting. Restore prunes per project, so this sits here to reach every project that gets
+      VimClient through TopoMojo.Hypervisor.
+    -->
+    <PrunePackageReference Include="Microsoft.NETCore.App" Version="2.1.0" />
+  </ItemGroup>
+
+</Project>
