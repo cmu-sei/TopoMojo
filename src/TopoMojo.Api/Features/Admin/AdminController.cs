@@ -26,7 +26,8 @@ public class AdminController(
     HubCache hubCache,
     IMemoryCache localCache,
     IWebHostEnvironment env,
-    IHypervisorService podService
+    IHypervisorService podService,
+    WorkspaceService workspaceService
     ) : BaseController(logger, hub)
 {
 
@@ -112,6 +113,21 @@ public class AdminController(
     public ActionResult<CachedConnection[]> ListActiveUsers()
     {
         return Ok(hubCache.Connections.Values);
+    }
+
+    /// <summary>
+    /// Show hypervisor memory, cpu and storage use.
+    /// </summary>
+    /// <remarks>
+    /// Figures are cached for Core:CapacityCacheSeconds, shared with the workspace
+    /// capacity estimate.
+    /// </remarks>
+    /// <returns></returns>
+    [HttpGet("api/admin/capacity")]
+    [SwaggerOperation(OperationId = "GetHypervisorCapacity")]
+    public async Task<ActionResult<HypervisorCapacity>> GetHypervisorCapacity()
+    {
+        return Ok(await workspaceService.GetHypervisorCapacity());
     }
 
     /// <summary>
