@@ -20,4 +20,4 @@ WORKDIR /home/app
 COPY --from=dev /home/app/dist .
 COPY --from=dev /home/app/LICENSE.md LICENSE.md
 USER $APP_UID
-CMD [ "dotnet", "TopoMojo.Api.dll" ]
+ENTRYPOINT ["./TopoMojo.Api"]
