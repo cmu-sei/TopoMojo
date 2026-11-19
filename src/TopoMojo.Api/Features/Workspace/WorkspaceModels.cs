@@ -24,6 +24,8 @@ namespace TopoMojo.Api.Models
         public string Challenge { get; set; }
         public Worker[] Workers { get; set; }
         public Template[] Templates { get; set; }
+        // whether the caller may download this workspace; set only when a single workspace is loaded
+        public bool CanDownload { get; set; }
     }
 
     public class WorkspaceSummary
