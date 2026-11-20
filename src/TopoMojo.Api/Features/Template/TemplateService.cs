@@ -113,8 +113,38 @@ namespace TopoMojo.Api.Services
             return Mapper.Map<TemplateDetail>(template);
         }
 
+        /// <summary>
+        /// Rejects a Detail that every later TemplateUtility load would choke on, so it fails here
+        /// with a 400 instead of breaking deploy, clone, unlink and export.
+        /// </summary>
+        internal static void ValidateDetail(string detail)
+        {
+            if (!detail.NotEmpty())
+                return;
+
+            VmTemplate template;
+
+            try
+            {
+                template = new TemplateUtility(detail).AsTemplate();
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                throw new ArgumentException($"Detail is not a valid template: {ex.Message}", nameof(detail), ex);
+            }
+
+            if (template is null)
+                throw new ArgumentException("Detail is not a valid template.", nameof(detail));
+
+            if (template.Firmware.NotEmpty()
+                && !template.Firmware.Trim().Equals("bios", StringComparison.OrdinalIgnoreCase)
+                && !template.Firmware.Trim().Equals("efi", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Firmware must be 'bios' or 'efi'.", nameof(detail));
+        }
+
         public async Task<TemplateDetail> Create(NewTemplateDetail model)
         {
+            ValidateDetail(model.Detail);
             model.Detail = new TemplateUtility(model.Detail, model.Name).ToString();
 
             var t = Mapper.Map<Data.Template>(model);
@@ -126,6 +156,8 @@ namespace TopoMojo.Api.Services
 
         public async Task<TemplateDetail> Configure(ChangedTemplateDetail template)
         {
+            ValidateDetail(template.Detail);
+
             var entity = await _store.Retrieve(template.Id);
 
             Mapper.Map(template, entity);

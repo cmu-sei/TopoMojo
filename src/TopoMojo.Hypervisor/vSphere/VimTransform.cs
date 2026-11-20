@@ -88,7 +88,7 @@ namespace TopoMojo.Hypervisor.vSphere
         }
 
         /// <summary>
-        /// The template's Firmware setting wins; otherwise a legacy "firmware=efi" Guest Setting
+        /// A recognized Firmware setting (bios or efi) wins; otherwise a legacy "firmware=efi" Guest Setting
         /// (only reachable through the Detail JSON) selects efi. Null leaves the vSphere default.
         /// </summary>
         internal static string GetFirmware(VmTemplate template)
@@ -96,7 +96,8 @@ namespace TopoMojo.Hypervisor.vSphere
             if (template.Firmware.HasValue())
             {
                 string firmware = template.Firmware.Trim().ToLowerInvariant();
-                return firmware is "efi" or "bios" ? firmware : null;
+                if (firmware is "efi" or "bios")
+                    return firmware;
             }
 
             return (template.GuestSettings ?? []).Any(c => c.Key == "firmware" && c.Value == "efi")

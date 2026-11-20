@@ -1,6 +1,7 @@
 // Copyright 2025 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
+using System;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -57,6 +58,33 @@ public class TemplateFirmwareSettingsTests
     public void UnknownFirmwareValue_LeavesTheVSphereDefault()
     {
         Assert.Null(Deploy("""{ "Firmware": "uefi" }""").firmware);
+    }
+
+    [Fact]
+    public void UnknownFirmwareValue_FallsBackToALegacyEfiGuestSetting()
+    {
+        var detail = """{ "Firmware": "uefi", "GuestSettings": [ { "Key": "firmware", "Value": "efi" } ] }""";
+
+        Assert.Equal("efi", Deploy(detail).firmware);
+    }
+
+    [Theory]
+    [InlineData("""{ "NestedVirtualization": "TRUE" }""")]
+    [InlineData("""{ "Firmware": 1 }""")]
+    [InlineData("""{ "Firmware": "uefi" }""")]
+    [InlineData("not json")]
+    public void ValidateDetail_RejectsDetailThatWouldBreakLaterLoads(string detail)
+    {
+        Assert.Throws<ArgumentException>(() => TemplateService.ValidateDetail(detail));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("""{ "Firmware": "EFI", "NestedVirtualization": true }""")]
+    public void ValidateDetail_AcceptsGoodOrEmptyDetail(string detail)
+    {
+        TemplateService.ValidateDetail(detail);
     }
 
     // The Guest Settings box prefixes every key with "guestinfo.", so "firmware=efi" typed there has
