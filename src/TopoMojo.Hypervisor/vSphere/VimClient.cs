@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using VimClient;
+using TopoMojo.Hypervisor.Exceptions;
 using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.vSphere
@@ -503,11 +504,39 @@ namespace TopoMojo.Hypervisor.vSphere
 
         public async Task<string[]> GetFiles(string path, bool recursive)
         {
+            var files = await SearchFiles(path, recursive, false);
+            return [.. files.Select(f => f.Path)];
+        }
+
+        /// <summary>
+        /// Like GetFiles, with each file's last-modified time. Unlike GetFiles, a failed search
+        /// throws instead of returning what it found so far, so callers can't mistake it for an empty folder.
+        /// </summary>
+        public async Task<List<DatastoreFile>> GetFilesWithModified(string path, bool recursive)
+        {
+            try
+            {
+                return await SearchFiles(path, recursive, true, throwOnError: true);
+            }
+            catch (Exception ex) when (ex is not HypervisorException)
+            {
+                // e.g. vCenter going away after the connection opened
+                throw new HypervisorException("The datastore search failed.", ex.Message);
+            }
+        }
+
+        private async Task<List<DatastoreFile>> SearchFiles(string path, bool recursive, bool withModified, bool throwOnError = false)
+        {
             await Connect();
-            List<string> list = [];
+
+            // Connect logs a failure and leaves no client, which would otherwise surface as a NullReferenceException
+            if (throwOnError && _vim is null)
+                throw new HypervisorException("TopoMojo can't connect to vSphere.", _config.Url);
+            List<DatastoreFile> list = [];
             DatastorePath dsPath = new(path);
             string oldRoot = "";
             string pattern = dsPath.File ?? "*";
+            bool found = false;
 
             RetrievePropertiesResponse response = await _vim.RetrievePropertiesAsync(
                 _props,
@@ -526,6 +555,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 if (summary.name == dsPath.Datastore)
                 {
+                    found = true;
                     // if topLevelDirectory not supported (vsan), map from directory name to guid)
                     if (
                         capability.topLevelDirectoryCreateSupportedSpecified
@@ -560,6 +590,11 @@ namespace TopoMojo.Hypervisor.vSphere
                         }
                         catch (Exception ex)
                         {
+                            if (throwOnError)
+                                throw new HypervisorException(
+                                    $"The search of datastore {dsPath.Datastore} failed.",
+                                    $"vSAN folder mapping: {ex.Message}");
+
                             _logger.LogError(ex, "error processing vsan toplevel folder");
                         }
                     }
@@ -570,6 +605,10 @@ namespace TopoMojo.Hypervisor.vSphere
                     var spec = new HostDatastoreBrowserSearchSpec
                     {
                         matchPattern = [pattern],
+                        // vCenter rejects details without fileOwner, which is only sent when fileOwnerSpecified is set
+                        details = withModified
+                            ? new FileQueryFlags { fileType = true, modification = true, fileOwnerSpecified = true }
+                            : null,
                     };
 
                     var results = new List<HostDatastoreBrowserSearchResults>();
@@ -588,6 +627,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
                             info = await WaitForVimTask(task);
 
+                            if (throwOnError && info.state == TaskInfoState.error)
+                                throw new HypervisorException(
+                                    $"The search of datastore {dsPath.Datastore} failed.",
+                                    info.error?.localizedMessage);
+
                             if (_config.DebugVerbose)
                                 _logger.LogDebug("searching recursive {path} for {pattern}; found [{count}]",
                                     dsPath.FolderPath,
@@ -601,6 +645,14 @@ namespace TopoMojo.Hypervisor.vSphere
                         }
                         catch (Exception ex)
                         {
+                            if (throwOnError)
+                            {
+                                if (ex is HypervisorException)
+                                    throw;
+
+                                throw new HypervisorException($"The search of datastore {dsPath.Datastore} failed.", ex.Message);
+                            }
+
                             _logger.LogError(ex, "error searching datastore.");
                         }
                     }
@@ -640,27 +692,38 @@ namespace TopoMojo.Hypervisor.vSphere
                                 if (!fp.EndsWith('/'))
                                     fp += "/";
 
-                                list.AddRange(result.file.Select(o => fp + o.path));
+                                list.AddRange(result.file.Select(o => new DatastoreFile(
+                                    fp + o.path,
+                                    o.modificationSpecified ? new DateTimeOffset(o.modification) : null
+                                )));
 
                                 if (_config.DebugVerbose)
                                 {
                                     foreach (var s in list)
-                                        _logger.LogDebug("added file result {s}", s);
+                                        _logger.LogDebug("added file result {s}", s.Path);
                                 }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
+                        if (throwOnError)
+                            throw new HypervisorException(
+                                $"The search of datastore {dsPath.Datastore} failed.",
+                                $"processing results: {ex.Message}");
+
                         _logger.LogError(ex, "error processing datastore search results.");
                     }
                 }
             }
 
+            if (throwOnError && !found)
+                throw new HypervisorException($"Datastore {dsPath.Datastore} was not found.");
+
             if (_config.DebugVerbose)
                 _logger.LogDebug("search datastore found [{count}] results.", list.Count);
 
-            return [.. list];
+            return list;
         }
 
         public async Task CloneDisk(string source, string dest)

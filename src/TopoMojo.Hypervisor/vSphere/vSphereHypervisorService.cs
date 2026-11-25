@@ -532,6 +532,74 @@ namespace TopoMojo.Hypervisor.vSphere
             };
         }
 
+        public async Task<TemplateSourceOptions> GetTemplateSourceOptions()
+        {
+            VimClient host = FindHostByRandom();
+
+            var files = await host.GetFilesWithModified(host.Options.DiskStore + "*.vmdk", true);
+
+            return new TemplateSourceOptions
+            {
+                Field = "disks",
+                Sources = ToTemplateSources(files, host.Options)
+            };
+        }
+
+        /// <summary>
+        /// Maps datastore search results to the abstract paths templates use, dropping
+        /// deployed vm disks and the extent/snapshot files behind each descriptor.
+        /// The first folder names the owning workspace; a localized disk is named for its template.
+        /// </summary>
+        /// <remarks>
+        /// Deployed vms are named "{template}#{isolation tag}", and so are their folders. Dropping any
+        /// folder with a '#' covers a VmStore that is the DiskStore itself, or above it. A VmStore folder
+        /// below the DiskStore is dropped too, with its {host} macro matching any host.
+        /// </remarks>
+        public static TemplateSource[] ToTemplateSources(IEnumerable<DatastoreFile> files, HypervisorServiceConfiguration options)
+        {
+            var diskStore = new DatastorePath(options.DiskStore + "x");
+            var vmStore = new DatastorePath(options.VmStore + "x");
+            string diskRoot = FolderRoot(diskStore);
+            string vmRoot = FolderRoot(vmStore);
+
+            Regex vmFolder = vmStore.Datastore == diskStore.Datastore
+                && vmRoot.Length > diskRoot.Length && vmRoot.StartsWith(diskRoot)
+                    ? new Regex("^" + Regex.Escape(vmRoot).Replace(Regex.Escape("{host}"), "[^/]*"), RegexOptions.IgnoreCase)
+                    : null;
+
+            return files
+                .Select(f => (dp: new DatastorePath(f.Path), f.Modified))
+                .Where(x => x.dp.Datastore == diskStore.Datastore)
+                .Select(x => (rel: x.dp.Folder.HasValue() ? $"{x.dp.Folder.Trim('/')}/{x.dp.File}" : x.dp.File, x.Modified))
+                .Where(x => x.rel.StartsWith(diskRoot))
+                .Where(x => vmFolder is null || !vmFolder.IsMatch(x.rel))
+                .Where(x => !x.rel[..(x.rel.LastIndexOf('/') + 1)].Contains('#'))
+                .Where(x => !DiskExtentRegex().IsMatch(x.rel))
+                .Select(x => (rel: x.rel[diskRoot.Length..], x.Modified))
+                .DistinctBy(x => x.rel)
+                .OrderBy(x => x.rel)
+                .Select(x =>
+                {
+                    int slash = x.rel.IndexOf('/');
+                    var localized = LocalizedDiskRegex().Match(x.rel);
+                    return new TemplateSource
+                    {
+                        Name = $"[ds] {x.rel}",
+                        WorkspaceId = slash > 0 ? x.rel[..slash] : null,
+                        TemplateId = localized.Success ? localized.Groups[1].Value : null,
+                        Modified = x.Modified
+                    };
+                })
+                .ToArray();
+        }
+
+        // "[ds] /disks/x" and "[ds] disks/x" both root at "disks/"; a datastore root is ""
+        private static string FolderRoot(DatastorePath path)
+        {
+            string folder = path.Folder?.Trim('/');
+            return folder.HasValue() ? folder + "/" : "";
+        }
+
         public async Task<VmOptions> GetVmNetOptions(string id)
         {
             await Task.Delay(0);
@@ -869,6 +937,12 @@ namespace TopoMojo.Hypervisor.vSphere
         private static partial Regex HostRangeRegex();
         [GeneratedRegex("(]|/)$")]
         private static partial Regex DatastoreEndsWithRegex();
+        // snapshot deltas are numbered from -000001, so a disk named for a date (win10-240115) isn't one
+        [GeneratedRegex(@"-(flat|delta|sesparse|ctk|rdm|rdmp|digest|0\d{5})\.vmdk$", RegexOptions.IgnoreCase)]
+        private static partial Regex DiskExtentRegex();
+        // LocalizeDiskPaths names a template's disks {workspace}/{template}_{n}.vmdk; older ids have dashes
+        [GeneratedRegex(@"/([0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_\d+\.vmdk$", RegexOptions.IgnoreCase)]
+        private static partial Regex LocalizedDiskRegex();
     }
 
 }
