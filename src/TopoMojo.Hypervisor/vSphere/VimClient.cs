@@ -518,6 +518,10 @@ namespace TopoMojo.Hypervisor.vSphere
         private async Task<List<DatastoreFile>> SearchFiles(string path, bool recursive, bool withModified, bool throwOnError = false)
         {
             await Connect();
+
+            // Connect logs a failure and leaves no client, which would otherwise surface as a NullReferenceException
+            if (throwOnError && _vim is null)
+                throw new HypervisorException($"TopoMojo can't connect to vSphere at {_config.Url}.");
             List<DatastoreFile> list = [];
             DatastorePath dsPath = new(path);
             string oldRoot = "";
