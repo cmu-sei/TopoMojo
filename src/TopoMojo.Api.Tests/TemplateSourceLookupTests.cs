@@ -42,6 +42,7 @@ public sealed class TemplateSourceLookupTests : IDisposable
         string current = WorkspaceId(tenant);
         string dashed = Guid.NewGuid().ToString("d");
         string template = Guid.NewGuid().ToString("n");
+        string otherTenant = WorkspaceId(tenant == "" ? "qq" : "");
         string dashedTemplate = Guid.NewGuid().ToString("d");
 
         _db.Workspaces.AddRange(
@@ -58,7 +59,9 @@ public sealed class TemplateSourceLookupTests : IDisposable
             new TemplateSource { Name = "b", WorkspaceId = dashed },
             new TemplateSource { Name = "c", WorkspaceId = current, TemplateId = template },
             // Proxmox: a copy made on unlink is named by its template id
-            new TemplateSource { Name = "d", TemplateId = dashedTemplate });
+            new TemplateSource { Name = "d", TemplateId = dashedTemplate },
+            // another TopoMojo's workspace on the same hypervisor is left out
+            new TemplateSource { Name = "e", WorkspaceId = otherTenant });
 
         var result = await TemplateSourcesSettingTests.Controller(
             new CoreOptions { EnableTemplateSources = true, Tenant = tenant },

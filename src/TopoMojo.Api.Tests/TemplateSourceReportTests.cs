@@ -145,4 +145,41 @@ public sealed class TemplateSourceReportTests
         Assert.Null(TemplateSourceReport.NormalizeId(folder));
         Assert.True(BuildOne(new TemplateSource { Name = $"[ds] {folder}/d.vmdk", WorkspaceId = folder }).IsGlobal);
     }
+
+    [Theory]
+    [InlineData("", "qq")]
+    [InlineData("zz", "")]
+    [InlineData("zz", "qq")]
+    public void AnotherTenantsWorkspacesAreLeftOut(string tenant, string other)
+    {
+        string mine = string.Concat(tenant, Guid.NewGuid().ToString("n").AsSpan(tenant.Length));
+        string theirs = string.Concat(other, Guid.NewGuid().ToString("n").AsSpan(other.Length));
+
+        var report = TemplateSourceReport.Build(
+            new TemplateSourceOptions
+            {
+                Field = "disks",
+                Sources = [
+                    new TemplateSource { Name = "mine", WorkspaceId = mine },
+                    new TemplateSource { Name = "theirs", WorkspaceId = theirs, TemplateId = TemplateId },
+                    new TemplateSource { Name = "global", WorkspaceId = Guid.Empty.ToString() }
+                ]
+            },
+            new Dictionary<string, TemplateSourceReport.TemplateRef>(),
+            Workspaces,
+            tenant);
+
+        Assert.Equal(new[] { "mine", "global" }, report.Sources.Select(s => s.Name));
+        Assert.Equal("(deleted)", report.Sources[0].WorkspaceName);
+    }
+
+    [Theory]
+    [InlineData("4b1c9a7e2f3d4c5b6a7f8e9d0a1b2c3d", "")]
+    [InlineData("4b1c9a7e-2f3d-4c5b-6a7f-8e9d0a1b2c3d", "")]
+    [InlineData("zztopoqw4b1c9a7e2f3d4c5b6a7f8e9d", "zztopoqw")]
+    [InlineData("ZZ4b1c9a7e2f3d4c5b6a7f8e9d0a1b2c", "zz")]
+    public void TheTenantIsTheLeadingNonHexLetters(string id, string tenant)
+    {
+        Assert.Equal(tenant, TemplateSourceReport.TenantOf(id));
+    }
 }

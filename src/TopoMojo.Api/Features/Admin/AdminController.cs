@@ -263,6 +263,7 @@ public class AdminController(
     /// Field names the template Detail field the names go in: "disks" (vSphere disk paths,
     /// "[ds] folder/disk.vmdk") or "template" (Proxmox template vm names).
     /// Each source is labeled global or with the workspace (and template) it belongs to.
+    /// Sources in another tenant's workspaces (Core:Tenant) are left out.
     /// When Core:EnableTemplateSources is off, returns Enabled false with no sources
     /// and doesn't query the hypervisor.
     /// </remarks>
@@ -308,7 +309,7 @@ public class AdminController(
             .DistinctBy(w => TemplateSourceReport.NormalizeId(w.Id))
             .ToDictionary(w => TemplateSourceReport.NormalizeId(w.Id), w => w.Name);
 
-        return Ok(TemplateSourceReport.Build(options, templates, workspaces));
+        return Ok(TemplateSourceReport.Build(options, templates, workspaces, coreOptions.Tenant));
     }
 
 

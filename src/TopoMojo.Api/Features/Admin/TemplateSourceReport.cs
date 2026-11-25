@@ -60,6 +60,12 @@ public partial class TemplateSourceReport
             ? new[] { g.ToString("n"), g.ToString("d") }
             : id is not null ? [id] : []).Distinct();
 
+    /// <summary>
+    /// The Core:Tenant an id was made with: its leading letters that aren't hex digits, or "" for none.
+    /// </summary>
+    public static string TenantOf(string id)
+        => new([.. id.ToLowerInvariant().TakeWhile(c => !Uri.IsHexDigit(c))]);
+
     // a tenant is letters that aren't hex digits, in front of the hex part of the id
     [GeneratedRegex("^(?=.{32}$)[g-z]+[0-9a-f]+$", RegexOptions.IgnoreCase)]
     private static partial Regex TenantIdRegex();
@@ -68,10 +74,17 @@ public partial class TemplateSourceReport
     /// Files each source under its workspace. A template id outranks a folder, since a template
     /// knows its workspace. Sources that name no workspace (base templates, shared folders) are global.
     /// </summary>
+    /// <remarks>
+    /// A workspace that isn't in this database and whose id carries another Core:Tenant prefix
+    /// belongs to another TopoMojo on the same hypervisor, which can delete its disks at any time,
+    /// so its sources are left out. A missing workspace in this tenant is shown as "(deleted)".
+    /// Proxmox copies are named by template id, which has no tenant, so those can't be told apart.
+    /// </remarks>
     public static TemplateSourceReport Build(
         TemplateSourceOptions options,
         IReadOnlyDictionary<string, TemplateRef> templates,
-        IReadOnlyDictionary<string, string> workspaces)
+        IReadOnlyDictionary<string, string> workspaces,
+        string tenant = "")
     {
         string globalId = Guid.Empty.ToString("n");
         var report = new TemplateSourceReport { Field = options.Field };
@@ -112,10 +125,14 @@ public partial class TemplateSourceReport
             }
             else
             {
+                if (workspaces.TryGetValue(workspaceId, out string name))
+                    entry.WorkspaceName = name;
+                else if (TenantOf(workspaceId) != (tenant ?? "").ToLowerInvariant())
+                    continue;
+                else
+                    entry.WorkspaceName = "(deleted)";
+
                 entry.WorkspaceId = workspaceId;
-                entry.WorkspaceName = workspaces.TryGetValue(workspaceId, out string name)
-                    ? name
-                    : "(deleted)";
             }
 
             report.Sources.Add(entry);
