@@ -222,4 +222,15 @@ public sealed class TemplateSourceReportTests
         Assert.Equal(id, TemplateSourceReport.NormalizeId(id));
         Assert.Equal("Imported Lab", entry.WorkspaceName);
     }
+
+    [Fact]
+    public void ADashedIdReimportedUnderAShorterTenantIsAWorkspace()
+    {
+        // TransferService.UpdateTenant: legacy id under "zztopoqwgg", then again under "zz",
+        // which pads the old tenant's length with zeros over where the first dash was
+        string id = "zz00000000d4c-4343-bf19-6bc7c7f9e48c";
+
+        Assert.Equal(id, TemplateSourceReport.NormalizeId(id));
+        Assert.Equal("zz", TemplateSourceReport.TenantOf(id));
+    }
 }

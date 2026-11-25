@@ -65,12 +65,12 @@ public class TemplateSourceReport
         if (tenant.Length == 0 || tenant.Length >= id.Length)
             return false;
 
-        // put back a dash a long tenant wrote over, then check what's left is a guid
+        // put back the dashes: a long tenant writes over them, and a later import under a shorter
+        // tenant pads that stretch with zeros, then check what's left is a guid
         char[] guid = [.. new string('0', tenant.Length), .. id.AsSpan(tenant.Length)];
         if (guid.Length == 36)
             foreach (int i in (int[])[8, 13, 18, 23])
-                if (i < tenant.Length)
-                    guid[i] = '-';
+                guid[i] = '-';
 
         return Guid.TryParse(guid, out _);
     }
