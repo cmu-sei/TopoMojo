@@ -21,9 +21,9 @@ public sealed class TemplateSourcesSettingTests
     // Filled by parameter type rather than position: other open PRs add constructor
     // dependencies, and this test shouldn't break whichever merges first. Anything not
     // given is null.
-    private static AdminController Controller(CoreOptions options)
+    internal static AdminController Controller(CoreOptions options, params object[] dependencies)
     {
-        object[] given = [NullLogger<AdminController>.Instance, options];
+        object[] given = [NullLogger<AdminController>.Instance, options, .. dependencies];
         var ctor = typeof(AdminController).GetConstructors().Single();
         var args = ctor.GetParameters()
             .Select(p => given.FirstOrDefault(p.ParameterType.IsInstanceOfType))
