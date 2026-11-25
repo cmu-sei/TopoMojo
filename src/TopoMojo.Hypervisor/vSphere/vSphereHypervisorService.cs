@@ -299,6 +299,53 @@ namespace TopoMojo.Hypervisor.vSphere
             return await ctx.Host.Change(ctx.Vm.Id, change);
         }
 
+        public async Task<HypervisorCapacity> GetCapacity()
+        {
+            var reads = _hostCache.Values
+                .Select(async host =>
+                {
+                    try
+                    {
+                        return await host.GetCapacity();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Capacity read failed for {host}", host.Name);
+                        return null;
+                    }
+                })
+                .ToArray();
+
+            var results = (await Task.WhenAll(reads)).Where(x => x is not null).ToArray();
+
+            if (results.Length == 0)
+                throw new InvalidOperationException("No vSphere host returned capacity.");
+
+            // A host range can reach the same cluster through more than one client, so
+            // hosts and datastores are counted once by name. A pool limit only binds when every client
+            // has one; an unlimited pool anywhere leaves the hosts to decide.
+            return new HypervisorCapacity
+            {
+                Provider = "vsphere",
+                AsOf = results.Min(x => x.AsOf),
+                Nodes = results
+                    .SelectMany(x => x.Nodes)
+                    .GroupBy(x => x.Name)
+                    .Select(g => g.First())
+                    .OrderBy(x => x.Name)
+                    .ToArray(),
+                Storage = results
+                    .SelectMany(x => x.Storage)
+                    .GroupBy(x => x.Name)
+                    .Select(g => g.First())
+                    .OrderBy(x => x.Name)
+                    .ToArray(),
+                PoolMemoryFreeMb = results.All(x => x.PoolMemoryFreeMb.HasValue)
+                    ? results.Sum(x => x.PoolMemoryFreeMb.Value)
+                    : null
+            };
+        }
+
         public async Task<Vm[]> Find(string term)
         {
             await Task.Delay(0);
