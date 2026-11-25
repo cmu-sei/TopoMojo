@@ -87,4 +87,108 @@ public class VSphereDiskOptionsTests
             new[] { "[ds] stock/win10.vmdk" },
             VSphereHypervisorService.ToTemplateSources(files, options).Select(s => s.Name));
     }
+
+    [Fact]
+    public void ToTemplateSources_DropsVmFoldersWhenTheVmStoreIsTheDiskStore()
+    {
+        var options = new HypervisorServiceConfiguration
+        {
+            DiskStore = "[datastore3] topo-dev/",
+            VmStore = "[datastore3] topo-dev/"
+        };
+
+        DatastoreFile[] files =
+        [
+            new("[datastore3] topo-dev/00000000-0000-0000-0000-000000000000/blank-50g.vmdk", null),
+            new("[datastore3] topo-dev/blank-50g-clone#00000000-0000-0000-0000-000000000000/blank-50g.vmdk", null)
+        ];
+
+        Assert.Equal(
+            new[] { "[ds] 00000000-0000-0000-0000-000000000000/blank-50g.vmdk" },
+            VSphereHypervisorService.ToTemplateSources(files, options).Select(s => s.Name));
+    }
+
+    [Theory]
+    [InlineData("[topomojo]")]
+    [InlineData("[topomojo] disks/")]
+    public void ToTemplateSources_DropsVmFoldersWhenTheVmStoreIsAboveTheDiskStore(string diskStore)
+    {
+        var options = new HypervisorServiceConfiguration { DiskStore = diskStore, VmStore = "[topomojo]" };
+        string root = diskStore == "[topomojo]" ? "[topomojo] " : "[topomojo] disks/";
+
+        DatastoreFile[] files =
+        [
+            new(root + "stock/kali.vmdk", null),
+            new(root + "kali#abc/kali.vmdk", null)
+        ];
+
+        Assert.Equal(
+            new[] { "[ds] stock/kali.vmdk" },
+            VSphereHypervisorService.ToTemplateSources(files, options).Select(s => s.Name));
+    }
+
+    [Fact]
+    public void ToTemplateSources_MatchesAnyHostInTheVmStoreMacro()
+    {
+        var options = new HypervisorServiceConfiguration
+        {
+            DiskStore = "[topomojo]",
+            VmStore = "[topomojo] _run-{host}/"
+        };
+
+        DatastoreFile[] files =
+        [
+            new("[topomojo] stock/kali.vmdk", null),
+            // a vm folder without a '#', so only the VmStore match drops it
+            new("[topomojo] _run-esx1/leftover/leftover.vmdk", null)
+        ];
+
+        Assert.Equal(
+            new[] { "[ds] stock/kali.vmdk" },
+            VSphereHypervisorService.ToTemplateSources(files, options).Select(s => s.Name));
+    }
+
+    [Fact]
+    public void ToTemplateSources_IgnoresSlashesAroundTheDiskStoreFolder()
+    {
+        var options = new HypervisorServiceConfiguration { DiskStore = "[san] /disks/", VmStore = "[san] /_run/" };
+
+        DatastoreFile[] files = [new("[san] disks/stock/win10.vmdk", null)];
+
+        Assert.Equal(
+            new[] { "[ds] stock/win10.vmdk" },
+            VSphereHypervisorService.ToTemplateSources(files, options).Select(s => s.Name));
+    }
+
+    [Fact]
+    public void ToTemplateSources_KeepsDisksNamedForADate()
+    {
+        var options = new HypervisorServiceConfiguration { DiskStore = "[topomojo]" };
+
+        DatastoreFile[] files =
+        [
+            new("[topomojo] stock/win10-240115.vmdk", null),
+            new("[topomojo] stock/win10-000002.vmdk", null)
+        ];
+
+        Assert.Equal(
+            new[] { "[ds] stock/win10-240115.vmdk" },
+            VSphereHypervisorService.ToTemplateSources(files, options).Select(s => s.Name));
+    }
+
+    [Fact]
+    public void ToTemplateSources_NamesTheTemplateOfADiskWithADashedId()
+    {
+        var options = new HypervisorServiceConfiguration { DiskStore = "[topomojo]" };
+
+        DatastoreFile[] files =
+        [
+            new("[topomojo] 67dade91-dd4c-4343-bf19-6bc7c7f9e48c/656b76dc-a894-4594-a043-daab251c46ad_0.vmdk", null)
+        ];
+
+        var source = VSphereHypervisorService.ToTemplateSources(files, options).Single();
+
+        Assert.Equal("67dade91-dd4c-4343-bf19-6bc7c7f9e48c", source.WorkspaceId);
+        Assert.Equal("656b76dc-a894-4594-a043-daab251c46ad", source.TemplateId);
+    }
 }

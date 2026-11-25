@@ -224,12 +224,6 @@ namespace TopoMojo.Hypervisor.Proxmox
         }
 
         /// <summary>
-        /// Finds the template a deploy should clone from. Proxmox omits the name of a vm whose node is not
-        /// reporting (pvestatd down leaves /cluster/resources entries with status "unknown" and no name), so
-        /// a template can drop out of the cache while the cluster otherwise looks healthy. Say so instead of
-        /// dereferencing null.
-        /// </summary>
-        /// <summary>
         /// Template vms a template's Detail can clone from, with when each was created.
         /// </summary>
         public async Task<TemplateSource[]> ListTemplateSources()
@@ -373,6 +367,12 @@ namespace TopoMojo.Hypervisor.Proxmox
                 : null;
         }
 
+        /// <summary>
+        /// Finds the template a deploy should clone from. Proxmox omits the name of a vm whose node is not
+        /// reporting (pvestatd down leaves /cluster/resources entries with status "unknown" and no name), so
+        /// a template can drop out of the cache while the cluster otherwise looks healthy. Say so instead of
+        /// dereferencing null.
+        /// </summary>
         internal static Vm SelectTemplateVm(IEnumerable<Vm> cached, string templateName)
         {
             var matches = cached

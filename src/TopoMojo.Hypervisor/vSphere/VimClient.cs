@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using VimClient;
+using TopoMojo.Hypervisor.Exceptions;
 using TopoMojo.Hypervisor.Extensions;
 
 namespace TopoMojo.Hypervisor.vSphere
@@ -508,18 +509,20 @@ namespace TopoMojo.Hypervisor.vSphere
         }
 
         /// <summary>
-        /// Like GetFiles, with each file's last-modified time.
+        /// Like GetFiles, with each file's last-modified time. Unlike GetFiles, a failed search
+        /// throws instead of returning what it found so far, so callers can't mistake it for an empty folder.
         /// </summary>
         public Task<List<DatastoreFile>> GetFilesWithModified(string path, bool recursive)
-            => SearchFiles(path, recursive, true);
+            => SearchFiles(path, recursive, true, throwOnError: true);
 
-        private async Task<List<DatastoreFile>> SearchFiles(string path, bool recursive, bool withModified)
+        private async Task<List<DatastoreFile>> SearchFiles(string path, bool recursive, bool withModified, bool throwOnError = false)
         {
             await Connect();
             List<DatastoreFile> list = [];
             DatastorePath dsPath = new(path);
             string oldRoot = "";
             string pattern = dsPath.File ?? "*";
+            bool found = false;
 
             RetrievePropertiesResponse response = await _vim.RetrievePropertiesAsync(
                 _props,
@@ -538,6 +541,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
                 if (summary.name == dsPath.Datastore)
                 {
+                    found = true;
                     // if topLevelDirectory not supported (vsan), map from directory name to guid)
                     if (
                         capability.topLevelDirectoryCreateSupportedSpecified
@@ -582,7 +586,10 @@ namespace TopoMojo.Hypervisor.vSphere
                     var spec = new HostDatastoreBrowserSearchSpec
                     {
                         matchPattern = [pattern],
-                        details = withModified ? new FileQueryFlags { modification = true } : null,
+                        // vCenter rejects details without fileOwner, which is only sent when fileOwnerSpecified is set
+                        details = withModified
+                            ? new FileQueryFlags { fileType = true, modification = true, fileOwnerSpecified = true }
+                            : null,
                     };
 
                     var results = new List<HostDatastoreBrowserSearchResults>();
@@ -601,6 +608,11 @@ namespace TopoMojo.Hypervisor.vSphere
 
                             info = await WaitForVimTask(task);
 
+                            if (throwOnError && info.state == TaskInfoState.error)
+                                throw new HypervisorException(
+                                    $"The search of datastore {dsPath.Datastore} failed.",
+                                    info.error?.localizedMessage);
+
                             if (_config.DebugVerbose)
                                 _logger.LogDebug("searching recursive {path} for {pattern}; found [{count}]",
                                     dsPath.FolderPath,
@@ -614,6 +626,14 @@ namespace TopoMojo.Hypervisor.vSphere
                         }
                         catch (Exception ex)
                         {
+                            if (throwOnError)
+                            {
+                                if (ex is HypervisorException)
+                                    throw;
+
+                                throw new HypervisorException($"The search of datastore {dsPath.Datastore} failed.", ex.Message);
+                            }
+
                             _logger.LogError(ex, "error searching datastore.");
                         }
                     }
@@ -672,6 +692,9 @@ namespace TopoMojo.Hypervisor.vSphere
                     }
                 }
             }
+
+            if (throwOnError && !found)
+                throw new HypervisorException($"Datastore {dsPath.Datastore} was not found.");
 
             if (_config.DebugVerbose)
                 _logger.LogDebug("search datastore found [{count}] results.", list.Count);
