@@ -116,4 +116,33 @@ public sealed class TemplateSourceReportTests
             new[] { WorkspaceId, Guid.Parse(WorkspaceId).ToString("d") },
             TemplateSourceReport.StoredForms([WorkspaceId, WorkspaceId]));
     }
+
+    [Theory]
+    [InlineData("zz")]
+    [InlineData("zztopoqw")]
+    public void TenantWorkspaceIdsResolveLikeHexIds(string tenant)
+    {
+        // as WorkspaceService makes them with Core:Tenant set
+        string id = string.Concat(tenant, Guid.NewGuid().ToString("n").AsSpan(tenant.Length));
+        var workspaces = new Dictionary<string, string> { [id] = "Tenant Lab" };
+
+        var entry = TemplateSourceReport.Build(
+            new TemplateSourceOptions { Field = "disks", Sources = [new TemplateSource { Name = "[ds] x/d.vmdk", WorkspaceId = id }] },
+            Templates,
+            workspaces).Sources.Single();
+
+        Assert.False(entry.IsGlobal);
+        Assert.Equal("Tenant Lab", entry.WorkspaceName);
+        Assert.Equal(new[] { id }, TemplateSourceReport.StoredForms([TemplateSourceReport.NormalizeId(id)]));
+    }
+
+    [Theory]
+    [InlineData("stock")]
+    [InlineData("zz-not-an-id")]
+    [InlineData("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")]
+    public void FoldersThatArentIdsStayGlobal(string folder)
+    {
+        Assert.Null(TemplateSourceReport.NormalizeId(folder));
+        Assert.True(BuildOne(new TemplateSource { Name = $"[ds] {folder}/d.vmdk", WorkspaceId = folder }).IsGlobal);
+    }
 }

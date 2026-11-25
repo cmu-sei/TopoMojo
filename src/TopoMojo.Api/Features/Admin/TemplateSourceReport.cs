@@ -1,11 +1,12 @@
 // Copyright 2026 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
+using System.Text.RegularExpressions;
 using TopoMojo.Hypervisor;
 
 namespace TopoMojo.Api.Controllers;
 
-public class TemplateSourceReport
+public partial class TemplateSourceReport
 {
     /// <summary>
     /// False when Core:EnableTemplateSources is off; the hypervisor isn't asked and Sources is empty.
@@ -39,18 +40,29 @@ public class TemplateSourceReport
     public record TemplateRef(string Name, string WorkspaceId);
 
     /// <summary>
-    /// Ids as stored: 32 hex digits. Null for anything that isn't a guid.
+    /// One key per id: a guid as 32 hex digits, whether it's stored that way or dashed (older
+    /// versions and imports). A workspace id with a Core:Tenant prefix ("zz" + hex, 32 in all)
+    /// isn't a guid and is kept as it is. Null for anything else.
     /// </summary>
     public static string NormalizeId(string id)
-        => Guid.TryParse(id, out Guid g) ? g.ToString("n") : null;
+    {
+        if (Guid.TryParse(id, out Guid g))
+            return g.ToString("n");
+
+        return id is not null && TenantIdRegex().IsMatch(id) ? id : null;
+    }
 
     /// <summary>
-    /// The forms an id can be stored in: 32 hex digits, or dashed for ids from older versions and imports.
+    /// The forms a normalized id can be stored in: a guid as 32 hex digits or dashed, a tenant id as it is.
     /// </summary>
     public static IEnumerable<string> StoredForms(IEnumerable<string> normalizedIds)
         => normalizedIds.SelectMany(id => Guid.TryParse(id, out Guid g)
             ? new[] { g.ToString("n"), g.ToString("d") }
-            : []).Distinct();
+            : id is not null ? [id] : []).Distinct();
+
+    // a tenant is letters that aren't hex digits, in front of the hex part of the id
+    [GeneratedRegex("^(?=.{32}$)[g-z]+[0-9a-f]+$", RegexOptions.IgnoreCase)]
+    private static partial Regex TenantIdRegex();
 
     /// <summary>
     /// Files each source under its workspace. A template id outranks a folder, since a template

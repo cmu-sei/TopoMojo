@@ -191,4 +191,21 @@ public class VSphereDiskOptionsTests
         Assert.Equal("67dade91-dd4c-4343-bf19-6bc7c7f9e48c", source.WorkspaceId);
         Assert.Equal("656b76dc-a894-4594-a043-daab251c46ad", source.TemplateId);
     }
+
+    [Fact]
+    public void ToTemplateSources_NamesTheTemplateOfADiskInATenantWorkspace()
+    {
+        // Core:Tenant prefixes workspace ids; template ids stay plain hex
+        var options = new HypervisorServiceConfiguration { DiskStore = "[topomojo]" };
+
+        DatastoreFile[] files =
+        [
+            new("[topomojo] zztopoqw4b1c9a7e2f3d4c5b6a7f8e9d/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb_0.vmdk", null)
+        ];
+
+        var source = VSphereHypervisorService.ToTemplateSources(files, options).Single();
+
+        Assert.Equal("zztopoqw4b1c9a7e2f3d4c5b6a7f8e9d", source.WorkspaceId);
+        Assert.Equal("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", source.TemplateId);
+    }
 }
