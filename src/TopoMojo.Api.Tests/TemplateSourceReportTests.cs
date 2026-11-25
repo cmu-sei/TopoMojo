@@ -205,6 +205,7 @@ public sealed class TemplateSourceReportTests
     [Theory]
     [InlineData("zz")]
     [InlineData("zztopoqw")]
+    [InlineData("zztopoqwgg")]
     public void AnImportedDashedIdWithATenantPrefixIsAWorkspace(string tenant)
     {
         // TransferService.UpdateTenant writes the tenant over the start of a dashed id

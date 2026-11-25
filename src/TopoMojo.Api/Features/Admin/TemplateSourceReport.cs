@@ -62,9 +62,17 @@ public class TemplateSourceReport
 
         string tenant = TenantOf(id);
 
-        return tenant.Length > 0
-            && tenant.Length < id.Length
-            && Guid.TryParse(string.Concat(new string('0', tenant.Length), id.AsSpan(tenant.Length)), out _);
+        if (tenant.Length == 0 || tenant.Length >= id.Length)
+            return false;
+
+        // put back a dash a long tenant wrote over, then check what's left is a guid
+        char[] guid = [.. new string('0', tenant.Length), .. id.AsSpan(tenant.Length)];
+        if (guid.Length == 36)
+            foreach (int i in (int[])[8, 13, 18, 23])
+                if (i < tenant.Length)
+                    guid[i] = '-';
+
+        return Guid.TryParse(guid, out _);
     }
 
     /// <summary>
