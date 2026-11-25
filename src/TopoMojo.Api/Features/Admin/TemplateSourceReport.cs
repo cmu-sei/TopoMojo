@@ -24,9 +24,13 @@ public class TemplateSourceReport
         public bool IsGlobal { get; set; }
         public string WorkspaceId { get; set; }
         /// <summary>
-        /// Owning workspace name, or "(deleted)" when the owning workspace or template is gone.
+        /// Owning workspace name, or "(deleted)" when the owning workspace is gone, or when the
+        /// source names only a template and that template is gone.
         /// </summary>
         public string WorkspaceName { get; set; }
+        /// <summary>
+        /// Template the source was copied for, or "(deleted)" when that template is gone.
+        /// </summary>
         public string TemplateName { get; set; }
         public DateTimeOffset? Created { get; set; }
         public DateTimeOffset? Modified { get; set; }
@@ -39,6 +43,14 @@ public class TemplateSourceReport
     /// </summary>
     public static string NormalizeId(string id)
         => Guid.TryParse(id, out Guid g) ? g.ToString("n") : null;
+
+    /// <summary>
+    /// The forms an id can be stored in: 32 hex digits, or dashed for ids from older versions and imports.
+    /// </summary>
+    public static IEnumerable<string> StoredForms(IEnumerable<string> normalizedIds)
+        => normalizedIds.SelectMany(id => Guid.TryParse(id, out Guid g)
+            ? new[] { g.ToString("n"), g.ToString("d") }
+            : []).Distinct();
 
     /// <summary>
     /// Files each source under its workspace. A template id outranks a folder, since a template
@@ -69,12 +81,17 @@ public class TemplateSourceReport
                 entry.TemplateName = template.Name;
                 workspaceId = NormalizeId(template.WorkspaceId);
             }
-            else if (templateId is not null && workspaceId is null)
+            else if (templateId is not null)
             {
                 // a copy whose template was deleted
-                entry.WorkspaceName = "(deleted)";
-                report.Sources.Add(entry);
-                continue;
+                entry.TemplateName = "(deleted)";
+
+                if (workspaceId is null)
+                {
+                    entry.WorkspaceName = "(deleted)";
+                    report.Sources.Add(entry);
+                    continue;
+                }
             }
 
             if (workspaceId is null || workspaceId == globalId)

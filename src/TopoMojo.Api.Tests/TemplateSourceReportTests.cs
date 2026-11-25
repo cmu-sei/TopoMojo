@@ -72,4 +72,48 @@ public sealed class TemplateSourceReportTests
         Assert.Equal("(deleted)", BuildOne(new TemplateSource { Name = gone, TemplateId = gone }).WorkspaceName);
         Assert.Equal("(deleted)", BuildOne(new TemplateSource { Name = "[ds] x/d.vmdk", WorkspaceId = gone }).WorkspaceName);
     }
+
+    [Fact]
+    public void ADiskWhoseTemplateIsGoneKeepsItsWorkspace()
+    {
+        var gone = Guid.NewGuid().ToString("n");
+
+        var entry = BuildOne(new TemplateSource { Name = "[ds] a/t_0.vmdk", WorkspaceId = WorkspaceId, TemplateId = gone });
+
+        Assert.Equal("Red Team Lab", entry.WorkspaceName);
+        Assert.Equal("(deleted)", entry.TemplateName);
+    }
+
+    [Fact]
+    public void ACopyWhoseTemplateIsGoneIsMarkedDeleted()
+    {
+        var gone = Guid.NewGuid().ToString("n");
+
+        var entry = BuildOne(new TemplateSource { Name = gone, TemplateId = gone });
+
+        Assert.Equal("(deleted)", entry.WorkspaceName);
+        Assert.Equal("(deleted)", entry.TemplateName);
+    }
+
+    [Fact]
+    public void DashedIdsResolveLikeHexIds()
+    {
+        var entry = BuildOne(new TemplateSource
+        {
+            Name = "[ds] a/t_0.vmdk",
+            WorkspaceId = Guid.Parse(WorkspaceId).ToString("d"),
+            TemplateId = Guid.Parse(TemplateId).ToString("d")
+        });
+
+        Assert.Equal("Red Team Lab", entry.WorkspaceName);
+        Assert.Equal("Kali Attacker", entry.TemplateName);
+    }
+
+    [Fact]
+    public void LookupsCoverBothStoredIdForms()
+    {
+        Assert.Equal(
+            new[] { WorkspaceId, Guid.Parse(WorkspaceId).ToString("d") },
+            TemplateSourceReport.StoredForms([WorkspaceId, WorkspaceId]));
+    }
 }

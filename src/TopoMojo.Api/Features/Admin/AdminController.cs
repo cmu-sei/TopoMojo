@@ -282,10 +282,16 @@ public class AdminController(
             .Where(id => id is not null)
             .Distinct()];
 
-        var templates = await templateStore.List()
-            .Where(t => templateIds.Contains(t.Id))
+        string[] templateLookup = [.. TemplateSourceReport.StoredForms(templateIds)];
+
+        var templates = (await templateStore.List()
+            .Where(t => templateLookup.Contains(t.Id))
             .Select(t => new { t.Id, t.Name, t.WorkspaceId })
-            .ToDictionaryAsync(t => t.Id, t => new TemplateSourceReport.TemplateRef(t.Name, t.WorkspaceId));
+            .ToListAsync())
+            .DistinctBy(t => TemplateSourceReport.NormalizeId(t.Id))
+            .ToDictionary(
+                t => TemplateSourceReport.NormalizeId(t.Id),
+                t => new TemplateSourceReport.TemplateRef(t.Name, t.WorkspaceId));
 
         string[] workspaceIds = [.. sources
             .Select(s => TemplateSourceReport.NormalizeId(s.WorkspaceId))
@@ -293,9 +299,14 @@ public class AdminController(
             .Where(id => id is not null)
             .Distinct()];
 
-        var workspaces = await workspaceStore.List()
-            .Where(w => workspaceIds.Contains(w.Id))
-            .ToDictionaryAsync(w => w.Id, w => w.Name);
+        string[] workspaceLookup = [.. TemplateSourceReport.StoredForms(workspaceIds)];
+
+        var workspaces = (await workspaceStore.List()
+            .Where(w => workspaceLookup.Contains(w.Id))
+            .Select(w => new { w.Id, w.Name })
+            .ToListAsync())
+            .DistinctBy(w => TemplateSourceReport.NormalizeId(w.Id))
+            .ToDictionary(w => TemplateSourceReport.NormalizeId(w.Id), w => w.Name);
 
         return Ok(TemplateSourceReport.Build(options, templates, workspaces));
     }
