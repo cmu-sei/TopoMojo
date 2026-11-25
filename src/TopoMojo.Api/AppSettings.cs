@@ -205,6 +205,9 @@ namespace TopoMojo.Api
         public int ReplicaLimit { get; set; } = 5;
         public bool AllowUnprivilegedVmReconfigure { get; set; }
         public bool AllowPrivilegedNetworkIsolationExemption { get; set; }
+
+        // shows admins the Disks tab: the disks or template vms a template can deploy from
+        public bool EnableTemplateSources { get; set; }
         public string DefaultUserScope { get; set; } = "everyone";
         public string GameEngineIsoFolder { get; set; } = "static";
         public string ConsoleHost { get; set; }

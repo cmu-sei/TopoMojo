@@ -60,6 +60,35 @@ namespace TopoMojo.Hypervisor
         public string[] Net { get; set; }
     }
 
+    public class TemplateSourceOptions
+    {
+        /// <summary>
+        /// Template Detail field the names go in: "disks" (a disk path) or "template" (a template vm).
+        /// </summary>
+        public string Field { get; set; }
+        public TemplateSource[] Sources { get; set; }
+    }
+
+    public class TemplateSource
+    {
+        /// <summary>
+        /// Value for the template Detail field.
+        /// </summary>
+        public string Name { get; set; }
+        /// <summary>
+        /// Workspace the source is filed under (a vSphere disk folder), if any.
+        /// </summary>
+        public string WorkspaceId { get; set; }
+        /// <summary>
+        /// Template the source was copied for (a localized vSphere disk or Proxmox template vm), if any.
+        /// </summary>
+        public string TemplateId { get; set; }
+        public DateTimeOffset? Created { get; set; }
+        public DateTimeOffset? Modified { get; set; }
+    }
+
+    public record DatastoreFile(string Path, DateTimeOffset? Modified);
+
     public class VmOperation
     {
         public string Id { get; set; }
