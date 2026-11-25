@@ -1,12 +1,11 @@
 // Copyright 2026 Carnegie Mellon University. All Rights Reserved.
 // Released under a 3 Clause BSD-style license. See LICENSE.md in the project root for license information.
 
-using System.Text.RegularExpressions;
 using TopoMojo.Hypervisor;
 
 namespace TopoMojo.Api.Controllers;
 
-public partial class TemplateSourceReport
+public class TemplateSourceReport
 {
     /// <summary>
     /// False when Core:EnableTemplateSources is off; the hypervisor isn't asked and Sources is empty.
@@ -41,15 +40,31 @@ public partial class TemplateSourceReport
 
     /// <summary>
     /// One key per id: a guid as 32 hex digits, whether it's stored that way or dashed (older
-    /// versions and imports). A workspace id with a Core:Tenant prefix ("zz" + hex, 32 in all)
-    /// isn't a guid and is kept as it is. Null for anything else.
+    /// versions and imports). A workspace id with a Core:Tenant prefix isn't a guid and is kept
+    /// as it is. Null for anything else.
     /// </summary>
     public static string NormalizeId(string id)
     {
         if (Guid.TryParse(id, out Guid g))
             return g.ToString("n");
 
-        return id is not null && TenantIdRegex().IsMatch(id) ? id : null;
+        return IsTenantId(id) ? id : null;
+    }
+
+    /// <summary>
+    /// A guid, plain or dashed, whose first characters are replaced by a tenant's letters (g-z),
+    /// as WorkspaceService makes ids and TransferService re-prefixes imported ones.
+    /// </summary>
+    private static bool IsTenantId(string id)
+    {
+        if (id is null || (id.Length != 32 && id.Length != 36))
+            return false;
+
+        string tenant = TenantOf(id);
+
+        return tenant.Length > 0
+            && tenant.Length < id.Length
+            && Guid.TryParse(string.Concat(new string('0', tenant.Length), id.AsSpan(tenant.Length)), out _);
     }
 
     /// <summary>
@@ -61,14 +76,12 @@ public partial class TemplateSourceReport
             : id is not null ? [id] : []).Distinct();
 
     /// <summary>
-    /// The Core:Tenant an id was made with: its leading letters that aren't hex digits, or "" for none.
+    /// The Core:Tenant an id was made with: its leading letters g-z (the letters that aren't hex
+    /// digits), or "" for none.
     /// </summary>
     public static string TenantOf(string id)
-        => new([.. id.ToLowerInvariant().TakeWhile(c => !Uri.IsHexDigit(c))]);
+        => new([.. id.ToLowerInvariant().TakeWhile(c => c >= 'g' && c <= 'z')]);
 
-    // a tenant is letters that aren't hex digits, in front of the hex part of the id
-    [GeneratedRegex("^(?=.{32}$)[g-z]+[0-9a-f]+$", RegexOptions.IgnoreCase)]
-    private static partial Regex TenantIdRegex();
 
     /// <summary>
     /// Files each source under its workspace. A template id outranks a folder, since a template
@@ -89,6 +102,12 @@ public partial class TemplateSourceReport
         string globalId = Guid.Empty.ToString("n");
         var report = new TemplateSourceReport { Field = options.Field };
 
+        bool IsOtherTenants(string workspaceId)
+            => workspaceId is not null
+            && workspaceId != globalId
+            && !workspaces.ContainsKey(workspaceId)
+            && TenantOf(workspaceId) != (tenant ?? "").ToLowerInvariant();
+
         foreach (var source in options.Sources ?? [])
         {
             var entry = new Entry
@@ -100,6 +119,11 @@ public partial class TemplateSourceReport
 
             string templateId = NormalizeId(source.TemplateId);
             string workspaceId = NormalizeId(source.WorkspaceId);
+
+            // a folder in another TopoMojo's workspace is theirs, even when its template id is
+            // also known here (an export imported into both keeps its template ids)
+            if (IsOtherTenants(workspaceId))
+                continue;
 
             if (templateId is not null && templates.TryGetValue(templateId, out TemplateRef template))
             {
@@ -127,7 +151,7 @@ public partial class TemplateSourceReport
             {
                 if (workspaces.TryGetValue(workspaceId, out string name))
                     entry.WorkspaceName = name;
-                else if (TenantOf(workspaceId) != (tenant ?? "").ToLowerInvariant())
+                else if (IsOtherTenants(workspaceId))
                     continue;
                 else
                     entry.WorkspaceName = "(deleted)";

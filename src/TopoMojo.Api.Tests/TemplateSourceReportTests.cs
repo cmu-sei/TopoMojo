@@ -182,4 +182,43 @@ public sealed class TemplateSourceReportTests
     {
         Assert.Equal(tenant, TemplateSourceReport.TenantOf(id));
     }
+
+    [Fact]
+    public void AnotherTenantsDiskStaysOutWhenItsTemplateIsKnownHere()
+    {
+        // the same export imported into both tenants keeps its template ids
+        string theirs = string.Concat("qq", Guid.NewGuid().ToString("n").AsSpan(2));
+
+        var report = TemplateSourceReport.Build(
+            new TemplateSourceOptions
+            {
+                Field = "disks",
+                Sources = [new TemplateSource { Name = "theirs", WorkspaceId = theirs, TemplateId = TemplateId }]
+            },
+            Templates,
+            Workspaces,
+            "zz");
+
+        Assert.Empty(report.Sources);
+    }
+
+    [Theory]
+    [InlineData("zz")]
+    [InlineData("zztopoqw")]
+    public void AnImportedDashedIdWithATenantPrefixIsAWorkspace(string tenant)
+    {
+        // TransferService.UpdateTenant writes the tenant over the start of a dashed id
+        string legacy = "67dade91-dd4c-4343-bf19-6bc7c7f9e48c";
+        string id = string.Concat(tenant, legacy.AsSpan(tenant.Length));
+        var workspaces = new Dictionary<string, string> { [id] = "Imported Lab" };
+
+        var entry = TemplateSourceReport.Build(
+            new TemplateSourceOptions { Field = "disks", Sources = [new TemplateSource { Name = "[ds] x/d.vmdk", WorkspaceId = id }] },
+            Templates,
+            workspaces,
+            tenant).Sources.Single();
+
+        Assert.Equal(id, TemplateSourceReport.NormalizeId(id));
+        Assert.Equal("Imported Lab", entry.WorkspaceName);
+    }
 }

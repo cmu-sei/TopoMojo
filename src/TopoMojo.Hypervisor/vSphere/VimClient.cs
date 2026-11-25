@@ -512,8 +512,18 @@ namespace TopoMojo.Hypervisor.vSphere
         /// Like GetFiles, with each file's last-modified time. Unlike GetFiles, a failed search
         /// throws instead of returning what it found so far, so callers can't mistake it for an empty folder.
         /// </summary>
-        public Task<List<DatastoreFile>> GetFilesWithModified(string path, bool recursive)
-            => SearchFiles(path, recursive, true, throwOnError: true);
+        public async Task<List<DatastoreFile>> GetFilesWithModified(string path, bool recursive)
+        {
+            try
+            {
+                return await SearchFiles(path, recursive, true, throwOnError: true);
+            }
+            catch (Exception ex) when (ex is not HypervisorException)
+            {
+                // e.g. vCenter going away after the connection opened
+                throw new HypervisorException("The datastore search failed.", ex.Message);
+            }
+        }
 
         private async Task<List<DatastoreFile>> SearchFiles(string path, bool recursive, bool withModified, bool throwOnError = false)
         {
@@ -521,7 +531,7 @@ namespace TopoMojo.Hypervisor.vSphere
 
             // Connect logs a failure and leaves no client, which would otherwise surface as a NullReferenceException
             if (throwOnError && _vim is null)
-                throw new HypervisorException($"TopoMojo can't connect to vSphere at {_config.Url}.");
+                throw new HypervisorException("TopoMojo can't connect to vSphere.", _config.Url);
             List<DatastoreFile> list = [];
             DatastorePath dsPath = new(path);
             string oldRoot = "";
@@ -580,6 +590,11 @@ namespace TopoMojo.Hypervisor.vSphere
                         }
                         catch (Exception ex)
                         {
+                            if (throwOnError)
+                                throw new HypervisorException(
+                                    $"The search of datastore {dsPath.Datastore} failed.",
+                                    $"vSAN folder mapping: {ex.Message}");
+
                             _logger.LogError(ex, "error processing vsan toplevel folder");
                         }
                     }
@@ -692,6 +707,11 @@ namespace TopoMojo.Hypervisor.vSphere
                     }
                     catch (Exception ex)
                     {
+                        if (throwOnError)
+                            throw new HypervisorException(
+                                $"The search of datastore {dsPath.Datastore} failed.",
+                                $"processing results: {ex.Message}");
+
                         _logger.LogError(ex, "error processing datastore search results.");
                     }
                 }

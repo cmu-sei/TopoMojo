@@ -43,11 +43,14 @@ public sealed class TemplateSourceLookupTests : IDisposable
         string dashed = Guid.NewGuid().ToString("d");
         string template = Guid.NewGuid().ToString("n");
         string otherTenant = WorkspaceId(tenant == "" ? "qq" : "");
+        // an import re-prefixed by TransferService.UpdateTenant
+        string imported = string.Concat(tenant, Guid.NewGuid().ToString("d").AsSpan(tenant.Length));
         string dashedTemplate = Guid.NewGuid().ToString("d");
 
         _db.Workspaces.AddRange(
             new Workspace { Id = current, Name = "Current" },
-            new Workspace { Id = dashed, Name = "Legacy" });
+            new Workspace { Id = dashed, Name = "Legacy" },
+            new Workspace { Id = imported, Name = "Imported" });
         _db.Templates.AddRange(
             new Template { Id = template, Name = "Kali", WorkspaceId = current },
             new Template { Id = dashedTemplate, Name = "Old Kali", WorkspaceId = dashed });
@@ -61,7 +64,8 @@ public sealed class TemplateSourceLookupTests : IDisposable
             // Proxmox: a copy made on unlink is named by its template id
             new TemplateSource { Name = "d", TemplateId = dashedTemplate },
             // another TopoMojo's workspace on the same hypervisor is left out
-            new TemplateSource { Name = "e", WorkspaceId = otherTenant });
+            new TemplateSource { Name = "e", WorkspaceId = otherTenant },
+            new TemplateSource { Name = "f", WorkspaceId = imported });
 
         var result = await TemplateSourcesSettingTests.Controller(
             new CoreOptions { EnableTemplateSources = true, Tenant = tenant },
@@ -69,7 +73,7 @@ public sealed class TemplateSourceLookupTests : IDisposable
 
         var report = Assert.IsType<TemplateSourceReport>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.Equal(
-            new[] { "a Current ", "b Legacy ", "c Current Kali", "d Legacy Old Kali" },
+            new[] { "a Current ", "b Legacy ", "c Current Kali", "d Legacy Old Kali", "f Imported " },
             report.Sources.Select(s => $"{s.Name} {s.WorkspaceName} {s.TemplateName}"));
         Assert.All(report.Sources, s => Assert.False(s.IsGlobal));
     }
